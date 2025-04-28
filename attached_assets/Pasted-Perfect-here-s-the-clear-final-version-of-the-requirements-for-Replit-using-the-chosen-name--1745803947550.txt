@@ -1,0 +1,173 @@
+Perfect — here’s the **clear, final version** of the requirements for Replit, using the chosen name **ClearCheck** ✅.
+
+---
+
+# 📋 ClearCheck – Replit MVP Requirements
+
+---
+
+## 🏷️ Name
+> **ClearCheck**  
+
+Simple, powerful, memorable — fits service businesses, Airbnb cleaning, property managers, contractors, etc.
+
+---
+
+## 🎨 Logo Suggestion
+- **Icon**:  
+  A **clipboard** with a **checkmark** inside it 📋✔️  
+  OR a **camera lens** blended into a checkmark 📸✔️
+  
+- **Style**:  
+  - Minimalist, flat design
+  - Strong outline or two-tone color (Blue + White)
+  - Rounded, mobile-app friendly look
+
+- **Colors**:
+  - Primary Blue: `#4F8FF7`
+  - White: `#FFFFFF`
+  - Light Gray accents: `#F1F5F9`
+
+**Example Visual Vibe**:  
+(Think something like a hybrid of ✅✔️📋📸 symbols in clean vector format.)
+
+---
+
+## 🧹 What ClearCheck Will Do (MVP Scope)
+
+**For Property Owners (Admin)**:
+- Create checklists easily
+- Edit existing tasks (add/delete/require photo)
+- Send a link to the cleaner (no login for cleaner needed)
+- See real-time progress on tasks
+- See uploaded photos attached to tasks
+- Download or view full checklist+photos after completion
+
+**For Cleaners (Guest Link View)**:
+- Open link from phone (no app download)
+- See a checklist of tasks
+- Tap to check a task as complete (saved immediately)
+- Upload/take photo for a task (if required)
+- Add optional remarks at end
+- Submit when finished (status changes for owner)
+
+---
+
+## 📱 Mobile-First UX Focus
+- Must load in under **1.5 seconds** on 4G.
+- Big tap targets (easy checkmark taps and upload buttons).
+- Instant visual feedback after checking a task.
+- Smooth photo upload experience (either from camera or device gallery).
+
+---
+
+## 🔥 Core Functional Features
+
+| Feature | Details |
+|:---|:---|
+| Owner Dashboard | Create/Edit Checklists, View Real-time Progress |
+| Checklist Management | Add/Edit/Delete tasks, Require/Optional Photo toggle |
+| Checklist Link Generation | Create unique links tied to each checklist |
+| Cleaner Link View | Mobile checklist view with checkboxes, photo upload, remarks |
+| Real-time Updates | Changes show on Owner dashboard within 5–10 seconds |
+| Offline Mode (Stretch Goal) | Allow checklist caching locally, auto-sync later if disconnected |
+| Report View/Export | After submission, allow viewing or downloading of completed checklist + photos |
+
+---
+
+## 🛠️ Tech Stack and Structure
+
+**Frontend**:  
+- React.js (Vite or Create React App)  
+- Tailwind CSS for fast mobile-first styling  
+- React Router for handling `/admin` and `/checklist/:id`
+
+**Backend**:
+- Firebase Firestore (for real-time checklist data)
+- Firebase Storage (for uploaded task photos)
+
+**Hosting**:
+- Replit first (easy preview & instant mobile testing)
+- Later can migrate to Vercel for custom domains if desired
+
+**Folder Structure:**
+```
+/src
+  /components
+    AdminDashboard.jsx
+    ChecklistView.jsx
+    TaskItem.jsx
+    ChecklistEditor.jsx
+  /services
+    firebase.js
+    checklistService.js
+App.js
+index.js
+/public
+  index.html
+  logo.svg
+```
+
+**Firestore DB structure**:
+```
+/checklists
+  /[checklistId]
+    ownerId: [owner's id]
+    tasks: [
+      {
+        taskId,
+        description,
+        completed (bool),
+        photoRequired (bool),
+        photoUrl (string, optional)
+      }
+    ]
+    remarks: (string)
+    createdAt: timestamp
+    updatedAt: timestamp
+```
+
+**Storage Path**:
+```
+/photos/[checklistId]/[taskId]/photo.jpg
+```
+
+---
+
+## 🎯 Success Criteria for MVP
+- Property owner can create, edit, and send checklists easily.
+- Cleaner can open link without downloading anything.
+- Real-time (or near-real-time) progress shows on Owner dashboard.
+- Photo proof uploads for required tasks.
+- MVP ready to demo on Replit without critical bugs.
+
+---
+
+# 🚀 MVP Build Flow on Replit
+1. Set up **React + TailwindCSS** template.
+2. Connect **Firebase Firestore and Storage** (minimal config).
+3. Build **Admin Dashboard** (create checklist, edit tasks).
+4. Build **Cleaner Link View** (live checklist progress).
+5. Implement **photo uploads** attached to checklist tasks.
+6. (Optional) Enable **offline persistence** if simple.
+7. Deploy MVP for real-world testing.
+
+---
+
+# ✅ Ready To Go?
+
+**Next Steps I can provide:**
+- Starter Replit code (I’ll scaffold it cleanly)
+- Sketch a sample mobile view for **Cleaner checklist**
+- Sketch a sample **Admin checklist management page**
+- Create the initial **logo (svg) for ClearCheck** if you want a quick brand asset!
+
+---
+
+**Quick confirmation**:  
+✅ Final Name = ClearCheck  
+✅ Final Logo = Clipboard/Checkmark/Camera hybrid logo  
+✅ Goal = Replit MVP mobile-first app with Firebase backend
+
+👉 **Confirm** and I'll immediately start preparing the starter code and sketches for you! 🚀  
+(We could have something working in just a few hours!)
