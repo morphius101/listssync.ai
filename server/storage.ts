@@ -1,4 +1,7 @@
-import { ChecklistDTO, TaskDTO, ChecklistSummaryDTO } from "@shared/schema";
+import { ChecklistDTO, TaskDTO, ChecklistSummaryDTO, checklists, tasks } from "@shared/schema";
+import { db } from "./db";
+import { eq, and } from "drizzle-orm";
+import { v4 as uuidv4 } from "uuid";
 
 export interface IStorage {
   getAllChecklists(): Promise<ChecklistSummaryDTO[]>;
@@ -9,77 +12,126 @@ export interface IStorage {
   updateTask(checklistId: string, taskId: string, updates: Partial<TaskDTO>): Promise<TaskDTO | undefined>;
 }
 
-export class MemStorage implements IStorage {
-  private checklists: Map<string, ChecklistDTO>;
-
-  constructor() {
-    this.checklists = new Map();
-  }
-
+export class DatabaseStorage implements IStorage {
   async getAllChecklists(): Promise<ChecklistSummaryDTO[]> {
-    return Array.from(this.checklists.values()).map(checklist => ({
-      id: checklist.id,
-      name: checklist.name,
-      status: checklist.status,
-      progress: checklist.progress,
-      taskCount: checklist.tasks.length,
-      createdAt: checklist.createdAt,
-      updatedAt: checklist.updatedAt
-    }));
+    const dbChecklists = await db.select().from(checklists);
+    
+    return dbChecklists.map(checklist => {
+      const tasksData = checklist.tasksData as TaskDTO[] || [];
+      
+      return {
+        id: checklist.id.toString(),
+        name: checklist.name,
+        status: checklist.status as 'not-started' | 'in-progress' | 'completed',
+        progress: checklist.progress,
+        taskCount: tasksData.length,
+        createdAt: checklist.createdAt,
+        updatedAt: checklist.updatedAt
+      };
+    });
   }
 
   async getChecklistById(id: string): Promise<ChecklistDTO | undefined> {
-    return this.checklists.get(id);
+    const [dbChecklist] = await db.select().from(checklists).where(eq(checklists.id, parseInt(id)));
+    
+    if (!dbChecklist) {
+      return undefined;
+    }
+    
+    const tasksData = dbChecklist.tasksData as TaskDTO[] || [];
+    
+    return {
+      id: dbChecklist.id.toString(),
+      name: dbChecklist.name,
+      status: dbChecklist.status as 'not-started' | 'in-progress' | 'completed',
+      progress: dbChecklist.progress,
+      tasks: tasksData,
+      remarks: dbChecklist.remarks || "",
+      createdAt: dbChecklist.createdAt,
+      updatedAt: dbChecklist.updatedAt
+    };
   }
 
   async createChecklist(checklist: ChecklistDTO): Promise<ChecklistSummaryDTO> {
-    // Ensure ID is created if not provided
-    if (!checklist.id) {
-      checklist.id = `checklist_${Date.now()}`;
-    }
+    // Format tasks for storage as JSON
+    const tasksWithIds = checklist.tasks.map(task => 
+      task.id ? task : { ...task, id: uuidv4() }
+    );
     
-    // Set timestamps
-    const now = new Date();
-    checklist.createdAt = now;
-    checklist.updatedAt = now;
-    
-    // Store in memory
-    this.checklists.set(checklist.id, { ...checklist });
-    
-    // Return summary
-    return {
-      id: checklist.id,
+    // Insert the checklist
+    const [insertedChecklist] = await db.insert(checklists).values({
       name: checklist.name,
       status: checklist.status,
       progress: checklist.progress,
-      taskCount: checklist.tasks.length,
-      createdAt: checklist.createdAt,
-      updatedAt: checklist.updatedAt
+      remarks: checklist.remarks || "",
+      tasksData: tasksWithIds
+    }).returning();
+    
+    // Return the checklist summary
+    return {
+      id: insertedChecklist.id.toString(),
+      name: insertedChecklist.name,
+      status: insertedChecklist.status as 'not-started' | 'in-progress' | 'completed',
+      progress: insertedChecklist.progress,
+      taskCount: tasksWithIds.length,
+      createdAt: insertedChecklist.createdAt,
+      updatedAt: insertedChecklist.updatedAt
     };
   }
 
   async updateChecklist(checklist: ChecklistDTO): Promise<ChecklistDTO | undefined> {
+    const checklistId = parseInt(checklist.id);
+    
     // Check if checklist exists
-    if (!this.checklists.has(checklist.id)) {
+    const existingChecklist = await this.getChecklistById(checklist.id);
+    if (!existingChecklist) {
       return undefined;
     }
     
-    // Update timestamp
-    checklist.updatedAt = new Date();
+    // Update the checklist
+    const [updatedChecklist] = await db.update(checklists)
+      .set({
+        name: checklist.name,
+        status: checklist.status,
+        progress: checklist.progress,
+        remarks: checklist.remarks,
+        tasksData: checklist.tasks,
+        updatedAt: new Date()
+      })
+      .where(eq(checklists.id, checklistId))
+      .returning();
     
-    // Update in storage
-    this.checklists.set(checklist.id, { ...checklist });
+    if (!updatedChecklist) {
+      return undefined;
+    }
     
-    return checklist;
+    const tasksData = updatedChecklist.tasksData as TaskDTO[] || [];
+    
+    return {
+      id: updatedChecklist.id.toString(),
+      name: updatedChecklist.name,
+      status: updatedChecklist.status as 'not-started' | 'in-progress' | 'completed',
+      progress: updatedChecklist.progress,
+      tasks: tasksData,
+      remarks: updatedChecklist.remarks || "",
+      createdAt: updatedChecklist.createdAt,
+      updatedAt: updatedChecklist.updatedAt
+    };
   }
 
   async deleteChecklist(id: string): Promise<boolean> {
-    return this.checklists.delete(id);
+    try {
+      await db.delete(checklists).where(eq(checklists.id, parseInt(id)));
+      return true;
+    } catch (error) {
+      console.error("Error deleting checklist:", error);
+      return false;
+    }
   }
 
   async updateTask(checklistId: string, taskId: string, updates: Partial<TaskDTO>): Promise<TaskDTO | undefined> {
     // Get the checklist
-    const checklist = this.checklists.get(checklistId);
+    const checklist = await this.getChecklistById(checklistId);
     if (!checklist) {
       return undefined;
     }
@@ -111,10 +163,11 @@ export class MemStorage implements IStorage {
     checklist.updatedAt = new Date();
     
     // Save changes
-    this.checklists.set(checklistId, checklist);
+    await this.updateChecklist(checklist);
     
     return updatedTask;
   }
 }
 
-export const storage = new MemStorage();
+// Use the new DatabaseStorage
+export const storage = new DatabaseStorage();
