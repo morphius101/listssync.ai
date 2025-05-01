@@ -1,6 +1,6 @@
 {
-  "name": "ListSync.ai",
-  "short_name": "ListSync",
+  "name": "ListsSync.ai",
+  "short_name": "ListsSync",
   "description": "Real-time checklists with instant photo proof — no app downloads, no confusion. Just clarity across teams.",
   "start_url": "/",
   "display": "standalone",

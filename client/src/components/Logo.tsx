@@ -30,7 +30,7 @@ const Logo = ({ size = 'md' }: LogoProps) => {
         <Check className={`${sizes[size].icon} text-white relative ml-1 mt-1`} />
       </div>
       <div className={`${sizes[size].text} font-bold`}>
-        <span className="text-primary">List</span>
+        <span className="text-primary">Lists</span>
         <span className="text-gray-800">Sync</span>
         <span className="text-primary">.ai</span>
       </div>

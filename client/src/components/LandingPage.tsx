@@ -54,7 +54,7 @@ const LandingPage = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
             <h2 className="text-2xl font-extrabold text-gray-900 sm:text-3xl">
-              Why teams choose ListSync.ai
+              Why teams choose ListsSync.ai
             </h2>
             <p className="mt-3 max-w-2xl mx-auto text-gray-500 sm:mt-4">
               Built for the way real teams work in the field

@@ -36,7 +36,7 @@ function App() {
     }
     
     // Set page title
-    document.title = 'ListSync.ai - Real-time Checklists with Photo Proof';
+    document.title = 'ListsSync.ai - Real-time Checklists with Photo Proof';
   }, []);
 
   // Don't show header on landing page
