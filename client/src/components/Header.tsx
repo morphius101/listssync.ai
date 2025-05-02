@@ -12,16 +12,49 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
+import { signInWithGoogle, signOutUser } from "../lib/firebase";
+import { useState } from "react";
+import { toast } from "@/hooks/use-toast";
 
 const Header = () => {
   const { user, isAuthenticated } = useAuth();
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
   
-  const handleLogin = () => {
-    window.location.href = "/api/login";
+  const handleLogin = async () => {
+    try {
+      setIsLoggingIn(true);
+      await signInWithGoogle();
+      toast({
+        title: "Success",
+        description: "You have been logged in successfully",
+      });
+    } catch (error) {
+      console.error("Login error:", error);
+      toast({
+        variant: "destructive",
+        title: "Login failed",
+        description: "There was a problem logging in. Please try again.",
+      });
+    } finally {
+      setIsLoggingIn(false);
+    }
   };
   
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
+  const handleLogout = async () => {
+    try {
+      await signOutUser();
+      toast({
+        title: "Logged out",
+        description: "You have been logged out successfully",
+      });
+    } catch (error) {
+      console.error("Logout error:", error);
+      toast({
+        variant: "destructive",
+        title: "Logout failed",
+        description: "There was a problem logging out. Please try again.",
+      });
+    }
   };
   
   return (

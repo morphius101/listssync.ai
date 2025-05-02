@@ -1,6 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, getDocs, query, where, onSnapshot, Timestamp, addDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -30,6 +31,18 @@ export function getFirebase() {
     return initializeFirebase();
   }
   return { app, db, storage };
+}
+
+// Auth helper functions
+export function signInWithGoogle() {
+  const auth = getAuth();
+  const provider = new GoogleAuthProvider();
+  return signInWithPopup(auth, provider);
+}
+
+export function signOutUser() {
+  const auth = getAuth();
+  return signOut(auth);
 }
 
 export {

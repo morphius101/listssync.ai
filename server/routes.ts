@@ -62,6 +62,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add createdAt and updatedAt timestamps since they're required by ChecklistDTO
       const checklistData = {
         ...validatedData,
+        remarks: validatedData.remarks || "",
         createdAt: new Date(),
         updatedAt: new Date()
       };
@@ -94,6 +95,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Add timestamps and preserve userId
       const checklistData = {
         ...validatedData,
+        remarks: validatedData.remarks || "",
         updatedAt: new Date(),
         createdAt: existingChecklist.createdAt,
         userId: existingChecklist.userId
