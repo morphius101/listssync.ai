@@ -2,12 +2,8 @@ import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { z } from "zod";
-import { setupAuth, isAuthenticated } from "./replitAuth";
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup Replit Auth
-  await setupAuth(app);
-  
   // API base path
   const API_BASE = "/api";
 
@@ -31,23 +27,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     remarks: z.string().optional(),
     userId: z.string().optional(),
   });
-  
-  // Add user endpoint to get current user info
-  app.get(`${API_BASE}/auth/user`, isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const user = await storage.getUser(userId);
-      res.json(user);
-    } catch (error) {
-      console.error("Error fetching user:", error);
-      res.status(500).json({ message: "Failed to fetch user" });
-    }
-  });
 
-  // Get all checklists (protected route)
-  app.get(`${API_BASE}/checklists`, isAuthenticated, async (req: any, res) => {
+  // Get all checklists
+  app.get(`${API_BASE}/checklists`, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.query.userId as string | undefined;
       const checklists = await storage.getAllChecklists(userId);
       res.json(checklists);
     } catch (error: any) {
@@ -55,19 +39,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get checklist by ID (protected route)
-  app.get(`${API_BASE}/checklists/:id`, isAuthenticated, async (req: any, res) => {
+  // Get checklist by ID
+  app.get(`${API_BASE}/checklists/:id`, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
       const checklist = await storage.getChecklistById(req.params.id);
       
       if (!checklist) {
         return res.status(404).json({ message: "Checklist not found" });
-      }
-      
-      // Only allow access to user's own checklists or shared checklists
-      if (checklist.userId && checklist.userId !== userId) {
-        return res.status(403).json({ message: "You don't have permission to access this checklist" });
       }
       
       res.json(checklist);
@@ -76,14 +54,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create new checklist (protected route)
-  app.post(`${API_BASE}/checklists`, isAuthenticated, async (req: any, res) => {
+  // Create new checklist
+  app.post(`${API_BASE}/checklists`, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      const validatedData = checklistSchema.parse({
-        ...req.body,
-        userId // Associate checklist with current user
-      });
+      const validatedData = checklistSchema.parse(req.body);
       
       // Add createdAt and updatedAt timestamps since they're required by ChecklistDTO
       const checklistData = {
@@ -102,20 +76,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update checklist (protected route)
-  app.put(`${API_BASE}/checklists/:id`, isAuthenticated, async (req: any, res) => {
+  // Update checklist
+  app.put(`${API_BASE}/checklists/:id`, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      
-      // Check if the checklist belongs to the current user
+      // Check if checklist exists
       const existingChecklist = await storage.getChecklistById(req.params.id);
       if (!existingChecklist) {
         return res.status(404).json({ message: "Checklist not found" });
-      }
-      
-      // Check ownership
-      if (existingChecklist.userId && existingChecklist.userId !== userId) {
-        return res.status(403).json({ message: "You don't have permission to update this checklist" });
       }
       
       const validatedData = checklistSchema.parse(req.body);
@@ -147,20 +114,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Delete checklist (protected route)
-  app.delete(`${API_BASE}/checklists/:id`, isAuthenticated, async (req: any, res) => {
+  // Delete checklist
+  app.delete(`${API_BASE}/checklists/:id`, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
-      
-      // Check if the checklist belongs to the current user
+      // Check if checklist exists
       const existingChecklist = await storage.getChecklistById(req.params.id);
       if (!existingChecklist) {
         return res.status(404).json({ message: "Checklist not found" });
-      }
-      
-      // Check ownership
-      if (existingChecklist.userId && existingChecklist.userId !== userId) {
-        return res.status(403).json({ message: "You don't have permission to delete this checklist" });
       }
       
       const success = await storage.deleteChecklist(req.params.id);
@@ -175,21 +135,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Update task status (protected route)
-  app.patch(`${API_BASE}/checklists/:checklistId/tasks/:taskId`, isAuthenticated, async (req: any, res) => {
+  // Update task status
+  app.patch(`${API_BASE}/checklists/:checklistId/tasks/:taskId`, async (req, res) => {
     try {
-      const userId = req.user.claims.sub;
       const { checklistId, taskId } = req.params;
       
-      // Check if the checklist belongs to the current user
+      // Check if checklist exists
       const existingChecklist = await storage.getChecklistById(checklistId);
       if (!existingChecklist) {
         return res.status(404).json({ message: "Checklist not found" });
-      }
-      
-      // Check ownership
-      if (existingChecklist.userId && existingChecklist.userId !== userId) {
-        return res.status(403).json({ message: "You don't have permission to update this checklist" });
       }
       
       const updates = req.body;

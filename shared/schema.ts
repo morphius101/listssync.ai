@@ -1,30 +1,6 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, varchar, index } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
-
-// Session storage table for Replit Auth
-export const sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull(),
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)],
-);
-
-// User storage table for Replit Auth
-export const users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(),
-  username: varchar("username").unique().notNull(),
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  bio: text("bio"),
-  profileImageUrl: varchar("profile_image_url"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-});
 
 // Task Schema
 export const tasks = pgTable("tasks", {
@@ -49,7 +25,7 @@ export const checklists = pgTable("checklists", {
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
   tasksData: jsonb("tasks_data"), // Store tasks as JSON for Firebase compatibility
   shareToken: text("share_token"),
-  userId: varchar("user_id").references(() => users.id),
+  userId: text("user_id"), // Firebase user ID
 });
 
 // Insert Schemas
@@ -62,10 +38,6 @@ export const insertChecklistSchema = createInsertSchema(checklists).omit({
   createdAt: true,
   updatedAt: true,
 });
-
-// Types
-export type UpsertUser = typeof users.$inferInsert;
-export type User = typeof users.$inferSelect;
 
 export type InsertTask = z.infer<typeof insertTaskSchema>;
 export type Task = typeof tasks.$inferSelect;

@@ -1,23 +1,9 @@
-import { 
-  ChecklistDTO, 
-  TaskDTO, 
-  ChecklistSummaryDTO, 
-  checklists, 
-  tasks, 
-  users,
-  User,
-  UpsertUser
-} from "@shared/schema";
+import { ChecklistDTO, TaskDTO, ChecklistSummaryDTO, checklists, tasks } from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 
 export interface IStorage {
-  // User operations for Replit Auth
-  getUser(id: string): Promise<User | undefined>;
-  upsertUser(user: UpsertUser): Promise<User>;
-  
-  // Checklist operations
   getAllChecklists(userId?: string): Promise<ChecklistSummaryDTO[]>;
   getChecklistById(id: string): Promise<ChecklistDTO | undefined>;
   createChecklist(checklist: ChecklistDTO): Promise<ChecklistSummaryDTO>;
@@ -27,26 +13,6 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  // User operations for Replit Auth
-  async getUser(id: string): Promise<User | undefined> {
-    const [user] = await db.select().from(users).where(eq(users.id, id));
-    return user;
-  }
-
-  async upsertUser(userData: UpsertUser): Promise<User> {
-    const [user] = await db
-      .insert(users)
-      .values(userData)
-      .onConflictDoUpdate({
-        target: users.id,
-        set: {
-          ...userData,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-    return user;
-  }
 
   async getAllChecklists(userId?: string): Promise<ChecklistSummaryDTO[]> {
     // Base query
