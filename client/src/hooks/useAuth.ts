@@ -1,22 +1,18 @@
-import { useEffect, useState } from "react";
-import { getAuth, onAuthStateChanged, User as FirebaseUser } from "firebase/auth";
-import { initializeFirebase } from "@/lib/firebase";
-
-// Initialize Firebase
-initializeFirebase();
+import { useState, useEffect } from 'react';
+import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
 
 export function useAuth() {
-  const [user, setUser] = useState<FirebaseUser | null>(null);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-      setUser(firebaseUser);
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
       setIsLoading(false);
     });
 
-    // Cleanup subscription
+    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, []);
 

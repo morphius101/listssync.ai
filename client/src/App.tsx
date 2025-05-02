@@ -8,6 +8,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import ChecklistView from "@/pages/ChecklistView";
 import Header from "@/components/Header";
 import LandingPage from "@/components/LandingPage";
+import ProtectedRoute from "@/components/ProtectedRoute";
 import { useEffect } from "react";
 import { initializeFirebase } from "./lib/firebase";
 
@@ -18,8 +19,20 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
-      <Route path="/dashboard" component={AdminDashboard} />
-      <Route path="/checklist/:id" component={ChecklistView} />
+      <Route path="/dashboard">
+        {() => (
+          <ProtectedRoute>
+            <AdminDashboard />
+          </ProtectedRoute>
+        )}
+      </Route>
+      <Route path="/checklist/:id">
+        {(params) => (
+          <ProtectedRoute>
+            <ChecklistView id={params.id} />
+          </ProtectedRoute>
+        )}
+      </Route>
       <Route component={NotFound} />
     </Switch>
   );

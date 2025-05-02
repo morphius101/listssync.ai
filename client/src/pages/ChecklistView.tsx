@@ -10,7 +10,11 @@ import { getChecklistById, updateTaskStatus, updateChecklist } from "@/services/
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Loader2 } from "lucide-react";
 
-const ChecklistView = () => {
+interface ChecklistViewProps {
+  id?: string;
+}
+
+const ChecklistView = ({ id: propId }: ChecklistViewProps) => {
   const [match, params] = useRoute("/checklist/:id");
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [remarks, setRemarks] = useState("");
@@ -20,10 +24,11 @@ const ChecklistView = () => {
   const { toast } = useToast();
 
   useEffect(() => {
-    if (params?.id) {
-      loadChecklist(params.id);
+    const checklistId = propId || params?.id;
+    if (checklistId) {
+      loadChecklist(checklistId);
     }
-  }, [params?.id]);
+  }, [propId, params?.id]);
 
   const loadChecklist = async (id: string) => {
     setIsLoading(true);
