@@ -1,10 +1,24 @@
-import { ChecklistDTO, TaskDTO, ChecklistSummaryDTO, checklists, tasks } from "@shared/schema";
+import { 
+  ChecklistDTO, 
+  TaskDTO, 
+  ChecklistSummaryDTO, 
+  checklists, 
+  tasks, 
+  users,
+  User,
+  UpsertUser
+} from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 
 export interface IStorage {
-  getAllChecklists(): Promise<ChecklistSummaryDTO[]>;
+  // User operations for Replit Auth
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
+  
+  // Checklist operations
+  getAllChecklists(userId?: string): Promise<ChecklistSummaryDTO[]>;
   getChecklistById(id: string): Promise<ChecklistDTO | undefined>;
   createChecklist(checklist: ChecklistDTO): Promise<ChecklistSummaryDTO>;
   updateChecklist(checklist: ChecklistDTO): Promise<ChecklistDTO | undefined>;
