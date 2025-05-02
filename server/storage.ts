@@ -27,8 +27,37 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
-  async getAllChecklists(): Promise<ChecklistSummaryDTO[]> {
-    const dbChecklists = await db.select().from(checklists);
+  // User operations for Replit Auth
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
+  }
+
+  async getAllChecklists(userId?: string): Promise<ChecklistSummaryDTO[]> {
+    // Base query
+    let dbChecklists;
+    
+    // If userId is provided, filter checklists by user
+    if (userId) {
+      dbChecklists = await db.select().from(checklists).where(eq(checklists.userId, userId));
+    } else {
+      dbChecklists = await db.select().from(checklists);
+    }
     
     return dbChecklists.map(checklist => {
       const tasksData = checklist.tasksData as TaskDTO[] || [];
@@ -62,7 +91,8 @@ export class DatabaseStorage implements IStorage {
       tasks: tasksData,
       remarks: dbChecklist.remarks || "",
       createdAt: dbChecklist.createdAt,
-      updatedAt: dbChecklist.updatedAt
+      updatedAt: dbChecklist.updatedAt,
+      userId: dbChecklist.userId ? dbChecklist.userId.toString() : undefined
     };
   }
 
@@ -78,7 +108,8 @@ export class DatabaseStorage implements IStorage {
       status: checklist.status,
       progress: checklist.progress,
       remarks: checklist.remarks || "",
-      tasksData: tasksWithIds
+      tasksData: tasksWithIds,
+      userId: checklist.userId
     }).returning();
     
     // Return the checklist summary
@@ -129,7 +160,8 @@ export class DatabaseStorage implements IStorage {
       tasks: tasksData,
       remarks: updatedChecklist.remarks || "",
       createdAt: updatedChecklist.createdAt,
-      updatedAt: updatedChecklist.updatedAt
+      updatedAt: updatedChecklist.updatedAt,
+      userId: updatedChecklist.userId ? updatedChecklist.userId.toString() : undefined
     };
   }
 
