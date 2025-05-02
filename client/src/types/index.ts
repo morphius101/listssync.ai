@@ -16,6 +16,7 @@ export interface Checklist {
   createdAt: Date;
   updatedAt: Date;
   remarks: string;
+  userId?: string | null;
 }
 
 export interface ChecklistSummary {
@@ -26,4 +27,5 @@ export interface ChecklistSummary {
   taskCount: number;
   createdAt: Date | any; // Support for Firestore Timestamp
   updatedAt: Date | any; // Support for Firestore Timestamp
+  userId?: string | null;
 }

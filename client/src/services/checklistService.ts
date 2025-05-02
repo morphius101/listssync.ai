@@ -1,5 +1,6 @@
 import { Checklist, ChecklistSummary, Task } from "@/types";
 import { getFirebase, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, getDocs, query, where, onSnapshot, Timestamp, addDoc, ref } from "@/lib/firebase";
+import { getAuth } from "firebase/auth";
 
 const CHECKLIST_COLLECTION = "checklists";
 
@@ -14,15 +15,30 @@ const convertFirestoreData = (data: any, id?: string): Checklist => {
     createdAt: data.createdAt?.toDate() || new Date(),
     updatedAt: data.updatedAt?.toDate() || new Date(),
     remarks: data.remarks || "",
+    userId: data.userId || null
   };
 };
 
-// Get all checklists
+// Get all checklists (optionally filtered by current user)
 export const getChecklists = async (): Promise<ChecklistSummary[]> => {
   const { db } = getFirebase();
-  const checklistsCollection = collection(db, CHECKLIST_COLLECTION);
+  const auth = getAuth();
+  const userId = auth.currentUser?.uid;
   
-  const snapshot = await getDocs(checklistsCollection);
+  let checklistsQuery;
+  
+  if (userId) {
+    // Get only user's checklists if logged in
+    checklistsQuery = query(
+      collection(db, CHECKLIST_COLLECTION),
+      where("userId", "==", userId)
+    );
+  } else {
+    // Get all checklists if no user is logged in (for demo purposes)
+    checklistsQuery = collection(db, CHECKLIST_COLLECTION);
+  }
+  
+  const snapshot = await getDocs(checklistsQuery);
   return snapshot.docs.map(doc => {
     const data = doc.data();
     return {
@@ -33,6 +49,7 @@ export const getChecklists = async (): Promise<ChecklistSummary[]> => {
       taskCount: (data.tasks || []).length,
       createdAt: data.createdAt?.toDate() || new Date(),
       updatedAt: data.updatedAt?.toDate() || new Date(),
+      userId: data.userId || null,
     };
   });
 };
@@ -53,14 +70,17 @@ export const getChecklistById = async (id: string): Promise<Checklist> => {
 // Create new checklist
 export const createChecklist = async (checklist: Checklist): Promise<ChecklistSummary> => {
   const { db } = getFirebase();
+  const auth = getAuth();
+  const userId = auth.currentUser?.uid;
   
   // Create a sanitized version for Firestore
   const { id, ...checklistData } = checklist;
   
-  // Add timestamps
+  // Add timestamps and user ID
   const now = new Date();
   const data = {
     ...checklistData,
+    userId: userId || null, // Associate with current user if logged in
     createdAt: Timestamp.fromDate(now),
     updatedAt: Timestamp.fromDate(now),
   };
@@ -77,6 +97,7 @@ export const createChecklist = async (checklist: Checklist): Promise<ChecklistSu
     taskCount: checklist.tasks.length,
     createdAt: now,
     updatedAt: now,
+    userId: userId || null,
   };
 };
 
