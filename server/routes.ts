@@ -237,9 +237,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Verification system routes
   app.post(`${API_BASE}/verification/send`, async (req, res) => {
     try {
+      // Log the entire request body for debugging
+      console.log('verification/send raw request body:', req.body);
+      console.log('verification/send request headers:', req.headers);
+      
       let { recipientId, email, phone, checklistId, recipientName } = req.body;
       
-      console.log('verification/send request received:', { 
+      console.log('verification/send parsed fields:', { 
         recipientId, 
         email, 
         phone, 

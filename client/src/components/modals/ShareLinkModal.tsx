@@ -182,7 +182,42 @@ export default function ShareLinkModal({
       // Log the complete parameters before making the API call
       console.log('Sharing checklist with params:', params);
       
-      // Send the API request
+      // Try a direct fetch call to diagnose the issue
+      try {
+        console.log('Making direct fetch call with params:', params);
+        
+        const directResponse = await fetch('/api/verification/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(params),
+          credentials: 'include'
+        });
+        
+        console.log('Direct fetch response status:', directResponse.status);
+        
+        if (directResponse.ok) {
+          const data = await directResponse.json();
+          console.log('Direct fetch success with data:', data);
+          
+          if (data.shareUrl) {
+            setShareLink(data.shareUrl);
+            setResponse(data);
+            return;
+          }
+        } else {
+          console.error('Direct fetch failed with status:', directResponse.status);
+          const errorText = await directResponse.text();
+          console.error('Error details:', errorText);
+          throw new Error(`API error: ${directResponse.status} - ${errorText}`);
+        }
+      } catch (directError) {
+        console.error('Direct fetch error:', directError);
+      }
+      
+      // If direct fetch failed or returned no data, fall back to the hook
+      console.log('Falling back to the shareChecklist hook');
       const response = await shareChecklist(params);
       
       if (response?.shareUrl) {

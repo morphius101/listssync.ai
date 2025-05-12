@@ -28,14 +28,38 @@ export async function apiRequest(
   // Ensure headers exist
   options.headers = options.headers || {};
   
-  // Debug API requests
-  if (options.method === "POST" && options.body) {
+  // Set content type for JSON requests if not already set
+  if (options.method === "POST" && options.body && typeof options.body === 'string') {
     try {
-      console.log(`API Request to ${url}:`, JSON.parse(options.body as string));
+      JSON.parse(options.body); // Test if it's valid JSON
+      
+      // Create a new headers object instead of modifying directly
+      options.headers = {
+        ...options.headers,
+        'Content-Type': 'application/json'
+      };
+      
     } catch (e) {
-      console.log(`API Request to ${url} (unparseable body)`);
+      // Not JSON, don't set the header
     }
   }
+  
+  // Debug API requests with enhanced logging
+  if (options.method === "POST" && options.body) {
+    try {
+      const bodyData = typeof options.body === 'string' ? JSON.parse(options.body) : options.body;
+      console.log(`API Request to ${url}:`, bodyData);
+      console.log('Request options:', {
+        method: options.method,
+        headers: options.headers,
+        credentials: options.credentials
+      });
+    } catch (e) {
+      console.log(`API Request to ${url} (unparseable body)`, options.body);
+      console.error('Parse error:', e);
+    }
+  }
+  
   // Include credentials
   options.credentials = 'include';
   
