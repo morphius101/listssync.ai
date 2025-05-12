@@ -250,8 +250,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recipientId = `recipient_${Date.now()}`;
       }
       
-      // Create verification
-      const { token, code } = createVerification(
+      // Create verification (async with database storage)
+      const { token, code } = await createVerification(
         recipientId, 
         email, 
         phone, 
@@ -319,10 +319,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      const isValid = verifyCode(token, code);
+      const isValid = await verifyCode(token, code);
       
       if (isValid) {
-        const verification = getVerification(token);
+        const verification = await getVerification(token);
         res.json({ 
           verified: true, 
           recipientId: verification?.recipientId,
@@ -343,13 +343,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { token } = req.params;
       
-      const verified = isVerified(token);
-      const verification = getVerification(token);
+      const verified = await isVerified(token);
+      const verification = await getVerification(token);
       
       if (verification) {
         res.json({ 
           verified, 
-          expired: verification.expires < new Date(),
+          expired: verification.expiresAt < new Date(),
           recipientId: verification.recipientId,
           checklistId: verification.checklistId
         });
@@ -385,7 +385,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const recipientId = Math.random().toString(36).substring(2, 15);
       
       // Create verification for recipient access
-      const { token, code } = createVerification(
+      const { token, code } = await createVerification(
         recipientId,
         recipientEmail,
         recipientPhone,
