@@ -119,13 +119,54 @@ export function formatEmailForDisplay(email: string): string {
   return `${username.charAt(0)}*****@${domain}`;
 }
 
-// In production, these would actually send messages
-export function sendVerificationSMS(phone: string, code: string): Promise<boolean> {
-  console.log(`[SIMULATION] Sending verification code ${code} to ${phone}`);
-  return Promise.resolve(true);
+// In production, these would integrate with actual SMS and email services
+
+/**
+ * Send verification code via SMS
+ * In production, this would integrate with a service like Twilio
+ */
+export async function sendVerificationSMS(phone: string, code: string): Promise<boolean> {
+  try {
+    // For now we're simulating the SMS sending
+    console.log(`[SIMULATION] Sending verification code ${code} to ${phone}`);
+    
+    // Here you would integrate with an SMS service
+    // Example with Twilio would be:
+    // await twilioClient.messages.create({
+    //   body: `Your ListsSync.ai verification code is: ${code}`,
+    //   from: process.env.TWILIO_PHONE_NUMBER,
+    //   to: phone
+    // });
+    
+    return true;
+  } catch (error) {
+    console.error('Error sending SMS:', error);
+    return false;
+  }
 }
 
-export function sendVerificationEmail(email: string, code: string): Promise<boolean> {
-  console.log(`[SIMULATION] Sending verification code ${code} to ${email}`);
-  return Promise.resolve(true);
+/**
+ * Send verification code via email
+ * In production, this would integrate with a service like SendGrid
+ */
+export async function sendVerificationEmail(email: string, code: string): Promise<boolean> {
+  try {
+    // For now we're simulating the email sending
+    console.log(`[SIMULATION] Sending verification code ${code} to ${email}`);
+    
+    // Here you would integrate with an email service
+    // Example with SendGrid would be:
+    // await sendgrid.send({
+    //   to: email,
+    //   from: 'notifications@listssync.ai',
+    //   subject: 'Your verification code for ListsSync.ai',
+    //   text: `Your verification code is: ${code}`,
+    //   html: `<p>Your verification code is: <strong>${code}</strong></p>`
+    // });
+    
+    return true;
+  } catch (error) {
+    console.error('Error sending email:', error);
+    return false;
+  }
 }

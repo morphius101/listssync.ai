@@ -259,12 +259,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
       
       // Send verification code
+      let sendSuccess = false;
+      
       if (email) {
-        await sendVerificationEmail(email, code);
+        const emailSuccess = await sendVerificationEmail(email, code);
+        if (emailSuccess) {
+          sendSuccess = true;
+        } else {
+          console.error(`Failed to send verification email to ${email}`);
+        }
       }
       
       if (phone) {
-        await sendVerificationSMS(phone, code);
+        const smsSuccess = await sendVerificationSMS(phone, code);
+        if (smsSuccess) {
+          sendSuccess = true;
+        } else {
+          console.error(`Failed to send verification SMS to ${phone}`);
+        }
+      }
+      
+      if (!sendSuccess) {
+        return res.status(500).json({ 
+          message: "Failed to send verification code. Please try again." 
+        });
       }
       
       // Create share URL with token
