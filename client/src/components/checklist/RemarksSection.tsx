@@ -24,7 +24,7 @@ const RemarksSection = ({ initialRemarks = "", onChange }: RemarksSectionProps) 
       </div>
       
       <Textarea 
-        placeholder="Add any notes, observations, or issues encountered during the inspection..." 
+        placeholder="Add notes, observations, or special circumstances that need to be documented..." 
         value={remarks}
         onChange={handleRemarksChange}
         className="min-h-[120px]"

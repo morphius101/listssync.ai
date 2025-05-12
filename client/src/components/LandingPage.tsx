@@ -34,43 +34,61 @@ const LandingPage = () => {
     { 
       icon: <XCircle className="h-5 w-5 text-primary" />, 
       title: 'No apps to download', 
-      description: 'Works on any device with a web browser. No app installation required.' 
+      description: 'Works on any device with a web browser. No app installation required for your team or clients.' 
     },
     { 
       icon: <WifiOff className="h-5 w-5 text-primary" />, 
       title: 'Works offline', 
-      description: "Continue working even when you lose connection. Your data will sync when you're back online." 
+      description: "Perfect for remote locations, construction sites, or anywhere with spotty connectivity. Data syncs automatically." 
     },
     { 
       icon: <Wifi className="h-5 w-5 text-primary" />, 
       title: 'Real-time collaboration', 
-      description: 'See checklist updates instantly across all devices in your team.' 
+      description: 'Coordinate between field workers, clients, and office staff with instant updates across all devices.' 
     },
     { 
       icon: <Smartphone className="h-5 w-5 text-primary" />, 
       title: 'Photo verification', 
-      description: 'Capture photo proof directly in checklists to verify task completion.' 
+      description: 'Document work completion with visual evidence. Perfect for quality control and dispute prevention.' 
     },
     { 
       icon: <Languages className="h-5 w-5 text-primary" />, 
       title: 'Multilingual support', 
-      description: 'Create checklists in one language and share them in another. Automatic translation between languages.' 
+      description: 'Bridge language gaps with automatic translation. Create in English, share in Spanish, French, Chinese, and more.' 
     },
     { 
       icon: <Share2 className="h-5 w-5 text-primary" />, 
-      title: 'Secure sharing', 
-      description: 'Send checklists securely with phone or email verification to confirm recipient identity.' 
+      title: 'Secure verification', 
+      description: 'Confirm recipient identity with phone or email verification. Know exactly who completed each task.' 
     },
+    {
+      icon: <MessageSquare className="h-5 w-5 text-primary" />,
+      title: 'Detailed remarks',
+      description: 'Add notes and comments to document specific issues or special instructions for any task.'
+    },
+    {
+      icon: <Globe className="h-5 w-5 text-primary" />,
+      title: 'Industry versatile',
+      description: 'Adaptable templates for hospitality, construction, cleaning, inspections, maintenance, and more.'
+    }
   ];
 
   const testimonials = [
     {
-      quote: "ListsSync has streamlined our property inspections. The photo verification feature gives us peace of mind that everything has been properly checked.",
-      author: "Sarah J., Property Manager"
+      quote: "ListsSync has transformed how I manage my Airbnb properties. Guests can verify check-in and check-out tasks with photos, eliminating disputes.",
+      author: "Sarah J., Airbnb Host"
     },
     {
-      quote: "Our maintenance team can now complete checklists even in areas with no cell service. When they get back in range, everything syncs automatically.",
-      author: "Michael R., Maintenance Supervisor"
+      quote: "Our construction team uses ListsSync for quality control. The offline mode is crucial on remote job sites where cell service is unreliable.",
+      author: "Michael R., Construction Manager"
+    },
+    {
+      quote: "My cleaning staff can now document their work with photos. The verification system ensures accountability and has improved our service quality.",
+      author: "Elena K., Cleaning Service Owner"
+    },
+    {
+      quote: "As an inspector, the multilingual feature lets me create reports in English that are automatically shared with international clients in their language.",
+      author: "David T., Home Inspector"
     }
   ];
 
@@ -88,7 +106,7 @@ const LandingPage = () => {
           </h1>
           
           <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl">
-            Sync real-time checklists with instant photo proof — no app downloads, no confusion. Just clarity across teams.
+            Create, share, and verify task completion with photo proof — across any industry, any team, anywhere in the world. No downloads needed.
           </p>
           
           <Button 
@@ -107,7 +125,7 @@ const LandingPage = () => {
       <div className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">
-            Designed for property management teams
+            Designed for professionals who need accountability
           </h2>
           
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -131,9 +149,9 @@ const LandingPage = () => {
           
           <div className="grid md:grid-cols-3 gap-8">
             {[
-              { number: '1', title: 'Create checklists', desc: 'Build customized templates for different property types and tasks' },
-              { number: '2', title: 'Assign & collaborate', desc: 'Share with your team for real-time updates and progress tracking' },
-              { number: '3', title: 'Verify & complete', desc: 'Add photo proof and comments to document completed work' }
+              { number: '1', title: 'Create checklists', desc: 'Build customized templates for your specific industry needs and requirements' },
+              { number: '2', title: 'Assign & collaborate', desc: 'Share with your team, clients, or contractors for real-time updates and tracking' },
+              { number: '3', title: 'Verify & complete', desc: 'Add photo proof and comments to ensure accountability and quality' }
             ].map((step, i) => (
               <div key={i} className="flex flex-col items-center text-center">
                 <div className="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white text-xl font-bold mb-4">
@@ -156,7 +174,7 @@ const LandingPage = () => {
           
           <div className="grid md:grid-cols-2 gap-8">
             {testimonials.map((testimonial, i) => (
-              <div key={i} className="bg-gray-50 p-6 rounded-lg">
+              <div key={i} className="bg-gray-50 p-6 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
                 <p className="text-gray-700 italic mb-4">"{testimonial.quote}"</p>
                 <p className="text-gray-900 font-medium">{testimonial.author}</p>
               </div>
@@ -168,8 +186,17 @@ const LandingPage = () => {
       {/* CTA Section */}
       <div className="py-16 bg-primary text-white">
         <div className="container mx-auto px-4 text-center">
-          <h2 className="text-3xl font-bold mb-6">Ready to streamline your property inspections?</h2>
-          <p className="text-xl mb-8 max-w-2xl mx-auto">Join thousands of property managers saving time with ListsSync.ai</p>
+          <h2 className="text-3xl font-bold mb-6">Ready to bring accountability to your business?</h2>
+          <p className="text-xl mb-8 max-w-2xl mx-auto">Join thousands of professionals across industries saving time with ListsSync.ai</p>
+          
+          <div className="mb-8 flex flex-wrap justify-center gap-4 text-sm">
+            <span className="bg-white/20 rounded-full px-4 py-1">Airbnb Hosts</span>
+            <span className="bg-white/20 rounded-full px-4 py-1">Contractors</span>
+            <span className="bg-white/20 rounded-full px-4 py-1">Property Managers</span>
+            <span className="bg-white/20 rounded-full px-4 py-1">Inspectors</span>
+            <span className="bg-white/20 rounded-full px-4 py-1">Cleaning Services</span>
+            <span className="bg-white/20 rounded-full px-4 py-1">Maintenance Teams</span>
+          </div>
           
           <Button 
             onClick={handleGetStarted}
