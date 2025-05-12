@@ -22,7 +22,7 @@ import {
 import { useVerification } from '@/hooks/useVerification';
 import { useTranslation, LanguageCode } from '@/hooks/useTranslation';
 import { Checklist } from '@/types';
-import { Loader2, ClipboardCopy, Mail, Phone, Languages, Smartphone, Globe } from 'lucide-react';
+import { AlertTriangle, Loader2, ClipboardCopy, Mail, Phone, Languages, Smartphone, Globe } from 'lucide-react';
 
 interface ShareLinkModalProps {
   isOpen: boolean;
@@ -263,6 +263,13 @@ export default function ShareLinkModal({
                 They can complete it from any device with a web browser.
               </p>
             </div>
+            
+            {error && (
+              <div className="bg-red-50 p-3 rounded-md text-red-700 text-sm flex items-start">
+                <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+                <p>{error}</p>
+              </div>
+            )}
             
             <Button 
               onClick={handleShareLink} 

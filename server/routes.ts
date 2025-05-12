@@ -237,12 +237,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Verification system routes
   app.post(`${API_BASE}/verification/send`, async (req, res) => {
     try {
-      const { recipientId, email, phone, checklistId, recipientName } = req.body;
+      let { recipientId, email, phone, checklistId, recipientName } = req.body;
       
-      if (!recipientId || (!email && !phone) || !checklistId) {
+      if ((!email && !phone) || !checklistId) {
         return res.status(400).json({ 
-          message: "Missing required fields: recipientId, checklistId, and either email or phone" 
+          message: "Missing required fields: checklistId, and either email or phone" 
         });
+      }
+      
+      // Generate a recipientId if not provided
+      if (!recipientId) {
+        recipientId = `recipient_${Date.now()}`;
       }
       
       // Create verification
