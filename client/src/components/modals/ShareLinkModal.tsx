@@ -71,6 +71,23 @@ export default function ShareLinkModal({
       // If we don't have the full checklist object but we have the generateNewLink function, use it directly
       if (!checklist && onGenerateNewLink) {
         try {
+          // First try to send verification
+          const recipientId = `recipient_${Date.now()}`;
+          const response = await shareChecklist({
+            checklistId, // Use the checklistId prop directly
+            email: activeTab === 'email' ? recipientEmail : undefined,
+            phone: activeTab === 'phone' ? recipientPhone : undefined,
+            recipientName,
+            recipientId
+          });
+          
+          if (response?.shareUrl) {
+            setShareLink(response.shareUrl);
+            setResponse(response);
+            return;
+          }
+          
+          // Fall back to the onGenerateNewLink function if verification fails
           const link = await onGenerateNewLink();
           setShareLink(link);
           setResponse({
