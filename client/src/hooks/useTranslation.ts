@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { apiRequest } from '@/lib/queryClient';
 
 export type LanguageCode = 
@@ -28,8 +28,8 @@ export const LANGUAGES: LanguageOption[] = [
   { code: 'zh', name: 'Chinese', flag: '🇨🇳' },
   { code: 'ru', name: 'Russian', flag: '🇷🇺' },
   { code: 'ja', name: 'Japanese', flag: '🇯🇵' },
-  { code: 'ar', name: 'Arabic', flag: '🇦🇪' },
-  { code: 'hi', name: 'Hindi', flag: '🇮🇳' },
+  { code: 'ar', name: 'Arabic', flag: '🇸🇦' },
+  { code: 'hi', name: 'Hindi', flag: '🇮🇳' }
 ];
 
 export interface TranslationHook {
@@ -51,8 +51,8 @@ export interface TranslationHook {
 export function useTranslation(): TranslationHook {
   const [isTranslating, setIsTranslating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  
-  const translateText = useCallback(async (
+
+  const translateText = async (
     text: string, 
     targetLanguage: LanguageCode, 
     sourceLanguage?: LanguageCode
@@ -61,28 +61,27 @@ export function useTranslation(): TranslationHook {
     setError(null);
     
     try {
-      const response = await apiRequest('/api/translate/text', {
+      const response = await apiRequest('/api/translation/text', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           text,
           targetLanguage,
-          sourceLanguage,
+          sourceLanguage: sourceLanguage || 'en'
         }),
       });
       
-      return response.translated;
-    } catch (err: any) {
-      setError(err.message || 'Translation failed');
-      return text; // Return original text on error
+      const data = await response.json();
+      return data.translatedText || '';
+    } catch (err) {
+      console.error('Translation error:', err);
+      setError('Failed to translate text');
+      return '';
     } finally {
       setIsTranslating(false);
     }
-  }, []);
+  };
   
-  const translateChecklist = useCallback(async (
+  const translateChecklist = async (
     checklistId: string, 
     targetLanguage: LanguageCode, 
     sourceLanguage?: LanguageCode
@@ -91,31 +90,30 @@ export function useTranslation(): TranslationHook {
     setError(null);
     
     try {
-      const response = await apiRequest(`/api/translate/checklist/${checklistId}`, {
+      const response = await apiRequest('/api/translation/checklist', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
+          checklistId,
           targetLanguage,
-          sourceLanguage,
+          sourceLanguage: sourceLanguage || 'en'
         }),
       });
       
-      return response;
-    } catch (err: any) {
-      setError(err.message || 'Translation failed');
-      throw err;
+      return await response.json();
+    } catch (err) {
+      console.error('Checklist translation error:', err);
+      setError('Failed to translate checklist');
+      return null;
     } finally {
       setIsTranslating(false);
     }
-  }, []);
-  
+  };
+
   return {
     isTranslating,
     error,
     translateText,
     translateChecklist,
-    languages: LANGUAGES,
+    languages: LANGUAGES
   };
 }

@@ -1,9 +1,9 @@
-import { useState } from "react";
-import { Task } from "@/types";
-import { Camera, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import PhotoUploadModal from "../modals/PhotoUploadModal";
+import { useState } from 'react';
+import { Task } from '@/types';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Button } from '@/components/ui/button';
+import { PhotoUploadModal } from '@/components/modals/PhotoUploadModal';
+import { Camera, ChevronDown, ChevronUp, Info } from 'lucide-react';
 
 interface TasksListProps {
   tasks: Task[];
@@ -11,104 +11,155 @@ interface TasksListProps {
 }
 
 const TasksList = ({ tasks, onTaskUpdate }: TasksListProps) => {
+  const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
+  const [photoUploadModalOpen, setPhotoUploadModalOpen] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
-  const [isPhotoModalOpen, setIsPhotoModalOpen] = useState(false);
 
-  const handleToggleTask = async (taskId: string, completed: boolean) => {
-    try {
-      await onTaskUpdate(taskId, { completed: !completed });
-    } catch (error) {
-      console.error("Error toggling task:", error);
+  const toggleTaskDetails = (taskId: string) => {
+    setExpandedTasks(prev => ({
+      ...prev,
+      [taskId]: !prev[taskId]
+    }));
+  };
+  
+  const handleTaskCompletionChange = async (taskId: string, completed: boolean) => {
+    const task = tasks.find(t => t.id === taskId);
+    
+    if (task?.photoRequired && completed && !task.photoUrl) {
+      // If photo is required but not uploaded yet, open the photo upload modal
+      setCurrentTaskId(taskId);
+      setPhotoUploadModalOpen(true);
+    } else {
+      // Otherwise, just mark the task as completed/uncompleted
+      await onTaskUpdate(taskId, { completed });
     }
   };
-
-  const handleUploadPhoto = (taskId: string) => {
-    setCurrentTaskId(taskId);
-    setIsPhotoModalOpen(true);
-  };
-
-  const handlePhotoUploaded = async (photoUrl: string) => {
+  
+  const handlePhotoUpload = async (photoUrl: string) => {
     if (currentTaskId) {
-      try {
-        await onTaskUpdate(currentTaskId, { photoUrl });
-        setIsPhotoModalOpen(false);
-        setCurrentTaskId(null);
-      } catch (error) {
-        console.error("Error saving photo URL:", error);
-      }
+      await onTaskUpdate(currentTaskId, { 
+        photoUrl,
+        completed: true 
+      });
+      setPhotoUploadModalOpen(false);
+      setCurrentTaskId(null);
     }
+  };
+  
+  const handlePhotoClick = (task: Task) => {
+    setCurrentTaskId(task.id);
+    setPhotoUploadModalOpen(true);
   };
 
   return (
-    <>
-      <div className="bg-white rounded-lg shadow overflow-hidden mb-4">
-        <ul className="divide-y divide-gray-200">
-          {tasks.map((task) => (
-            <li key={task.id} className={`p-4 hover:bg-gray-50 transition-colors ${task.completed ? 'bg-gray-50' : ''}`}>
+    <div className="space-y-4 mb-8">
+      <h2 className="text-xl font-semibold">Tasks</h2>
+      
+      <div className="space-y-3">
+        {tasks.map(task => (
+          <div 
+            key={task.id} 
+            className={`bg-white border rounded-lg overflow-hidden ${
+              task.completed ? 'border-green-200' : 'border-gray-200'
+            }`}
+          >
+            <div className="p-3 flex items-start justify-between">
               <div className="flex items-start space-x-3">
-                <div className="flex-shrink-0 pt-0.5">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className={`w-6 h-6 ${
-                      task.completed
-                        ? "bg-primary border-2 border-primary"
-                        : "border-2 border-gray-300"
-                    } rounded-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 p-0 flex items-center justify-center`}
-                    onClick={() => handleToggleTask(task.id, task.completed)}
+                <Checkbox 
+                  id={`task-${task.id}`}
+                  checked={task.completed}
+                  onCheckedChange={(checked) => 
+                    handleTaskCompletionChange(task.id, checked === true)
+                  }
+                  className="mt-1"
+                />
+                
+                <div>
+                  <label 
+                    htmlFor={`task-${task.id}`}
+                    className={`font-medium ${
+                      task.completed ? 'text-gray-500 line-through' : 'text-gray-900'
+                    }`}
                   >
-                    {task.completed && <Check className="h-4 w-4 text-white" />}
-                  </Button>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className={`text-sm font-medium text-gray-900 ${task.completed ? 'line-through' : ''}`}>
                     {task.description}
-                  </p>
-                  {task.details && (
-                    <p className="text-xs text-gray-500 mt-0.5">
-                      {task.details}
-                    </p>
-                  )}
-                  {task.photoUrl && (
-                    <div className="mt-2">
-                      <img 
-                        src={task.photoUrl} 
-                        alt="Task photo" 
-                        className="h-24 w-auto rounded-md object-cover"
-                      />
+                  </label>
+                  
+                  {task.photoRequired && (
+                    <div className="flex items-center mt-1 text-xs text-blue-600">
+                      <Camera className="w-3 h-3 mr-1" />
+                      {task.photoUrl ? 'Photo attached' : 'Photo required'}
                     </div>
                   )}
                 </div>
-                <div className="flex-shrink-0">
-                  {task.completed ? (
-                    <Badge variant="success" className="bg-green-100 text-green-800">
-                      Complete
-                    </Badge>
-                  ) : task.photoRequired ? (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="p-1 text-primary rounded-full hover:bg-blue-50"
-                      onClick={() => handleUploadPhoto(task.id)}
-                    >
-                      <Camera className="h-5 w-5" />
-                    </Button>
-                  ) : null}
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                {task.photoUrl && (
+                  <button
+                    onClick={() => handlePhotoClick(task)}
+                    className="w-8 h-8 rounded-md overflow-hidden"
+                  >
+                    <img 
+                      src={task.photoUrl} 
+                      alt="Task photo" 
+                      className="w-full h-full object-cover"
+                    />
+                  </button>
+                )}
+                
+                {task.details && (
+                  <button
+                    onClick={() => toggleTaskDetails(task.id)}
+                    className="p-1.5 text-gray-500 hover:text-gray-700 rounded-md"
+                  >
+                    {expandedTasks[task.id] ? (
+                      <ChevronUp className="w-4 h-4" />
+                    ) : (
+                      <ChevronDown className="w-4 h-4" />
+                    )}
+                  </button>
+                )}
+              </div>
+            </div>
+            
+            {task.details && expandedTasks[task.id] && (
+              <div className="px-3 pb-3 pt-0">
+                <div className="pl-8 pr-2 text-sm text-gray-600 border-l-2 border-gray-200">
+                  {task.details}
                 </div>
               </div>
-            </li>
-          ))}
-        </ul>
+            )}
+            
+            {task.photoRequired && !task.photoUrl && task.completed && (
+              <div className="px-3 pb-3 pt-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="ml-8"
+                  onClick={() => handlePhotoClick(task)}
+                >
+                  <Camera className="w-4 h-4 mr-2" />
+                  Add required photo
+                </Button>
+              </div>
+            )}
+          </div>
+        ))}
       </div>
-
+      
+      {tasks.length === 0 && (
+        <div className="py-8 flex flex-col items-center justify-center text-center text-gray-500">
+          <Info className="w-10 h-10 mb-2 text-gray-400" />
+          <p>No tasks in this checklist.</p>
+        </div>
+      )}
+      
       <PhotoUploadModal
-        isOpen={isPhotoModalOpen}
-        onClose={() => setIsPhotoModalOpen(false)}
-        onSave={handlePhotoUploaded}
+        isOpen={photoUploadModalOpen}
+        onClose={() => setPhotoUploadModalOpen(false)}
+        onSave={handlePhotoUpload}
       />
-    </>
+    </div>
   );
 };
 

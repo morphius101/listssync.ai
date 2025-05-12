@@ -3,25 +3,16 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { useVerification } from '@/hooks/useVerification';
-import { useTranslation, LanguageCode } from '@/hooks/useTranslation';
+import { Button } from '@/components/ui/button';
 import { Checklist } from '@/types';
-import { Loader2, Mail, Phone, Languages, Share2, Smartphone, Globe } from 'lucide-react';
+import { generateShareLink } from '@/services/checklistService';
+import ShareLinkModal from './ShareLinkModal';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Copy, Mail, QrCode, Link, Share } from 'lucide-react';
 
 interface ShareChecklistModalProps {
   isOpen: boolean;
@@ -32,190 +23,156 @@ interface ShareChecklistModalProps {
 export function ShareChecklistModal({
   isOpen,
   onClose,
-  checklist,
+  checklist
 }: ShareChecklistModalProps) {
-  const [email, setEmail] = useState('');
-  const [phone, setPhone] = useState('');
-  const [recipientName, setRecipientName] = useState('');
-  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>('en');
-  const [shareUrl, setShareUrl] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<string>('email');
+  const [activeTab, setActiveTab] = useState<string>('link');
+  const [showLinkModal, setShowLinkModal] = useState(false);
+  const isMobile = useIsMobile();
   
-  const { isLoading, shareChecklist } = useVerification();
-  const { languages, isTranslating, translateChecklist } = useTranslation();
-
-  const handleShare = async () => {
-    // Check that either email or phone is provided
-    if ((activeTab === 'email' && !email) || (activeTab === 'phone' && !phone)) {
-      return;
-    }
-    
-    // Create a translated version if not in English
-    let checklistToShare = checklist;
-    if (selectedLanguage !== 'en') {
-      try {
-        checklistToShare = await translateChecklist(checklist.id, selectedLanguage, 'en');
-      } catch (error) {
-        console.error('Translation error:', error);
-        // Continue with original checklist if translation fails
+  // Generate a QR code for the checklist
+  const shareUrl = window.location.origin + '/shared/' + checklist.id;
+  const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
+  
+  // Share via native share API (mobile)
+  const handleNativeShare = async () => {
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share({
+          title: `ListsSync.ai: ${checklist.name}`,
+          text: `Check out this checklist: ${checklist.name}`,
+          url: shareUrl,
+        });
       }
-    }
-    
-    // Share the checklist
-    const response = await shareChecklist(
-      checklistToShare.id,
-      activeTab === 'email' ? email : undefined,
-      activeTab === 'phone' ? phone : undefined,
-      recipientName
-    );
-    
-    if (response?.shareUrl) {
-      setShareUrl(response.shareUrl);
+    } catch (error) {
+      console.error('Error sharing:', error);
     }
   };
-
+  
+  // Copy link to clipboard
   const handleCopyLink = () => {
-    if (shareUrl) {
-      navigator.clipboard.writeText(shareUrl);
-    }
+    navigator.clipboard.writeText(shareUrl);
+  };
+  
+  // Open the verification modal
+  const handleOpenLinkModal = () => {
+    setShowLinkModal(true);
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center">
-            <Share2 className="w-5 h-5 mr-2" />
-            Share "{checklist.name}"
-          </DialogTitle>
-          <DialogDescription>
-            Send this checklist to a recipient to complete.
-          </DialogDescription>
-        </DialogHeader>
-        
-        <div className="grid gap-4 py-4">
-          {shareUrl ? (
-            <div className="flex flex-col items-center space-y-4">
-              <div className="bg-green-50 p-3 rounded-md text-green-700 text-center w-full">
-                Verification code sent to recipient
-              </div>
-              
-              <div className="flex items-center w-full space-x-2">
-                <Input 
-                  readOnly 
-                  value={shareUrl} 
-                  className="flex-1"
-                />
-                <Button onClick={handleCopyLink} size="sm">
-                  Copy
+    <>
+      <Dialog open={isOpen && !showLinkModal} onOpenChange={onClose}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Checklist</DialogTitle>
+            <DialogDescription>
+              Choose how you want to share this checklist
+            </DialogDescription>
+          </DialogHeader>
+          
+          <Tabs defaultValue="link" value={activeTab} onValueChange={setActiveTab}>
+            <TabsList className="grid w-full grid-cols-3">
+              <TabsTrigger value="link" className="flex items-center">
+                <Link className="w-4 h-4 mr-2" />
+                Link
+              </TabsTrigger>
+              <TabsTrigger value="qr" className="flex items-center">
+                <QrCode className="w-4 h-4 mr-2" />
+                QR Code
+              </TabsTrigger>
+              <TabsTrigger value="email" className="flex items-center">
+                <Mail className="w-4 h-4 mr-2" />
+                Send
+              </TabsTrigger>
+            </TabsList>
+            
+            <TabsContent value="link" className="py-4">
+              <div className="flex flex-col space-y-4">
+                <p className="text-sm text-gray-500">
+                  Copy this link to share the checklist directly
+                </p>
+                
+                <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                  <Button 
+                    onClick={handleCopyLink} 
+                    variant="outline"
+                    className="flex-1"
+                  >
+                    <Copy className="w-4 h-4 mr-2" />
+                    Copy Link
+                  </Button>
+                  
+                  {isMobile && typeof navigator.share === 'function' && (
+                    <Button 
+                      onClick={handleNativeShare}
+                      variant="outline"
+                      className="flex-1"
+                    >
+                      <Share className="w-4 h-4 mr-2" />
+                      Share
+                    </Button>
+                  )}
+                </div>
+                
+                <Button onClick={handleOpenLinkModal} className="mt-2">
+                  Share with Verification
                 </Button>
-              </div>
-              
-              <p className="text-sm text-gray-500 text-center">
-                The recipient will need to enter the verification code to access the checklist.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="flex items-center space-x-2">
-                <Globe className="w-4 h-4 text-gray-500" />
-                <Label htmlFor="language">Language for recipient</Label>
-                <Select
-                  value={selectedLanguage}
-                  onValueChange={(value) => setSelectedLanguage(value as LanguageCode)}
-                >
-                  <SelectTrigger id="language" className="flex-1">
-                    <SelectValue placeholder="Select language" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {languages.map((lang) => (
-                      <SelectItem key={lang.code} value={lang.code}>
-                        {lang.flag} {lang.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="recipient-name">Recipient's name (optional)</Label>
-                <Input
-                  id="recipient-name"
-                  value={recipientName}
-                  onChange={(e) => setRecipientName(e.target.value)}
-                  placeholder="Enter recipient's name"
-                />
-              </div>
-              
-              <Tabs defaultValue="email" value={activeTab} onValueChange={setActiveTab}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="email" className="flex items-center">
-                    <Mail className="w-4 h-4 mr-2" />
-                    Email
-                  </TabsTrigger>
-                  <TabsTrigger value="phone" className="flex items-center">
-                    <Phone className="w-4 h-4 mr-2" />
-                    Phone
-                  </TabsTrigger>
-                </TabsList>
                 
-                <TabsContent value="email" className="space-y-2">
-                  <Label htmlFor="email">Email address</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    placeholder="recipient@example.com"
-                  />
-                </TabsContent>
-                
-                <TabsContent value="phone" className="space-y-2">
-                  <Label htmlFor="phone">Phone number</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+1 (555) 123-4567"
-                  />
-                </TabsContent>
-              </Tabs>
-              
-              <div className="bg-blue-50 p-3 rounded-md text-blue-700 text-sm flex items-start">
-                <Smartphone className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-                <p>
-                  The recipient will receive a verification code to access the checklist.
-                  They can complete it from any device with a web browser.
+                <p className="text-xs text-gray-400 mt-2">
+                  Sharing with verification allows you to control who can access the checklist and track their completion.
                 </p>
               </div>
-            </>
-          )}
-        </div>
-        
-        <DialogFooter>
-          {shareUrl ? (
-            <Button onClick={onClose}>
-              Done
-            </Button>
-          ) : (
-            <Button 
-              onClick={handleShare} 
-              disabled={
-                isLoading || 
-                isTranslating || 
-                (activeTab === 'email' && !email) || 
-                (activeTab === 'phone' && !phone)
-              }
-            >
-              {(isLoading || isTranslating) && (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-              )}
-              {isTranslating ? 'Translating...' : (isLoading ? 'Sending...' : 'Share Checklist')}
-            </Button>
-          )}
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            </TabsContent>
+            
+            <TabsContent value="qr" className="py-4">
+              <div className="flex flex-col items-center space-y-4">
+                <p className="text-sm text-gray-500">
+                  Scan this QR code to open the checklist on another device
+                </p>
+                
+                <div className="border border-gray-200 p-2 rounded-md">
+                  <img 
+                    src={qrCodeUrl}
+                    alt="QR Code for Checklist"
+                    className="w-full max-w-[200px] h-auto"
+                  />
+                </div>
+                
+                <Button onClick={handleOpenLinkModal} className="mt-2">
+                  Share with Verification
+                </Button>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="email" className="py-4">
+              <div className="flex flex-col space-y-4">
+                <p className="text-sm text-gray-500">
+                  Send this checklist to someone via email or text message with a verification code
+                </p>
+                
+                <Button onClick={handleOpenLinkModal} className="mt-2">
+                  Send with Verification
+                </Button>
+                
+                <p className="text-xs text-gray-400 mt-2">
+                  Recipients will need to verify their identity before accessing the checklist.
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+      
+      {showLinkModal && (
+        <ShareLinkModal
+          isOpen={showLinkModal}
+          onClose={() => {
+            setShowLinkModal(false);
+            onClose();
+          }}
+          checklistId={checklist.id}
+          checklist={checklist}
+        />
+      )}
+    </>
   );
 }

@@ -65,12 +65,12 @@ export default function ShareLinkModal({
     }
     
     // Share the checklist
-    const response = await shareChecklist(
-      checklistToShare.id,
-      activeTab === 'email' ? recipientEmail : undefined,
-      activeTab === 'phone' ? recipientPhone : undefined,
+    const response = await shareChecklist({
+      checklistId: checklistToShare.id,
+      email: activeTab === 'email' ? recipientEmail : undefined,
+      phone: activeTab === 'phone' ? recipientPhone : undefined,
       recipientName
-    );
+    });
     
     if (response?.shareUrl) {
       setShareLink(response.shareUrl);

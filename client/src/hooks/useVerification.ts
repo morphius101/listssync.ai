@@ -1,23 +1,23 @@
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { apiRequest } from '@/lib/queryClient';
-import { useToast } from '@/hooks/use-toast';
 
 interface SendVerificationParams {
-  recipientId: string;
+  checklistId: string;
   email?: string;
   phone?: string;
-  checklistId?: string;
-}
-
-interface SendVerificationResponse {
-  token: string;
-  maskedEmail?: string;
-  maskedPhone?: string;
+  recipientName?: string;
 }
 
 interface VerifyCodeParams {
   token: string;
   code: string;
+}
+
+interface ShareChecklistResponse {
+  token: string;
+  maskedEmail?: string;
+  maskedPhone?: string;
+  shareUrl: string;
 }
 
 interface VerifyCodeResponse {
@@ -34,70 +34,62 @@ interface VerificationStatus {
   checklistId?: string;
 }
 
+interface VerificationMaskedContact {
+  email?: string;
+  phone?: string;
+}
+
 export function useVerification() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [token, setToken] = useState<string | null>(null);
-  const [maskedContact, setMaskedContact] = useState<{
-    email?: string;
-    phone?: string;
-  }>({});
-  const { toast } = useToast();
+  const [token, setToken] = useState<string>('');
+  const [maskedContact, setMaskedContact] = useState<VerificationMaskedContact>({});
 
-  const sendVerification = useCallback(async ({
-    recipientId,
+  // Send a verification code to a recipient
+  const shareChecklist = async ({
+    checklistId,
     email,
     phone,
-    checklistId
-  }: SendVerificationParams): Promise<SendVerificationResponse | null> => {
+    recipientName
+  }: SendVerificationParams): Promise<ShareChecklistResponse | null> => {
     setIsLoading(true);
     setError(null);
     
     try {
       const response = await apiRequest('/api/verification/send', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
-          recipientId,
+          checklistId,
           email,
           phone,
-          checklistId,
+          recipientName
         }),
       });
       
-      setToken(response.token);
-      setMaskedContact({
-        email: response.maskedEmail,
-        phone: response.maskedPhone,
-      });
+      const data = await response.json();
       
-      toast({
-        title: 'Verification code sent',
-        description: `Check your ${email ? 'email' : 'phone'} for the verification code.`,
-      });
+      if (data.token) {
+        setToken(data.token);
+        setMaskedContact({
+          email: data.maskedEmail,
+          phone: data.maskedPhone
+        });
+      }
       
-      return response;
-    } catch (err: any) {
-      const errorMessage = err.message || 'Failed to send verification code';
-      setError(errorMessage);
-      
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-      
+      return data;
+    } catch (err) {
+      setError('Failed to send verification code');
+      console.error('Send verification error:', err);
       return null;
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
-
-  const verifyCode = useCallback(async ({
-    token: verificationToken,
-    code,
+  };
+  
+  // Verify a code against a token
+  const verifyCode = async ({
+    token,
+    code
   }: VerifyCodeParams): Promise<VerifyCodeResponse | null> => {
     setIsLoading(true);
     setError(null);
@@ -105,114 +97,49 @@ export function useVerification() {
     try {
       const response = await apiRequest('/api/verification/verify', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
-          token: verificationToken || token,
-          code,
+          token,
+          code
         }),
       });
       
-      if (response.verified) {
-        toast({
-          title: 'Verified',
-          description: 'Your identity has been verified.',
-        });
-      } else {
-        toast({
-          title: 'Verification failed',
-          description: response.message || 'Invalid verification code',
-          variant: 'destructive',
-        });
-      }
-      
-      return response;
-    } catch (err: any) {
-      const errorMessage = err.message || 'Verification failed';
-      setError(errorMessage);
-      
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-      
+      return await response.json();
+    } catch (err) {
+      setError('Failed to verify code');
+      console.error('Verify code error:', err);
       return null;
     } finally {
       setIsLoading(false);
     }
-  }, [token, toast]);
-
-  const checkVerificationStatus = useCallback(async (
-    verificationToken: string
-  ): Promise<VerificationStatus | null> => {
+  };
+  
+  // Check if a token is verified
+  const checkVerificationStatus = async (token: string): Promise<VerificationStatus | null> => {
     setIsLoading(true);
     setError(null);
     
     try {
-      return await apiRequest(`/api/verification/status/${verificationToken || token}`);
-    } catch (err: any) {
-      const errorMessage = err.message || 'Failed to check verification status';
-      setError(errorMessage);
+      const response = await apiRequest(`/api/verification/status/${token}`, {
+        method: 'GET'
+      });
+      
+      return await response.json();
+    } catch (err) {
+      setError('Failed to check verification status');
+      console.error('Check verification status error:', err);
       return null;
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
-
-  const shareChecklist = useCallback(async (
-    checklistId: string,
-    recipientEmail?: string,
-    recipientPhone?: string,
-    recipientName?: string
-  ) => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const response = await apiRequest(`/api/checklists/${checklistId}/share`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          recipientEmail,
-          recipientPhone,
-          recipientName,
-        }),
-      });
-      
-      toast({
-        title: 'Checklist shared',
-        description: 'Verification code sent to recipient.',
-      });
-      
-      return response;
-    } catch (err: any) {
-      const errorMessage = err.message || 'Failed to share checklist';
-      setError(errorMessage);
-      
-      toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
-      });
-      
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
+  };
 
   return {
     isLoading,
     error,
     token,
     maskedContact,
-    sendVerification,
-    verifyCode,
-    checkVerificationStatus,
     shareChecklist,
+    verifyCode,
+    checkVerificationStatus
   };
 }

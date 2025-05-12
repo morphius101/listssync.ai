@@ -1,46 +1,72 @@
-import { Checklist } from "@/types";
-import { Info } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Checklist } from '@/types';
+import { Badge } from '@/components/ui/badge';
+import { Calendar, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
+import { format } from 'date-fns';
 
 interface ChecklistHeaderProps {
   checklist: Checklist;
 }
 
 const ChecklistHeader = ({ checklist }: ChecklistHeaderProps) => {
-  const completed = checklist.tasks.filter(task => task.completed).length;
-  const total = checklist.tasks.length;
-  const progressPercentage = total > 0 ? Math.round((completed / total) * 100) : 0;
+  const { name, status, progress, createdAt, updatedAt } = checklist;
+  
+  const getStatusColor = () => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-100 text-green-800 border-green-200';
+      case 'in-progress':
+        return 'bg-blue-100 text-blue-800 border-blue-200';
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200';
+    }
+  };
+  
+  const getStatusIcon = () => {
+    switch (status) {
+      case 'completed':
+        return <CheckCircle2 className="w-3.5 h-3.5 mr-1" />;
+      case 'in-progress':
+        return <Clock className="w-3.5 h-3.5 mr-1" />;
+      default:
+        return <AlertCircle className="w-3.5 h-3.5 mr-1" />;
+    }
+  };
+  
+  const formattedDate = (date: Date | any) => {
+    try {
+      // Handle both Date objects and Firestore timestamps
+      const dateObj = date instanceof Date ? date : new Date(date.seconds * 1000);
+      return format(dateObj, 'MMM d, yyyy');
+    } catch (error) {
+      return 'Unknown date';
+    }
+  };
 
   return (
-    <div className="bg-white rounded-lg shadow mb-4">
-      <div className="p-4">
-        <h1 className="text-xl font-bold text-gray-900">{checklist.name}</h1>
-        <p className="text-sm text-gray-500">
-          {total} tasks to complete
-        </p>
+    <div className="mb-6">
+      <h1 className="text-2xl font-bold mb-2">{name}</h1>
+      
+      <div className="flex flex-wrap items-center gap-2 mb-4">
+        <Badge className={`flex items-center ${getStatusColor()}`}>
+          {getStatusIcon()}
+          {status === 'not-started' ? 'Not Started' : 
+            status === 'in-progress' ? 'In Progress' : 'Completed'}
+        </Badge>
         
-        <div className="mt-3 bg-blue-50 border border-blue-100 rounded-md p-3">
-          <div className="flex">
-            <div className="flex-shrink-0">
-              <Info className="h-5 w-5 text-blue-400" />
-            </div>
-            <div className="ml-3 text-sm text-blue-700">
-              <p>Tap tasks to mark complete. Camera icon means a photo is required.</p>
-            </div>
-          </div>
-        </div>
+        <Badge variant="outline" className="flex items-center">
+          <span className="font-medium">{progress}%</span>
+        </Badge>
       </div>
       
-      <div className="bg-gray-100 rounded-b-lg">
-        <div className="flex items-center px-4 py-2">
-          <div className="w-full bg-gray-200 rounded-full h-2.5">
-            <div
-              className="bg-primary h-2.5 rounded-full"
-              style={{ width: `${progressPercentage}%` }}
-            ></div>
-          </div>
-          <span className="ml-3 text-sm font-medium text-gray-700">{progressPercentage}%</span>
-        </div>
+      <div className="flex items-center text-sm text-gray-500">
+        <Calendar className="w-3.5 h-3.5 mr-1" />
+        <span>Created: {formattedDate(createdAt)}</span>
+        
+        {updatedAt && updatedAt !== createdAt && (
+          <span className="ml-4">
+            Updated: {formattedDate(updatedAt)}
+          </span>
+        )}
       </div>
     </div>
   );

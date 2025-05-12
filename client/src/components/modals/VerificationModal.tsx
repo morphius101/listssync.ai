@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -8,9 +8,10 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { useVerification } from '@/hooks/useVerification';
-import { Loader2, Mail, Phone, CheckCircle2, AlertCircle } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { Loader2, Mail, ShieldCheck, Phone } from 'lucide-react';
+import { Input } from '@/components/ui/input';
 
 interface VerificationModalProps {
   isOpen: boolean;
@@ -29,132 +30,116 @@ export function VerificationModal({
   maskedEmail,
   maskedPhone,
 }: VerificationModalProps) {
-  const [code, setCode] = useState('');
-  const [isVerified, setIsVerified] = useState(false);
-  const { isLoading, error, verifyCode } = useVerification();
+  const [verificationCode, setVerificationCode] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
+  const { verifyCode } = useVerification();
+  const { toast } = useToast();
 
-  // Auto-format verification code as it's entered (add spaces)
-  const handleCodeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Remove any non-digit characters
-    const digits = e.target.value.replace(/\D/g, '');
-    
-    // Take only the first 6 digits
-    const truncated = digits.substring(0, 6);
-    
-    // Format with a space in the middle for readability
-    if (truncated.length > 3) {
-      setCode(`${truncated.substring(0, 3)} ${truncated.substring(3)}`);
-    } else {
-      setCode(truncated);
+  const handleVerification = async () => {
+    if (!verificationCode.trim()) {
+      toast({
+        title: 'Error',
+        description: 'Please enter the verification code',
+        variant: 'destructive',
+      });
+      return;
     }
-  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    // Remove spaces for verification
-    const cleanCode = code.replace(/\s/g, '');
-    
-    if (cleanCode.length !== 6) {
-      return; // Don't submit if code isn't complete
-    }
-    
-    const result = await verifyCode({ token, code: cleanCode });
-    
-    if (result?.verified) {
-      setIsVerified(true);
-      
-      // Delay to show success state
-      setTimeout(() => {
+    setIsVerifying(true);
+    try {
+      const result = await verifyCode({
+        token,
+        code: verificationCode,
+      });
+
+      if (result?.verified) {
+        toast({
+          title: 'Success',
+          description: 'Verification successful',
+        });
         onVerified(result.recipientId || '', result.checklistId);
-      }, 1500);
+      } else {
+        toast({
+          title: 'Error',
+          description: result?.message || 'Invalid verification code. Please try again.',
+          variant: 'destructive',
+        });
+      }
+    } catch (error) {
+      console.error('Verification error:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to verify code. Please try again.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsVerifying(false);
     }
   };
-
-  // Reset state when modal opens
-  useEffect(() => {
-    if (isOpen) {
-      setCode('');
-      setIsVerified(false);
-    }
-  }, [isOpen]);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Verify Your Identity</DialogTitle>
+          <DialogTitle className="flex items-center">
+            <ShieldCheck className="w-5 h-5 text-primary mr-2" />
+            Verification Required
+          </DialogTitle>
           <DialogDescription>
-            {isVerified ? (
-              <div className="flex items-center justify-center text-green-500 mt-2">
-                <CheckCircle2 className="w-6 h-6 mr-2" />
-                <span>Verification successful!</span>
-              </div>
-            ) : (
-              <>
-                Enter the 6-digit code sent to:
-                <div className="flex items-center justify-center mt-2 font-medium">
-                  {maskedEmail && (
-                    <div className="flex items-center text-primary">
-                      <Mail className="w-4 h-4 mr-1" />
-                      <span>{maskedEmail}</span>
-                    </div>
-                  )}
-                  
-                  {maskedPhone && (
-                    <div className="flex items-center text-primary">
-                      <Phone className="w-4 h-4 mr-1" />
-                      <span>{maskedPhone}</span>
-                    </div>
-                  )}
-                </div>
-              </>
-            )}
+            Enter the verification code sent to you to access this checklist.
           </DialogDescription>
         </DialogHeader>
-        
-        {!isVerified && (
-          <form onSubmit={handleSubmit}>
-            <div className="flex flex-col items-center space-y-4">
-              <div className="grid flex-1 gap-2">
-                <Input
-                  type="text"
-                  value={code}
-                  onChange={handleCodeChange}
-                  placeholder="000 000"
-                  className="text-center text-xl tracking-widest py-6"
-                  inputMode="numeric"
-                  disabled={isLoading || isVerified}
-                  autoFocus
-                />
-                
-                {error && (
-                  <div className="flex items-center text-destructive text-sm">
-                    <AlertCircle className="w-4 h-4 mr-1" />
-                    <span>{error}</span>
-                  </div>
-                )}
-              </div>
-              
-              <DialogFooter className="sm:justify-center">
-                <Button
-                  type="submit"
-                  disabled={code.replace(/\s/g, '').length !== 6 || isLoading || isVerified}
-                  className="w-full"
-                >
-                  {isLoading ? (
-                    <>
-                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                      Verifying...
-                    </>
-                  ) : (
-                    'Verify'
-                  )}
-                </Button>
-              </DialogFooter>
+
+        <div className="space-y-4">
+          {(maskedEmail || maskedPhone) && (
+            <div className="bg-muted p-3 rounded-md text-sm">
+              {maskedEmail && (
+                <div className="flex items-center space-x-2">
+                  <Mail className="w-4 h-4 text-gray-500" />
+                  <span>Code sent to: {maskedEmail}</span>
+                </div>
+              )}
+              {maskedPhone && (
+                <div className="flex items-center space-x-2 mt-1">
+                  <Phone className="w-4 h-4 text-gray-500" />
+                  <span>Code sent to: {maskedPhone}</span>
+                </div>
+              )}
             </div>
-          </form>
-        )}
+          )}
+
+          <div className="space-y-2">
+            <Input
+              placeholder="Enter verification code"
+              value={verificationCode}
+              onChange={(e) => setVerificationCode(e.target.value)}
+              className="text-center text-lg tracking-widest"
+              maxLength={6}
+              autoFocus
+              inputMode="numeric"
+              pattern="[0-9]*"
+            />
+            <p className="text-xs text-gray-500 text-center">
+              The code is 6 digits and valid for 10 minutes.
+            </p>
+          </div>
+        </div>
+
+        <DialogFooter>
+          <Button onClick={onClose} variant="outline">
+            Cancel
+          </Button>
+          <Button onClick={handleVerification} disabled={isVerifying}>
+            {isVerifying ? (
+              <>
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                Verifying...
+              </>
+            ) : (
+              'Verify'
+            )}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
