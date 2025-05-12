@@ -63,8 +63,8 @@ export default function ShareLinkModal({
         setShareLink(link);
         setResponse({
           shareUrl: link,
-          maskedEmail: activeTab === 'email' ? formatEmailDisplay(recipientEmail) : undefined,
-          maskedPhone: activeTab === 'phone' ? formatPhoneDisplay(recipientPhone) : undefined
+          maskedEmail: activeTab === 'email' ? recipientEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3") : undefined,
+          maskedPhone: activeTab === 'phone' ? recipientPhone.replace(/(\d{3})(\d+)(\d{4})/, "$1-***-$3") : undefined
         });
         return;
       } catch (error) {
