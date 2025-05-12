@@ -212,7 +212,7 @@ const AdminDashboard = () => {
         isOpen={isShareModalOpen}
         onClose={() => setIsShareModalOpen(false)}
         checklistId={currentChecklist?.id || ""}
-        checklist={currentChecklist}
+        checklist={currentChecklist || undefined}
         onGenerateNewLink={handleGenerateNewLink}
       />
       

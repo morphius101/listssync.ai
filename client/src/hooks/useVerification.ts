@@ -51,7 +51,8 @@ export function useVerification() {
     checklistId,
     email,
     phone,
-    recipientName
+    recipientName,
+    recipientId
   }: SendVerificationParams): Promise<ShareChecklistResponse | null> => {
     setIsLoading(true);
     setError(null);
@@ -63,7 +64,8 @@ export function useVerification() {
           checklistId,
           email,
           phone,
-          recipientName
+          recipientName,
+          recipientId
         }),
       });
       
