@@ -68,16 +68,21 @@ export default function ShareLinkModal({
       hasChecklist: !!checklist
     });
     
-    // Validate required fields
+    // Validate required fields with detailed logging
     if (activeTab === 'email' && !recipientEmail) {
+      console.log('Email validation failed: empty email address');
       setError('Please enter a valid email address.');
       return;
     }
     
     if (activeTab === 'phone' && !recipientPhone) {
+      console.log('Phone validation failed: empty phone number');
       setError('Please enter a valid phone number.');
       return;
     }
+    
+    // Log which validation passed
+    console.log(`Validation passed for ${activeTab} with value: ${activeTab === 'email' ? recipientEmail : recipientPhone}`);
     
     // Validate checklist ID
     if (!checklistId) {
@@ -209,15 +214,27 @@ export default function ShareLinkModal({
         return;
       }
       
-      // Share the checklist
-      console.log('Sharing checklist with ID:', finalChecklistId);
-      const response = await shareChecklist({
+      // Prepare API request parameters
+      const params: SendVerificationParams = {
         checklistId: finalChecklistId,
-        email: activeTab === 'email' ? recipientEmail : undefined,
-        phone: activeTab === 'phone' ? recipientPhone : undefined,
         recipientName,
         recipientId
-      });
+      };
+      
+      // Add the appropriate contact method based on the active tab
+      if (activeTab === 'email') {
+        params.email = recipientEmail;
+        console.log('Using email for verification:', params.email);
+      } else if (activeTab === 'phone') {
+        params.phone = recipientPhone;
+        console.log('Using phone for verification:', params.phone);
+      }
+      
+      // Log the complete parameters before making the API call
+      console.log('Sharing checklist with params:', params);
+      
+      // Send the API request
+      const response = await shareChecklist(params);
       
       if (response?.shareUrl) {
         setShareLink(response.shareUrl);
@@ -364,7 +381,17 @@ export default function ShareLinkModal({
             )}
             
             <Button 
-              onClick={handleShareLink} 
+              onClick={(e) => {
+                e.preventDefault(); // Prevent default form submission
+                console.log('Share button clicked with values:', {
+                  activeTab,
+                  recipientEmail: activeTab === 'email' ? recipientEmail : undefined,
+                  recipientPhone: activeTab === 'phone' ? recipientPhone : undefined,
+                  recipientName,
+                  checklistId
+                });
+                handleShareLink();
+              }} 
               disabled={isLoading || isTranslating || 
                 (activeTab === 'email' && !recipientEmail) || 
                 (activeTab === 'phone' && !recipientPhone)

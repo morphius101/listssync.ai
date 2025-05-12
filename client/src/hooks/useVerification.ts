@@ -72,6 +72,14 @@ export function useVerification() {
       return null;
     }
     
+    // Only one of email or phone should be provided
+    if (!email && !phone) {
+      console.error("Either email or phone must be provided");
+      setError("Please provide either an email address or phone number");
+      setIsLoading(false);
+      return null;
+    }
+    
     try {
       // Ensure we have a valid checklist ID
       if (!checklistId || checklistId.trim() === '') {
@@ -81,14 +89,26 @@ export function useVerification() {
         return null;
       }
       
-      // Prepare API request data
-      const requestData = {
-        checklistId,
-        email: email && email.trim() !== '' ? email.trim() : undefined,
-        phone: phone && phone.trim() !== '' ? phone.trim() : undefined,
-        recipientName: recipientName || undefined,
+      // Prepare API request data with detailed validation
+      const requestData: SendVerificationParams = {
+        checklistId: checklistId.trim(),
         recipientId: recipientId || `recipient_${Date.now()}`
       };
+      
+      // Only add valid values to the request
+      if (recipientName && recipientName.trim()) {
+        requestData.recipientName = recipientName.trim();
+      }
+      
+      if (email && email.trim()) {
+        console.log("Adding email to request:", email.trim());
+        requestData.email = email.trim();
+      }
+      
+      if (phone && phone.trim()) {
+        console.log("Adding phone to request:", phone.trim());
+        requestData.phone = phone.trim();
+      }
       
       console.log("Making API request with data:", requestData);
       
