@@ -72,7 +72,15 @@ export default function ShareLinkModal({
       if (!checklist && onGenerateNewLink) {
         try {
           // First try to send verification
+          console.log('Sharing checklist with ID:', checklistId);
           const recipientId = `recipient_${Date.now()}`;
+          
+          if (!checklistId) {
+            console.error('Missing checklistId in ShareLinkModal');
+            setError('Missing checklist ID. Please try again or contact support.');
+            return;
+          }
+          
           const response = await shareChecklist({
             checklistId, // Use the checklistId prop directly
             email: activeTab === 'email' ? recipientEmail : undefined,
@@ -117,6 +125,9 @@ export default function ShareLinkModal({
     try {
       // Create a translated version if not in English
       let checklistToShare = checklist;
+      console.log('Checklist object:', checklist);
+      console.log('ChecklistId prop:', checklistId);
+      
       if (checklistToShare && selectedLanguage !== 'en') {
         try {
           checklistToShare = await translateChecklist(checklistToShare.id, selectedLanguage, 'en');
@@ -128,6 +139,27 @@ export default function ShareLinkModal({
       
       // Make sure we have a valid checklist
       if (!checklistToShare) {
+        // If we don't have a checklist object but have an ID, try using just the ID
+        if (checklistId) {
+          console.log('Using checklistId directly:', checklistId);
+          const recipientId = `recipient_${Date.now()}`;
+          
+          // Share the checklist using the ID directly
+          const response = await shareChecklist({
+            checklistId,
+            email: activeTab === 'email' ? recipientEmail : undefined,
+            phone: activeTab === 'phone' ? recipientPhone : undefined,
+            recipientName,
+            recipientId
+          });
+          
+          if (response?.shareUrl) {
+            setShareLink(response.shareUrl);
+            setResponse(response);
+            return;
+          }
+        }
+        
         setError('Invalid checklist data');
         return;
       }
@@ -136,6 +168,7 @@ export default function ShareLinkModal({
       const recipientId = `recipient_${Date.now()}`;
       
       // Share the checklist
+      console.log('Sharing checklist with object ID:', checklistToShare.id);
       const response = await shareChecklist({
         checklistId: checklistToShare.id,
         email: activeTab === 'email' ? recipientEmail : undefined,
