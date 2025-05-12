@@ -128,7 +128,10 @@ export function formatEmailForDisplay(email: string): string {
 export async function sendVerificationSMS(phone: string, code: string): Promise<boolean> {
   try {
     // For now we're simulating the SMS sending
-    console.log(`[SIMULATION] Sending verification code ${code} to ${phone}`);
+    console.log('===================================================');
+    console.log(`📱 SIMULATION: SMS VERIFICATION CODE: ${code}`);
+    console.log(`📱 For phone number: ${formatPhoneForDisplay(phone)}`);
+    console.log('===================================================');
     
     // Here you would integrate with an SMS service
     // Example with Twilio would be:
@@ -152,7 +155,10 @@ export async function sendVerificationSMS(phone: string, code: string): Promise<
 export async function sendVerificationEmail(email: string, code: string): Promise<boolean> {
   try {
     // For now we're simulating the email sending
-    console.log(`[SIMULATION] Sending verification code ${code} to ${email}`);
+    console.log('===================================================');
+    console.log(`📧 SIMULATION: EMAIL VERIFICATION CODE: ${code}`);
+    console.log(`📧 For email: ${formatEmailForDisplay(email)}`);
+    console.log('===================================================');
     
     // Here you would integrate with an email service
     // Example with SendGrid would be:

@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, timestamp, jsonb, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -75,4 +75,38 @@ export interface ChecklistSummaryDTO {
   taskCount: number;
   createdAt: Date;
   updatedAt: Date;
+}
+
+// Verification Schema for secure access to shared checklists
+export const verifications = pgTable("verifications", {
+  id: serial("id").primaryKey(),
+  token: varchar("token", { length: 128 }).notNull().unique(),
+  code: varchar("code", { length: 10 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  expiresAt: timestamp("expires_at").notNull(),
+  verified: boolean("verified").notNull().default(false),
+  recipientId: text("recipient_id").notNull(),
+  recipientEmail: text("recipient_email"),
+  recipientPhone: text("recipient_phone"),
+  checklistId: text("checklist_id"),
+});
+
+export const insertVerificationSchema = createInsertSchema(verifications).omit({
+  id: true,
+  createdAt: true,
+});
+
+export type InsertVerification = z.infer<typeof insertVerificationSchema>;
+export type Verification = typeof verifications.$inferSelect;
+
+export interface VerificationDTO {
+  token: string;
+  code: string;
+  createdAt: Date;
+  expiresAt: Date;
+  verified: boolean;
+  recipientId: string;
+  recipientEmail?: string;
+  recipientPhone?: string;
+  checklistId?: string;
 }
