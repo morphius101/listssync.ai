@@ -1,6 +1,6 @@
-import { useState, useEffect } from "react";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
+import { useState } from 'react';
+import { Textarea } from '@/components/ui/textarea';
+import { MessageSquare } from 'lucide-react';
 
 interface RemarksSectionProps {
   initialRemarks?: string;
@@ -10,29 +10,29 @@ interface RemarksSectionProps {
 const RemarksSection = ({ initialRemarks = "", onChange }: RemarksSectionProps) => {
   const [remarks, setRemarks] = useState(initialRemarks);
 
-  useEffect(() => {
-    setRemarks(initialRemarks);
-  }, [initialRemarks]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+  const handleRemarksChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const value = e.target.value;
     setRemarks(value);
     onChange(value);
   };
 
   return (
-    <div className="bg-white rounded-lg shadow p-4 mb-6">
-      <Label htmlFor="remarks" className="block text-sm font-medium text-gray-700 mb-2">
-        Additional Remarks
-      </Label>
-      <Textarea
-        id="remarks"
-        rows={3}
-        className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
-        placeholder="Add any additional notes here..."
+    <div className="space-y-2">
+      <div className="flex items-center">
+        <MessageSquare className="h-5 w-5 text-gray-500 mr-2" />
+        <h2 className="text-lg font-medium">Notes & Remarks</h2>
+      </div>
+      
+      <Textarea 
+        placeholder="Add any notes, observations, or issues encountered during the inspection..." 
         value={remarks}
-        onChange={handleChange}
+        onChange={handleRemarksChange}
+        className="min-h-[120px]"
       />
+      
+      <p className="text-xs text-gray-500">
+        These remarks will be saved with your completed checklist.
+      </p>
     </div>
   );
 };
