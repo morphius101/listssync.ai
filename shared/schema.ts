@@ -1,4 +1,4 @@
-import { pgTable, text, serial, integer, boolean, timestamp, jsonb, varchar } from "drizzle-orm/pg-core";
+import { pgTable, index, text, serial, integer, boolean, timestamp, jsonb, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -12,7 +12,12 @@ export const tasks = pgTable("tasks", {
   photoRequired: boolean("photo_required").notNull().default(false),
   photoUrl: text("photo_url"),
   orderIndex: integer("order_index").notNull().default(0),
-});
+}, (table) => ({
+  // Index for faster task lookup by checklist
+  checklistIdIdx: index("task_checklist_id_idx").on(table.checklistId),
+  // Composite index for efficient querying of task status within checklists
+  taskStatusIdx: index("task_status_idx").on(table.checklistId, table.completed)
+}));
 
 // Checklist Schema
 export const checklists = pgTable("checklists", {
@@ -26,7 +31,14 @@ export const checklists = pgTable("checklists", {
   tasksData: jsonb("tasks_data"), // Store tasks as JSON for Firebase compatibility
   shareToken: text("share_token"),
   userId: text("user_id"), // Firebase user ID
-});
+}, (table) => ({
+  // Index for faster lookup by user
+  userIdIdx: index("checklist_user_id_idx").on(table.userId),
+  // Index for finding checklists by status
+  statusIdx: index("checklist_status_idx").on(table.status),
+  // Index for finding shared checklists
+  shareTokenIdx: index("checklist_share_token_idx").on(table.shareToken)
+}));
 
 // Insert Schemas
 export const insertTaskSchema = createInsertSchema(tasks).omit({
@@ -89,7 +101,16 @@ export const verifications = pgTable("verifications", {
   recipientEmail: text("recipient_email"),
   recipientPhone: text("recipient_phone"),
   checklistId: text("checklist_id"),
-});
+}, (table) => ({
+  // Index for faster token lookup
+  tokenIdx: index("verification_token_idx").on(table.token),
+  // Index for expiration query optimizations
+  expiresAtIdx: index("verification_expires_at_idx").on(table.expiresAt),
+  // Index for finding verifications by checklist
+  checklistIdIdx: index("verification_checklist_id_idx").on(table.checklistId),
+  // Composite index for contact lookups
+  contactIdx: index("verification_contact_idx").on(table.recipientEmail, table.recipientPhone)
+}));
 
 export const insertVerificationSchema = createInsertSchema(verifications).omit({
   id: true,

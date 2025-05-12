@@ -92,17 +92,119 @@ export const getQueryFn: <T>(options: {
     return await res.json();
   };
 
+// Helper to check if we're in a browser environment
+const isBrowser = typeof window !== 'undefined';
+
+// Create a persistent cache storage
+const createPersistentCache = () => {
+  const CACHE_KEY = 'LISTSYNC_QUERY_CACHE';
+  
+  return {
+    getItem: (key: string): Promise<string | null> => {
+      if (!isBrowser) return Promise.resolve(null);
+      const storageData = localStorage.getItem(CACHE_KEY);
+      if (!storageData) return Promise.resolve(null);
+      
+      try {
+        const cache = JSON.parse(storageData);
+        return Promise.resolve(cache[key] || null);
+      } catch (e) {
+        console.error('Error retrieving from cache:', e);
+        return Promise.resolve(null);
+      }
+    },
+    
+    setItem: (key: string, value: string): Promise<void> => {
+      if (!isBrowser) return Promise.resolve();
+      try {
+        const storageData = localStorage.getItem(CACHE_KEY);
+        const cache = storageData ? JSON.parse(storageData) : {};
+        cache[key] = value;
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+        return Promise.resolve();
+      } catch (e) {
+        console.error('Error saving to cache:', e);
+        return Promise.resolve();
+      }
+    },
+    
+    removeItem: (key: string): Promise<void> => {
+      if (!isBrowser) return Promise.resolve();
+      try {
+        const storageData = localStorage.getItem(CACHE_KEY);
+        if (!storageData) return Promise.resolve();
+        
+        const cache = JSON.parse(storageData);
+        delete cache[key];
+        localStorage.setItem(CACHE_KEY, JSON.stringify(cache));
+        return Promise.resolve();
+      } catch (e) {
+        console.error('Error removing from cache:', e);
+        return Promise.resolve();
+      }
+    }
+  };
+};
+
+// Network detection for offline mode handling
+const setupNetworkDetection = (client: QueryClient) => {
+  if (!isBrowser) return;
+  
+  const updateNetworkStatus = () => {
+    const isOnline = navigator.onLine;
+    if (isOnline) {
+      // When we come back online, refetch any stale queries
+      client.resumePausedMutations();
+      client.invalidateQueries();
+    }
+  };
+  
+  window.addEventListener('online', updateNetworkStatus);
+  window.addEventListener('offline', updateNetworkStatus);
+};
+
 export const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
       queryFn: getQueryFn({ on401: "throw" }),
       refetchInterval: false,
-      refetchOnWindowFocus: false,
-      staleTime: Infinity,
-      retry: false,
+      refetchOnWindowFocus: true, // Enable refetch on window focus to sync data
+      staleTime: 5 * 60 * 1000, // 5 minutes stale time instead of infinity
+      gcTime: 30 * 60 * 1000, // 30 minutes garbage collection time
+      retry: 3, // Retry failed requests 3 times
+      retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000), // Exponential backoff
     },
     mutations: {
-      retry: false,
+      retry: 2, // Retry mutations up to 2 times
     },
   },
 });
+
+// Initialize network detection after creating the client
+setupNetworkDetection(queryClient);
+
+// Initialize the cache hydration on startup
+if (isBrowser) {
+  const hydrateCache = async () => {
+    try {
+      const persistentCache = createPersistentCache();
+      const storageData = localStorage.getItem('LISTSYNC_QUERY_CACHE');
+      
+      if (storageData) {
+        const cache = JSON.parse(storageData);
+        
+        // Iterate through the cache and set the data in the query client
+        for (const [key, value] of Object.entries(cache)) {
+          const parsedData = JSON.parse(value as string);
+          queryClient.setQueryData([key], parsedData);
+        }
+        
+        console.log('Query cache hydrated successfully');
+      }
+    } catch (e) {
+      console.error('Error hydrating cache:', e);
+    }
+  };
+  
+  hydrateCache();
+}
