@@ -1,67 +1,88 @@
-import { useState, useEffect } from "react";
-import { 
+import { useState } from 'react';
+import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle, 
+  DialogDescription,
   DialogFooter,
-  DialogDescription
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Info, Copy, RefreshCw } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useVerification } from '@/hooks/useVerification';
+import { useTranslation, LanguageCode } from '@/hooks/useTranslation';
+import { Checklist } from '@/types';
+import { Loader2, ClipboardCopy, Mail, Phone, Languages, Smartphone, Globe } from 'lucide-react';
 
 interface ShareLinkModalProps {
   isOpen: boolean;
   onClose: () => void;
   checklistId: string;
-  onGenerateNewLink: () => Promise<string>;
+  checklist: Checklist;
 }
 
-const ShareLinkModal = ({ isOpen, onClose, checklistId, onGenerateNewLink }: ShareLinkModalProps) => {
-  const [shareLink, setShareLink] = useState("");
-  const [isGenerating, setIsGenerating] = useState(false);
-  const { toast } = useToast();
+export default function ShareLinkModal({ 
+  isOpen, 
+  onClose, 
+  checklistId, 
+  checklist 
+}: ShareLinkModalProps) {
+  const [shareLink, setShareLink] = useState<string | null>(null);
+  const [isCopied, setIsCopied] = useState(false);
+  const [activeTab, setActiveTab] = useState('email');
+  const [recipientEmail, setRecipientEmail] = useState('');
+  const [recipientPhone, setRecipientPhone] = useState('');
+  const [recipientName, setRecipientName] = useState('');
+  const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>('en');
   
-  // Generate link when modal opens
-  useEffect(() => {
-    if (isOpen && !shareLink) {
-      generateLink();
+  const { isLoading, shareChecklist } = useVerification();
+  const { languages, isTranslating, translateChecklist } = useTranslation();
+
+  const handleShareLink = async () => {
+    if ((activeTab === 'email' && !recipientEmail) || (activeTab === 'phone' && !recipientPhone)) {
+      return;
     }
-  }, [isOpen]);
-  
-  const generateLink = async () => {
-    setIsGenerating(true);
-    try {
-      const newLink = await onGenerateNewLink();
-      setShareLink(newLink);
-    } catch (error) {
-      console.error('Error generating link:', error);
-      toast({
-        title: "Error",
-        description: "Failed to generate share link. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsGenerating(false);
+    
+    // Create a translated version if not in English
+    let checklistToShare = checklist;
+    if (selectedLanguage !== 'en') {
+      try {
+        checklistToShare = await translateChecklist(checklist.id, selectedLanguage, 'en');
+      } catch (error) {
+        console.error('Translation error:', error);
+        // Continue with original checklist if translation fails
+      }
+    }
+    
+    // Share the checklist
+    const response = await shareChecklist(
+      checklistToShare.id,
+      activeTab === 'email' ? recipientEmail : undefined,
+      activeTab === 'phone' ? recipientPhone : undefined,
+      recipientName
+    );
+    
+    if (response?.shareUrl) {
+      setShareLink(response.shareUrl);
     }
   };
-  
+
   const handleCopyLink = () => {
-    navigator.clipboard.writeText(shareLink).then(() => {
-      toast({
-        title: "Link copied",
-        description: "Share link copied to clipboard",
-      });
-    }).catch(err => {
-      console.error('Error copying text: ', err);
-      toast({
-        title: "Copy failed",
-        description: "Failed to copy link to clipboard",
-        variant: "destructive",
-      });
-    });
+    if (shareLink) {
+      navigator.clipboard.writeText(shareLink);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    }
   };
 
   return (
@@ -70,58 +91,127 @@ const ShareLinkModal = ({ isOpen, onClose, checklistId, onGenerateNewLink }: Sha
         <DialogHeader>
           <DialogTitle>Share Checklist</DialogTitle>
           <DialogDescription>
-            Share this link with your cleaner
+            Send this checklist to team members with verification.
           </DialogDescription>
         </DialogHeader>
         
-        <div className="space-y-4">
-          <div className="flex">
-            <Input
-              type="text"
-              readOnly
-              className="flex-1 rounded-r-none"
-              value={shareLink}
-            />
-            <Button
-              className="rounded-l-none"
-              onClick={handleCopyLink}
-            >
-              <Copy className="h-4 w-4 mr-2" />
-              Copy
-            </Button>
-          </div>
-          
-          <div className="bg-blue-50 border border-blue-200 rounded-md p-3">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <Info className="h-5 w-5 text-blue-400" />
-              </div>
-              <div className="ml-3 text-sm text-blue-700">
-                <p>Anyone with this link can view and complete the checklist. Generate a new link if needed for security.</p>
-              </div>
+        {shareLink ? (
+          <div className="space-y-4">
+            <div className="bg-green-50 p-3 rounded-md text-green-700 text-center">
+              Verification code sent to recipient
             </div>
+            
+            <div className="flex items-center space-x-2">
+              <Input readOnly value={shareLink} className="flex-1" />
+              <Button onClick={handleCopyLink} variant="outline" size="sm">
+                {isCopied ? 'Copied!' : 'Copy'}
+                <ClipboardCopy className="w-4 h-4 ml-2" />
+              </Button>
+            </div>
+            
+            <p className="text-sm text-gray-500 text-center">
+              The recipient will need to enter the verification code to access the checklist.
+            </p>
           </div>
-          
-          <div>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-sm text-primary hover:text-primary-dark font-medium focus:outline-none flex items-center space-x-1"
-              disabled={isGenerating}
-              onClick={generateLink}
+        ) : (
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <Globe className="w-4 h-4 text-gray-500" />
+              <Label htmlFor="language">Language for recipient</Label>
+              <Select
+                value={selectedLanguage}
+                onValueChange={(value) => setSelectedLanguage(value as LanguageCode)}
+              >
+                <SelectTrigger id="language" className="flex-1">
+                  <SelectValue placeholder="Select language" />
+                </SelectTrigger>
+                <SelectContent>
+                  {languages.map((lang) => (
+                    <SelectItem key={lang.code} value={lang.code}>
+                      {lang.flag} {lang.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="recipient-name">Recipient's name (optional)</Label>
+              <Input
+                id="recipient-name"
+                value={recipientName}
+                onChange={(e) => setRecipientName(e.target.value)}
+                placeholder="Enter recipient's name"
+              />
+            </div>
+            
+            <Tabs defaultValue="email" value={activeTab} onValueChange={setActiveTab}>
+              <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="email" className="flex items-center">
+                  <Mail className="w-4 h-4 mr-2" />
+                  Email
+                </TabsTrigger>
+                <TabsTrigger value="phone" className="flex items-center">
+                  <Phone className="w-4 h-4 mr-2" />
+                  Phone
+                </TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="email" className="space-y-2">
+                <Label htmlFor="email">Email address</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  placeholder="recipient@example.com"
+                />
+              </TabsContent>
+              
+              <TabsContent value="phone" className="space-y-2">
+                <Label htmlFor="phone">Phone number</Label>
+                <Input
+                  id="phone"
+                  type="tel"
+                  value={recipientPhone}
+                  onChange={(e) => setRecipientPhone(e.target.value)}
+                  placeholder="+1 (555) 123-4567"
+                />
+              </TabsContent>
+            </Tabs>
+            
+            <div className="bg-blue-50 p-3 rounded-md text-blue-700 text-sm flex items-start">
+              <Smartphone className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
+              <p>
+                The recipient will receive a verification code to access the checklist.
+                They can complete it from any device with a web browser.
+              </p>
+            </div>
+            
+            <Button 
+              onClick={handleShareLink} 
+              disabled={isLoading || isTranslating || 
+                (activeTab === 'email' && !recipientEmail) || 
+                (activeTab === 'phone' && !recipientPhone)
+              }
+              className="w-full"
             >
-              <RefreshCw className="h-3 w-3 mr-1" />
-              <span>Generate New Link</span>
+              {(isLoading || isTranslating) && (
+                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              )}
+              {isTranslating ? 'Translating...' : (isLoading ? 'Sending...' : 'Share Checklist')}
             </Button>
           </div>
-        </div>
+        )}
         
         <DialogFooter>
-          <Button onClick={onClose}>Close</Button>
+          {shareLink && (
+            <Button onClick={onClose}>
+              Done
+            </Button>
+          )}
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
-};
-
-export default ShareLinkModal;
+}

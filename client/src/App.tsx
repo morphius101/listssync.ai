@@ -6,6 +6,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import NotFound from "@/pages/not-found";
 import AdminDashboard from "@/pages/AdminDashboard";
 import ChecklistView from "@/pages/ChecklistView";
+import SharedChecklist from "@/pages/SharedChecklist";
 import Header from "@/components/Header";
 import LandingPage from "@/components/LandingPage";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -19,6 +20,8 @@ function Router() {
   return (
     <Switch>
       <Route path="/" component={LandingPage} />
+      
+      {/* Protected admin dashboard */}
       <Route path="/dashboard">
         {() => (
           <ProtectedRoute>
@@ -26,6 +29,8 @@ function Router() {
           </ProtectedRoute>
         )}
       </Route>
+      
+      {/* Protected checklist view */}
       <Route path="/checklist/:id">
         {(params) => (
           <ProtectedRoute>
@@ -33,6 +38,11 @@ function Router() {
           </ProtectedRoute>
         )}
       </Route>
+      
+      {/* Publicly shared checklist with verification */}
+      <Route path="/shared/:token" component={SharedChecklist} />
+      
+      {/* 404 page */}
       <Route component={NotFound} />
     </Switch>
   );
