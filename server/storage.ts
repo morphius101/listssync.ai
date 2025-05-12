@@ -1,4 +1,12 @@
-import { ChecklistDTO, TaskDTO, ChecklistSummaryDTO, checklists, tasks } from "@shared/schema";
+import { 
+  ChecklistDTO, 
+  TaskDTO, 
+  ChecklistSummaryDTO, 
+  VerificationDTO,
+  checklists, 
+  tasks,
+  verifications 
+} from "@shared/schema";
 import { db } from "./db";
 import { eq, and } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
@@ -10,6 +18,11 @@ export interface IStorage {
   updateChecklist(checklist: ChecklistDTO): Promise<ChecklistDTO | undefined>;
   deleteChecklist(id: string): Promise<boolean>;
   updateTask(checklistId: string, taskId: string, updates: Partial<TaskDTO>): Promise<TaskDTO | undefined>;
+  
+  // Verification methods for scalable access control
+  createVerification(verification: VerificationDTO): Promise<VerificationDTO>;
+  getVerificationByToken(token: string): Promise<VerificationDTO | undefined>;
+  markVerificationAsVerified(token: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -179,7 +192,76 @@ export class DatabaseStorage implements IStorage {
     
     return updatedTask;
   }
+
+  // Verification Methods
+  async createVerification(verification: VerificationDTO): Promise<VerificationDTO> {
+    const [insertedVerification] = await db
+      .insert(verifications)
+      .values({
+        token: verification.token,
+        code: verification.code,
+        expiresAt: verification.expiresAt,
+        verified: verification.verified,
+        recipientId: verification.recipientId,
+        recipientEmail: verification.recipientEmail,
+        recipientPhone: verification.recipientPhone,
+        checklistId: verification.checklistId,
+      })
+      .returning();
+    
+    return {
+      token: insertedVerification.token,
+      code: insertedVerification.code,
+      createdAt: insertedVerification.createdAt,
+      expiresAt: insertedVerification.expiresAt,
+      verified: insertedVerification.verified,
+      recipientId: insertedVerification.recipientId,
+      recipientEmail: insertedVerification.recipientEmail || undefined,
+      recipientPhone: insertedVerification.recipientPhone || undefined,
+      checklistId: insertedVerification.checklistId || undefined,
+    };
+  }
+  
+  async getVerificationByToken(token: string): Promise<VerificationDTO | undefined> {
+    try {
+      const [foundVerification] = await db
+        .select()
+        .from(verifications)
+        .where(eq(verifications.token, token));
+      
+      if (!foundVerification) return undefined;
+      
+      return {
+        token: foundVerification.token,
+        code: foundVerification.code,
+        createdAt: foundVerification.createdAt,
+        expiresAt: foundVerification.expiresAt,
+        verified: foundVerification.verified,
+        recipientId: foundVerification.recipientId,
+        recipientEmail: foundVerification.recipientEmail || undefined,
+        recipientPhone: foundVerification.recipientPhone || undefined,
+        checklistId: foundVerification.checklistId || undefined,
+      };
+    } catch (error) {
+      console.error('Error retrieving verification:', error);
+      return undefined;
+    }
+  }
+  
+  async markVerificationAsVerified(token: string): Promise<boolean> {
+    try {
+      const [updated] = await db
+        .update(verifications)
+        .set({ verified: true })
+        .where(eq(verifications.token, token))
+        .returning();
+      
+      return !!updated;
+    } catch (error) {
+      console.error('Error marking verification as verified:', error);
+      return false;
+    }
+  }
 }
 
-// Use the new DatabaseStorage
 export const storage = new DatabaseStorage();
