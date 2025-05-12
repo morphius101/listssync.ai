@@ -163,14 +163,25 @@ export default function ShareLinkModal({
           console.log('Using checklistId directly:', checklistId);
           const recipientId = `recipient_${Date.now()}`;
           
-          // Share the checklist using the ID directly
-          const response = await shareChecklist({
-            checklistId,
-            email: activeTab === 'email' ? recipientEmail : undefined,
-            phone: activeTab === 'phone' ? recipientPhone : undefined,
+          // Share checklist parameters
+          const params: SendVerificationParams = {
+            checklistId: checklistId,
             recipientName,
             recipientId
-          });
+          };
+          
+          // Add either email or phone based on active tab
+          if (activeTab === 'email' && recipientEmail) {
+            params.email = recipientEmail;
+          } else if (activeTab === 'phone' && recipientPhone) {
+            params.phone = recipientPhone;
+          }
+          
+          // Log what we're sending to the API
+          console.log('Sending verification params:', params);
+          
+          // Share the checklist using the ID directly
+          const response = await shareChecklist(params);
           
           if (response?.shareUrl) {
             setShareLink(response.shareUrl);
