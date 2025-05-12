@@ -239,9 +239,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       let { recipientId, email, phone, checklistId, recipientName } = req.body;
       
-      if ((!email && !phone) || !checklistId) {
+      console.log('verification/send request received:', { 
+        recipientId, 
+        email, 
+        phone, 
+        checklistId, 
+        recipientName 
+      });
+      
+      if (!email && !phone) {
         return res.status(400).json({ 
-          message: "Missing required fields: checklistId, and either email or phone" 
+          message: "Missing required fields: either email or phone must be provided" 
+        });
+      }
+      
+      if (!checklistId) {
+        return res.status(400).json({ 
+          message: "Missing required field: checklistId" 
         });
       }
       

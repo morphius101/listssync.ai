@@ -176,8 +176,17 @@ export default function ShareLinkModal({
       // Generate a recipient ID if not provided
       const recipientId = `recipient_${Date.now()}`;
       
-      // Make sure we have a valid checklistId - use a fallback if needed
-      const finalChecklistId = checklistToShare?.id || checklistId || "fallback_checklist_123";
+      // Make sure we have a valid checklistId 
+      let finalChecklistId;
+      if (checklistToShare?.id) {
+        finalChecklistId = checklistToShare.id;
+      } else if (checklistId) {
+        finalChecklistId = checklistId;
+      } else {
+        console.error("No valid checklist ID is available!");
+        setError("Unable to share checklist: No valid ID available");
+        return;
+      }
       
       // Share the checklist
       console.log('Sharing checklist with ID:', finalChecklistId);
