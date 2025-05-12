@@ -1,7 +1,10 @@
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { ArrowRight, Check, Wifi, WifiOff, Smartphone, XCircle } from 'lucide-react';
+import { 
+  ArrowRight, Check, Wifi, WifiOff, Smartphone, XCircle,
+  Languages, Share2, Globe, MessageSquare
+} from 'lucide-react';
 import { Logo } from './Logo';
 import { useAuth } from '@/hooks/useAuth';
 import { signInWithGoogle } from '@/lib/firebase';
@@ -47,6 +50,16 @@ const LandingPage = () => {
       icon: <Smartphone className="h-5 w-5 text-primary" />, 
       title: 'Photo verification', 
       description: 'Capture photo proof directly in checklists to verify task completion.' 
+    },
+    { 
+      icon: <Languages className="h-5 w-5 text-primary" />, 
+      title: 'Multilingual support', 
+      description: 'Create checklists in one language and share them in another. Automatic translation between languages.' 
+    },
+    { 
+      icon: <Share2 className="h-5 w-5 text-primary" />, 
+      title: 'Secure sharing', 
+      description: 'Send checklists securely with phone or email verification to confirm recipient identity.' 
     },
   ];
 
