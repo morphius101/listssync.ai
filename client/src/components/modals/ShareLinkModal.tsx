@@ -47,64 +47,95 @@ export default function ShareLinkModal({
   const [recipientName, setRecipientName] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>('en');
   const [response, setResponse] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
   
   const { isLoading, shareChecklist } = useVerification();
   const { languages, isTranslating, translateChecklist } = useTranslation();
 
   const handleShareLink = async () => {
-    if ((activeTab === 'email' && !recipientEmail) || (activeTab === 'phone' && !recipientPhone)) {
+    // Reset any previous errors
+    setError(null);
+    
+    // Validate required fields
+    if (activeTab === 'email' && !recipientEmail) {
+      setError('Please enter a valid email address.');
       return;
     }
     
-    // If we don't have the full checklist object but we have the generateNewLink function, use it directly
-    if (!checklist && onGenerateNewLink) {
-      try {
-        const link = await onGenerateNewLink();
-        setShareLink(link);
-        setResponse({
-          shareUrl: link,
-          maskedEmail: activeTab === 'email' ? recipientEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3") : undefined,
-          maskedPhone: activeTab === 'phone' ? recipientPhone.replace(/(\d{3})(\d+)(\d{4})/, "$1-***-$3") : undefined
-        });
-        return;
-      } catch (error) {
-        console.error('Error generating link:', error);
-        return;
-      }
-    }
-    
-    // If we don't have either, we can't proceed
-    if (!checklist) {
-      console.error('No checklist data available');
+    if (activeTab === 'phone' && !recipientPhone) {
+      setError('Please enter a valid phone number.');
       return;
     }
     
-    // Create a translated version if not in English
-    let checklistToShare = checklist;
-    if (selectedLanguage !== 'en') {
-      try {
-        checklistToShare = await translateChecklist(checklist.id, selectedLanguage, 'en');
-      } catch (error) {
-        console.error('Translation error:', error);
-        // Continue with original checklist if translation fails
+    try {
+      // If we don't have the full checklist object but we have the generateNewLink function, use it directly
+      if (!checklist && onGenerateNewLink) {
+        try {
+          const link = await onGenerateNewLink();
+          setShareLink(link);
+          setResponse({
+            shareUrl: link,
+            maskedEmail: activeTab === 'email' ? recipientEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3") : undefined,
+            maskedPhone: activeTab === 'phone' ? recipientPhone.replace(/(\d{3})(\d+)(\d{4})/, "$1-***-$3") : undefined
+          });
+          return;
+        } catch (error: any) {
+          console.error('Error generating link:', error);
+          setError(error.message || 'Failed to generate share link');
+          return;
+        }
       }
+      
+      // If we don't have either, we can't proceed
+      if (!checklist) {
+        setError('No checklist data available to share');
+        console.error('No checklist data available');
+        return;
+      }
+    } catch (err: any) {
+      setError(err.message || 'An error occurred while preparing to share the checklist');
+      console.error('Share preparation error:', err);
     }
     
-    // Generate a recipient ID if not provided
-    const recipientId = `recipient_${Date.now()}`;
-    
-    // Share the checklist
-    const response = await shareChecklist({
-      checklistId: checklistToShare.id,
-      email: activeTab === 'email' ? recipientEmail : undefined,
-      phone: activeTab === 'phone' ? recipientPhone : undefined,
-      recipientName,
-      recipientId
-    });
-    
-    if (response?.shareUrl) {
-      setShareLink(response.shareUrl);
-      setResponse(response);
+    try {
+      // Create a translated version if not in English
+      let checklistToShare = checklist;
+      if (checklistToShare && selectedLanguage !== 'en') {
+        try {
+          checklistToShare = await translateChecklist(checklistToShare.id, selectedLanguage, 'en');
+        } catch (error) {
+          console.error('Translation error:', error);
+          // Continue with original checklist if translation fails
+        }
+      }
+      
+      // Make sure we have a valid checklist
+      if (!checklistToShare) {
+        setError('Invalid checklist data');
+        return;
+      }
+      
+      // Generate a recipient ID if not provided
+      const recipientId = `recipient_${Date.now()}`;
+      
+      // Share the checklist
+      const response = await shareChecklist({
+        checklistId: checklistToShare.id,
+        email: activeTab === 'email' ? recipientEmail : undefined,
+        phone: activeTab === 'phone' ? recipientPhone : undefined,
+        recipientName,
+        recipientId
+      });
+      
+      if (response?.shareUrl) {
+        setShareLink(response.shareUrl);
+        setResponse(response);
+      } else {
+        setError('Failed to generate a share link. Please try again.');
+      }
+    } catch (err: any) {
+      console.error('Share checklist error:', err);
+      setError(err.message || 'Failed to share checklist. Please try again.');
     }
   };
 
