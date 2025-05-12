@@ -39,6 +39,8 @@ export default function ShareLinkModal({
   checklist,
   onGenerateNewLink
 }: ShareLinkModalProps) {
+  console.log("ShareLinkModal rendered with checklistId:", checklistId);
+  console.log("ShareLinkModal rendered with checklist:", checklist);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('email');
@@ -64,6 +66,13 @@ export default function ShareLinkModal({
     
     if (activeTab === 'phone' && !recipientPhone) {
       setError('Please enter a valid phone number.');
+      return;
+    }
+    
+    // Validate checklist ID
+    if (!checklistId) {
+      console.error("Missing checklist ID");
+      setError('Unable to share: missing checklist ID.');
       return;
     }
     

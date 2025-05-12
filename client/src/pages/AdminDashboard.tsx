@@ -92,12 +92,23 @@ const AdminDashboard = () => {
 
   const handleShare = async (id: string) => {
     try {
+      console.log("Sharing checklist with ID:", id);
+      
       // Fetch the full checklist with tasks from the server
       const fullChecklist = await getChecklistById(id);
+      console.log("Fetched full checklist:", fullChecklist);
       
       if (fullChecklist) {
         setCurrentChecklist(fullChecklist);
+        console.log("Set current checklist:", fullChecklist.id);
         setIsShareModalOpen(true);
+      } else {
+        console.error("Could not fetch checklist with ID:", id);
+        toast({
+          title: "Error",
+          description: "Could not load checklist for sharing. Please try again.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Error fetching checklist for sharing:", error);
@@ -196,13 +207,15 @@ const AdminDashboard = () => {
         </>
       )}
       
-      <ShareLinkModal
-        isOpen={isShareModalOpen}
-        onClose={() => setIsShareModalOpen(false)}
-        checklistId={currentChecklist?.id || ""}
-        checklist={currentChecklist || undefined}
-        onGenerateNewLink={handleGenerateNewLink}
-      />
+      {currentChecklist && (
+        <ShareLinkModal
+          isOpen={isShareModalOpen}
+          onClose={() => setIsShareModalOpen(false)}
+          checklistId={currentChecklist.id}
+          checklist={currentChecklist}
+          onGenerateNewLink={handleGenerateNewLink}
+        />
+      )}
       
       <AlertDialog open={!!checklistToDelete} onOpenChange={() => setChecklistToDelete(null)}>
         <AlertDialogContent>
