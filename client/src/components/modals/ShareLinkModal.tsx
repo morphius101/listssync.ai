@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { useVerification } from '@/hooks/useVerification';
+import { useVerification, SendVerificationParams } from '@/hooks/useVerification';
 import { useTranslation, LanguageCode } from '@/hooks/useTranslation';
 import { Checklist } from '@/types';
 import { AlertTriangle, Loader2, ClipboardCopy, Mail, Phone, Languages, Smartphone, Globe } from 'lucide-react';

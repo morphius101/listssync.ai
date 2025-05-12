@@ -247,13 +247,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recipientName 
       });
       
+      // Input validation with more detailed logging
       if (!email && !phone) {
+        console.error("Verification request missing both email and phone");
         return res.status(400).json({ 
           message: "Missing required fields: either email or phone must be provided" 
         });
       }
       
       if (!checklistId) {
+        console.error("Verification request missing checklistId");
         return res.status(400).json({ 
           message: "Missing required field: checklistId" 
         });
@@ -262,7 +265,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate a recipientId if not provided
       if (!recipientId) {
         recipientId = `recipient_${Date.now()}`;
+        console.log(`Generated recipientId: ${recipientId}`);
       }
+      
+      // Clean phone number if provided (remove any non-numeric characters)
+      if (phone) {
+        // Keep only digits
+        const cleanedPhone = phone.replace(/\D/g, '');
+        if (cleanedPhone !== phone) {
+          console.log(`Cleaned phone number from ${phone} to ${cleanedPhone}`);
+          phone = cleanedPhone;
+        }
+      }
+      
+      console.log(`Creating verification for recipient: ${recipientId}, contact: ${email || phone}`);
       
       // Create verification (async with database storage)
       const { token, code } = await createVerification(
@@ -272,12 +288,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         checklistId
       );
       
+      console.log(`Verification created with token: ${token}, code: ${code}`);
+      
       // Send verification code
       let sendSuccess = false;
       
       if (email) {
+        console.log(`Attempting to send verification email to: ${email}`);
         const emailSuccess = await sendVerificationEmail(email, code);
         if (emailSuccess) {
+          console.log(`Successfully sent verification email to: ${email}`);
           sendSuccess = true;
         } else {
           console.error(`Failed to send verification email to ${email}`);
@@ -285,8 +305,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       if (phone) {
+        console.log(`Attempting to send verification SMS to: ${phone}`);
         const smsSuccess = await sendVerificationSMS(phone, code);
         if (smsSuccess) {
+          console.log(`Successfully sent verification SMS to: ${phone}`);
           sendSuccess = true;
         } else {
           console.error(`Failed to send verification SMS to ${phone}`);

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { apiRequest } from '@/lib/queryClient';
 
-interface SendVerificationParams {
+export interface SendVerificationParams {
   checklistId: string;
   email?: string;
   phone?: string;
@@ -9,19 +9,19 @@ interface SendVerificationParams {
   recipientId?: string;
 }
 
-interface VerifyCodeParams {
+export interface VerifyCodeParams {
   token: string;
   code: string;
 }
 
-interface ShareChecklistResponse {
+export interface ShareChecklistResponse {
   token: string;
   maskedEmail?: string;
   maskedPhone?: string;
   shareUrl: string;
 }
 
-interface VerifyCodeResponse {
+export interface VerifyCodeResponse {
   verified: boolean;
   recipientId?: string;
   checklistId?: string;
