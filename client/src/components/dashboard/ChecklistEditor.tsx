@@ -146,7 +146,7 @@ const ChecklistEditor = ({ checklist, onSave, onCancel, onShare }: ChecklistEdit
               value={name}
               onChange={(e) => setName(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary"
-              placeholder="e.g. Beach House Cleaning"
+              placeholder="e.g. Site Inspection, Airbnb Turnover, Equipment Maintenance"
               required
             />
           </div>
@@ -189,7 +189,7 @@ const ChecklistEditor = ({ checklist, onSave, onCancel, onShare }: ChecklistEdit
                               className="flex-1 px-3 py-1 border border-gray-300 rounded-md shadow-sm focus:ring-primary focus:border-primary text-sm"
                               value={task.description}
                               onChange={(e) => handleTaskChange(task.id, "description", e.target.value)}
-                              placeholder="Enter task description"
+                              placeholder="e.g. Check smoke detectors, Verify inventory, Sign paperwork"
                             />
                             
                             <div className="flex items-center">
