@@ -54,7 +54,10 @@ export default function ShareLinkModal({
   const { isLoading, shareChecklist } = useVerification();
   const { languages, isTranslating, translateChecklist } = useTranslation();
 
-  const handleShareLink = async () => {
+  const handleShareLink = async (e?: React.FormEvent) => {
+    // If event provided, prevent default form submission
+    if (e) e.preventDefault();
+    
     // Reset any previous errors
     setError(null);
     
@@ -92,66 +95,10 @@ export default function ShareLinkModal({
     }
     
     try {
-      // If we don't have the full checklist object but we have the generateNewLink function, use it directly
-      if (!checklist && onGenerateNewLink) {
-        try {
-          // First try to send verification
-          console.log('Sharing checklist with ID:', checklistId);
-          const recipientId = `recipient_${Date.now()}`;
-          
-          if (!checklistId) {
-            console.error('Missing checklistId in ShareLinkModal');
-            setError('Missing checklist ID. Please try again or contact support.');
-            return;
-          }
-          
-          const response = await shareChecklist({
-            checklistId, // Use the checklistId prop directly
-            email: activeTab === 'email' ? recipientEmail : undefined,
-            phone: activeTab === 'phone' ? recipientPhone : undefined,
-            recipientName,
-            recipientId
-          });
-          
-          if (response?.shareUrl) {
-            setShareLink(response.shareUrl);
-            setResponse(response);
-            return;
-          }
-          
-          // Fall back to the onGenerateNewLink function if verification fails
-          const link = await onGenerateNewLink();
-          setShareLink(link);
-          setResponse({
-            shareUrl: link,
-            maskedEmail: activeTab === 'email' ? recipientEmail.replace(/(.{2})(.*)(@.*)/, "$1***$3") : undefined,
-            maskedPhone: activeTab === 'phone' ? recipientPhone.replace(/(\d{3})(\d+)(\d{4})/, "$1-***-$3") : undefined
-          });
-          return;
-        } catch (error: any) {
-          console.error('Error generating link:', error);
-          setError(error.message || 'Failed to generate share link');
-          return;
-        }
-      }
-      
-      // If we don't have either, we can't proceed
-      if (!checklist) {
-        setError('No checklist data available to share');
-        console.error('No checklist data available');
-        return;
-      }
-    } catch (err: any) {
-      setError(err.message || 'An error occurred while preparing to share the checklist');
-      console.error('Share preparation error:', err);
-    }
-    
-    try {
-      // Create a translated version if not in English
+      // Make a copy of the checklist for potential translation
       let checklistToShare = checklist;
-      console.log('Checklist object:', checklist);
-      console.log('ChecklistId prop:', checklistId);
       
+      // Translate the checklist if needed
       if (checklistToShare && selectedLanguage !== 'en') {
         try {
           checklistToShare = await translateChecklist(checklistToShare.id, selectedLanguage, 'en');
@@ -178,8 +125,10 @@ export default function ShareLinkModal({
           // Add either email or phone based on active tab
           if (activeTab === 'email' && recipientEmail) {
             params.email = recipientEmail;
+            console.log('Using email for verification:', recipientEmail);
           } else if (activeTab === 'phone' && recipientPhone) {
             params.phone = recipientPhone;
+            console.log('Using phone for verification:', recipientPhone);
           }
           
           // Log what we're sending to the API
@@ -257,25 +206,24 @@ export default function ShareLinkModal({
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>Share Checklist</DialogTitle>
           <DialogDescription>
-            Send this checklist to team members with verification.
+            Send the checklist to someone for completion
           </DialogDescription>
         </DialogHeader>
         
         {shareLink ? (
           <div className="space-y-4">
-            <div className="bg-green-50 p-4 rounded-md text-green-700">
-              <h3 className="font-semibold text-center mb-2">Verification code sent!</h3>
-              <p className="text-sm">
-                {activeTab === 'email' && response?.maskedEmail && (
-                  <>A verification code has been sent to <span className="font-medium">{response.maskedEmail}</span></>
+            <div className="bg-green-50 p-3 rounded-md text-green-700 text-sm">
+              <p className="font-medium">
+                {response?.maskedEmail && (
+                  <>A verification code has been sent to <span className="font-bold">{response.maskedEmail}</span></>
                 )}
-                {activeTab === 'phone' && response?.maskedPhone && (
-                  <>A verification code has been sent to <span className="font-medium">{response.maskedPhone}</span></>
+                {response?.maskedPhone && (
+                  <>A verification code has been sent to <span className="font-bold">{response.maskedPhone}</span></>
                 )}
                 {!response?.maskedEmail && !response?.maskedPhone && (
                   <>A verification code has been sent to the recipient</>
@@ -299,7 +247,7 @@ export default function ShareLinkModal({
             </p>
           </div>
         ) : (
-          <div className="space-y-4">
+          <form onSubmit={handleShareLink} className="space-y-4">
             <div className="flex items-center space-x-2">
               <Globe className="w-4 h-4 text-gray-500" />
               <Label htmlFor="language">Language for recipient</Label>
@@ -381,17 +329,7 @@ export default function ShareLinkModal({
             )}
             
             <Button 
-              onClick={(e) => {
-                e.preventDefault(); // Prevent default form submission
-                console.log('Share button clicked with values:', {
-                  activeTab,
-                  recipientEmail: activeTab === 'email' ? recipientEmail : undefined,
-                  recipientPhone: activeTab === 'phone' ? recipientPhone : undefined,
-                  recipientName,
-                  checklistId
-                });
-                handleShareLink();
-              }} 
+              type="submit"
               disabled={isLoading || isTranslating || 
                 (activeTab === 'email' && !recipientEmail) || 
                 (activeTab === 'phone' && !recipientPhone)
@@ -403,7 +341,7 @@ export default function ShareLinkModal({
               )}
               {isTranslating ? 'Translating...' : (isLoading ? 'Sending...' : 'Share Checklist')}
             </Button>
-          </div>
+          </form>
         )}
         
         <DialogFooter>
