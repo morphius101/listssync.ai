@@ -57,11 +57,30 @@ export function useVerification() {
     setIsLoading(true);
     setError(null);
     
+    console.log("useVerification.shareChecklist called with:", {
+      checklistId,
+      email,
+      phone,
+      recipientName,
+      recipientId
+    });
+    
+    if (!checklistId) {
+      console.error("Missing checklistId in shareChecklist!");
+      setError("Missing checklist ID");
+      setIsLoading(false);
+      return null;
+    }
+    
     try {
+      // For testing purposes - use hardcoded ID if the provided one is empty
+      const finalChecklistId = checklistId || "test123";
+      console.log("Making API request with checklistId:", finalChecklistId);
+      
       const response = await apiRequest('/api/verification/send', {
         method: 'POST',
         body: JSON.stringify({
-          checklistId,
+          checklistId: finalChecklistId,
           email,
           phone,
           recipientName,

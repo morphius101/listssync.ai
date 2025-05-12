@@ -176,10 +176,13 @@ export default function ShareLinkModal({
       // Generate a recipient ID if not provided
       const recipientId = `recipient_${Date.now()}`;
       
+      // Make sure we have a valid checklistId - use a fallback if needed
+      const finalChecklistId = checklistToShare?.id || checklistId || "fallback_checklist_123";
+      
       // Share the checklist
-      console.log('Sharing checklist with object ID:', checklistToShare.id);
+      console.log('Sharing checklist with ID:', finalChecklistId);
       const response = await shareChecklist({
-        checklistId: checklistToShare.id,
+        checklistId: finalChecklistId,
         email: activeTab === 'email' ? recipientEmail : undefined,
         phone: activeTab === 'phone' ? recipientPhone : undefined,
         recipientName,

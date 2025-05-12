@@ -28,6 +28,14 @@ export async function apiRequest(
   // Ensure headers exist
   options.headers = options.headers || {};
   
+  // Debug API requests
+  if (options.method === "POST" && options.body) {
+    try {
+      console.log(`API Request to ${url}:`, JSON.parse(options.body as string));
+    } catch (e) {
+      console.log(`API Request to ${url} (unparseable body)`);
+    }
+  }
   // Include credentials
   options.credentials = 'include';
   
