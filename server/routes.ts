@@ -262,8 +262,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await sendVerificationSMS(phone, code);
       }
       
-      // Return masked contact info and token
-      const response: any = { token };
+      // Create share URL with token
+      const shareUrl = `${req.protocol}://${req.get('host')}/shared/${token}`;
+      
+      // Return masked contact info, token, and share URL
+      const response: any = { 
+        token,
+        shareUrl,
+        message: "Verification code sent to recipient" 
+      };
       
       if (email) {
         response.maskedEmail = formatEmailForDisplay(email);

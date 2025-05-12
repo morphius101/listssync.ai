@@ -46,6 +46,7 @@ export default function ShareLinkModal({
   const [recipientPhone, setRecipientPhone] = useState('');
   const [recipientName, setRecipientName] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>('en');
+  const [response, setResponse] = useState<any>(null);
   
   const { isLoading, shareChecklist } = useVerification();
   const { languages, isTranslating, translateChecklist } = useTranslation();
@@ -60,6 +61,11 @@ export default function ShareLinkModal({
       try {
         const link = await onGenerateNewLink();
         setShareLink(link);
+        setResponse({
+          shareUrl: link,
+          maskedEmail: activeTab === 'email' ? formatEmailDisplay(recipientEmail) : undefined,
+          maskedPhone: activeTab === 'phone' ? formatPhoneDisplay(recipientPhone) : undefined
+        });
         return;
       } catch (error) {
         console.error('Error generating link:', error);
@@ -98,6 +104,7 @@ export default function ShareLinkModal({
     
     if (response?.shareUrl) {
       setShareLink(response.shareUrl);
+      setResponse(response);
     }
   };
 
@@ -121,8 +128,22 @@ export default function ShareLinkModal({
         
         {shareLink ? (
           <div className="space-y-4">
-            <div className="bg-green-50 p-3 rounded-md text-green-700 text-center">
-              Verification code sent to recipient
+            <div className="bg-green-50 p-4 rounded-md text-green-700">
+              <h3 className="font-semibold text-center mb-2">Verification code sent!</h3>
+              <p className="text-sm">
+                {activeTab === 'email' && response?.maskedEmail && (
+                  <>A verification code has been sent to <span className="font-medium">{response.maskedEmail}</span></>
+                )}
+                {activeTab === 'phone' && response?.maskedPhone && (
+                  <>A verification code has been sent to <span className="font-medium">{response.maskedPhone}</span></>
+                )}
+                {!response?.maskedEmail && !response?.maskedPhone && (
+                  <>A verification code has been sent to the recipient</>
+                )}
+              </p>
+              <p className="text-xs mt-1">
+                The recipient will need this verification code to access the checklist.
+              </p>
             </div>
             
             <div className="flex items-center space-x-2">
