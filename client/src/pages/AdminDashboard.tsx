@@ -7,7 +7,7 @@ import ShareLinkModal from "@/components/modals/ShareLinkModal";
 import { Checklist, ChecklistSummary } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import { getChecklists, createChecklist, updateChecklist, deleteChecklist, generateShareLink } from "@/services/checklistService";
+import { getChecklists, getChecklistById, createChecklist, updateChecklist, deleteChecklist, generateShareLink } from "@/services/checklistService";
 
 const AdminDashboard = () => {
   const [checklists, setChecklists] = useState<ChecklistSummary[]>([]);
@@ -47,23 +47,11 @@ const AdminDashboard = () => {
 
   const handleEdit = async (id: string) => {
     try {
-      // Find checklist in the existing list
-      const summaryChecklist = checklists.find(c => c.id === id);
+      // Fetch the full checklist with tasks from the server
+      const fullChecklist = await getChecklistById(id);
       
-      if (summaryChecklist) {
-        // Create a full checklist object from the summary
-        const checklist: Checklist = {
-          id: summaryChecklist.id,
-          name: summaryChecklist.name,
-          status: summaryChecklist.status,
-          progress: summaryChecklist.progress,
-          createdAt: summaryChecklist.createdAt,
-          updatedAt: summaryChecklist.updatedAt,
-          tasks: [],
-          remarks: "",
-        };
-        
-        setCurrentChecklist(checklist);
+      if (fullChecklist) {
+        setCurrentChecklist(fullChecklist);
         setIsEditing(true);
       }
     } catch (error) {
@@ -102,22 +90,22 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleShare = (id: string) => {
-    const summaryChecklist = checklists.find(c => c.id === id);
-    if (summaryChecklist) {
-      // Create a full checklist object from the summary
-      const checklist: Checklist = {
-        id: summaryChecklist.id,
-        name: summaryChecklist.name,
-        status: summaryChecklist.status,
-        progress: summaryChecklist.progress,
-        createdAt: summaryChecklist.createdAt,
-        updatedAt: summaryChecklist.updatedAt,
-        tasks: [],
-        remarks: "",
-      };
-      setCurrentChecklist(checklist);
-      setIsShareModalOpen(true);
+  const handleShare = async (id: string) => {
+    try {
+      // Fetch the full checklist with tasks from the server
+      const fullChecklist = await getChecklistById(id);
+      
+      if (fullChecklist) {
+        setCurrentChecklist(fullChecklist);
+        setIsShareModalOpen(true);
+      }
+    } catch (error) {
+      console.error("Error fetching checklist for sharing:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load checklist details for sharing. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
