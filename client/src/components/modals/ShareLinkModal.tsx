@@ -28,14 +28,16 @@ interface ShareLinkModalProps {
   isOpen: boolean;
   onClose: () => void;
   checklistId: string;
-  checklist: Checklist;
+  checklist?: Checklist;
+  onGenerateNewLink?: () => Promise<string>;
 }
 
 export default function ShareLinkModal({ 
   isOpen, 
   onClose, 
   checklistId, 
-  checklist 
+  checklist,
+  onGenerateNewLink
 }: ShareLinkModalProps) {
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
@@ -53,6 +55,24 @@ export default function ShareLinkModal({
       return;
     }
     
+    // If we don't have the full checklist object but we have the generateNewLink function, use it directly
+    if (!checklist && onGenerateNewLink) {
+      try {
+        const link = await onGenerateNewLink();
+        setShareLink(link);
+        return;
+      } catch (error) {
+        console.error('Error generating link:', error);
+        return;
+      }
+    }
+    
+    // If we don't have either, we can't proceed
+    if (!checklist) {
+      console.error('No checklist data available');
+      return;
+    }
+    
     // Create a translated version if not in English
     let checklistToShare = checklist;
     if (selectedLanguage !== 'en') {
@@ -64,12 +84,16 @@ export default function ShareLinkModal({
       }
     }
     
+    // Generate a recipient ID if not provided
+    const recipientId = `recipient_${Date.now()}`;
+    
     // Share the checklist
     const response = await shareChecklist({
       checklistId: checklistToShare.id,
       email: activeTab === 'email' ? recipientEmail : undefined,
       phone: activeTab === 'phone' ? recipientPhone : undefined,
-      recipientName
+      recipientName,
+      recipientId
     });
     
     if (response?.shareUrl) {

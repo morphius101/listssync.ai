@@ -6,6 +6,7 @@ interface SendVerificationParams {
   email?: string;
   phone?: string;
   recipientName?: string;
+  recipientId?: string;
 }
 
 interface VerifyCodeParams {
