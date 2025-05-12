@@ -73,19 +73,28 @@ export function useVerification() {
     }
     
     try {
-      // For testing purposes - use hardcoded ID if the provided one is empty
-      const finalChecklistId = checklistId || "test123";
-      console.log("Making API request with checklistId:", finalChecklistId);
+      // Ensure we have a valid checklist ID
+      if (!checklistId || checklistId.trim() === '') {
+        console.error("Invalid or empty checklistId!");
+        setError("Invalid checklist ID");
+        setIsLoading(false);
+        return null;
+      }
+      
+      // Prepare API request data
+      const requestData = {
+        checklistId,
+        email: email && email.trim() !== '' ? email.trim() : undefined,
+        phone: phone && phone.trim() !== '' ? phone.trim() : undefined,
+        recipientName: recipientName || undefined,
+        recipientId: recipientId || `recipient_${Date.now()}`
+      };
+      
+      console.log("Making API request with data:", requestData);
       
       const response = await apiRequest('/api/verification/send', {
         method: 'POST',
-        body: JSON.stringify({
-          checklistId: finalChecklistId,
-          email,
-          phone,
-          recipientName,
-          recipientId
-        }),
+        body: JSON.stringify(requestData),
       });
       
       const data = await response.json();

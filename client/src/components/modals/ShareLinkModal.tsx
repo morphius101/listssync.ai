@@ -58,6 +58,16 @@ export default function ShareLinkModal({
     // Reset any previous errors
     setError(null);
     
+    // Debug form values
+    console.log('Share form values:', {
+      activeTab,
+      recipientEmail,
+      recipientPhone,
+      recipientName,
+      checklistId,
+      hasChecklist: !!checklist
+    });
+    
     // Validate required fields
     if (activeTab === 'email' && !recipientEmail) {
       setError('Please enter a valid email address.');
