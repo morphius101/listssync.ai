@@ -3,6 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { WebSocketServer } from "ws";
 import { z } from "zod";
+import compression from "compression";
 import { 
   translateChecklist, 
   translateText, 
@@ -23,6 +24,9 @@ import {
 export async function registerRoutes(app: Express): Promise<Server> {
   // API base path
   const API_BASE = "/api";
+  
+  // Setup API response compression for performance
+  app.use(compression());
 
   // Task schema for validation
   const taskSchema = z.object({
@@ -51,6 +55,73 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.query.userId as string | undefined;
       const checklists = await storage.getAllChecklists(userId);
       res.json(checklists);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+  
+  // Batch API endpoint for optimizing multiple requests
+  app.post(`${API_BASE}/batch`, async (req, res) => {
+    try {
+      // Validate batch request structure
+      if (!req.body.batch || !Array.isArray(req.body.batch)) {
+        return res.status(400).json({ message: "Invalid batch request format" });
+      }
+      
+      const batchRequests = req.body.batch;
+      const results = [];
+      
+      // Process each request in the batch
+      for (const request of batchRequests) {
+        try {
+          // Validate each request has the required fields
+          if (!request.operation || !request.path) {
+            results.push({ error: "Invalid request format" });
+            continue;
+          }
+          
+          // Handle different operation types
+          switch (request.operation) {
+            case 'get-checklist':
+              if (!request.id) {
+                results.push({ error: "Missing checklist ID" });
+                break;
+              }
+              
+              const checklist = await storage.getChecklistById(request.id);
+              results.push(checklist || { error: "Checklist not found" });
+              break;
+              
+            case 'update-task':
+              if (!request.checklistId || !request.taskId || !request.updates) {
+                results.push({ error: "Missing required parameters" });
+                break;
+              }
+              
+              const updatedTask = await storage.updateTask(
+                request.checklistId,
+                request.taskId,
+                request.updates
+              );
+              
+              results.push(updatedTask || { error: "Failed to update task" });
+              break;
+              
+            case 'get-checklists':
+              const userId = request.userId;
+              const checklists = await storage.getAllChecklists(userId);
+              results.push(checklists);
+              break;
+              
+            default:
+              results.push({ error: "Unsupported operation" });
+          }
+        } catch (error: any) {
+          results.push({ error: error.message });
+        }
+      }
+      
+      res.json(results);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
