@@ -21,6 +21,12 @@ import {
   sendVerificationEmail
 } from "./services/verificationService";
 
+// Site configuration for URLs - use custom domain in production
+const SITE_CONFIG = {
+  protocol: process.env.NODE_ENV === 'production' ? 'https' : 'http',
+  host: process.env.NODE_ENV === 'production' ? 'www.listssync.ai' : undefined // undefined will use req.get('host')
+};
+
 export async function registerRoutes(app: Express): Promise<Server> {
   // API base path
   const API_BASE = "/api";
@@ -396,8 +402,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Create share URL with token
-      const shareUrl = `${req.protocol}://${req.get('host')}/shared/${token}`;
+      // Create share URL with token, using custom domain in production
+      const protocol = SITE_CONFIG.protocol || req.protocol;
+      const host = SITE_CONFIG.host || req.get('host');
+      const shareUrl = `${protocol}://${host}/shared/${token}`;
       
       // Return masked contact info, token, and share URL
       const response: any = { 
@@ -503,8 +511,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id
       );
       
-      // Create share URL with token
-      const shareUrl = `${req.protocol}://${req.get('host')}/shared/${token}`;
+      // Create share URL with token, using custom domain in production
+      const protocol = SITE_CONFIG.protocol || req.protocol;
+      const host = SITE_CONFIG.host || req.get('host');
+      const shareUrl = `${protocol}://${host}/shared/${token}`;
       
       // Send verification via email or SMS
       if (recipientEmail) {

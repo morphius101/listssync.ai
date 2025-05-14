@@ -30,7 +30,10 @@ export function ShareChecklistModal({
   const isMobile = useIsMobile();
   
   // Generate a QR code for the checklist
-  const shareUrl = window.location.origin + '/shared/' + checklist.id;
+  // Use custom domain in production, otherwise use current origin
+  const isProduction = import.meta.env.MODE === 'production';
+  const baseUrl = isProduction ? 'https://www.listssync.ai' : window.location.origin;
+  const shareUrl = baseUrl + '/shared/' + checklist.id;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
   
   // Share via native share API (mobile)

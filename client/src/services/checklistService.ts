@@ -169,12 +169,18 @@ export const updateTaskStatus = async (checklistId: string, taskId: string, upda
 
 // Generate share link for checklist
 export const generateShareLink = async (checklistId: string): Promise<string> => {
-  // Get the current URL domain
-  const protocol = window.location.protocol;
-  const host = window.location.host;
+  // Use custom domain in production, otherwise use current domain
+  const isProduction = import.meta.env.MODE === 'production';
   
-  // Create a unique link
-  return `${protocol}//${host}/checklist/${checklistId}`;
+  if (isProduction) {
+    // Use our custom domain in production
+    return `https://www.listssync.ai/checklist/${checklistId}`;
+  } else {
+    // Use local domain in development
+    const protocol = window.location.protocol;
+    const host = window.location.host;
+    return `${protocol}//${host}/checklist/${checklistId}`;
+  }
 };
 
 // Setup real-time listener for checklist updates
