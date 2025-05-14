@@ -55,6 +55,11 @@ app.use((req, res, next) => {
   // importantly only setup vite in development and after
   // setting up all the other routes so the catch-all route
   // doesn't interfere with the other routes
+  // Add health check endpoint that works in both dev and prod
+  app.get('/health', (_req, res) => {
+    res.status(200).send('OK');
+  });
+
   if (app.get("env") === "development") {
     await setupVite(app, server);
   } else {
