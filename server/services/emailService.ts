@@ -44,9 +44,9 @@ interface EmailOptions {
  * @returns Promise resolving to true if email sent successfully, false otherwise
  */
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
-  // Default FROM address - use an available verified sender domain from SendGrid
-  // NOTE: SendGrid requires sender domain verification to avoid emails going to spam/being blocked
-  const { to, subject, text, html, from = 'notifications@listssync.ai' } = options;
+  // Use the same verified sender that worked previously with greyson.gardner.m@gmail.com
+  // We'll stick to that known working configuration until we can verify other sender addresses
+  const { to, subject, text, html, from = 'greyson@listssync.ai' } = options;
   
   // API Key validation - fail early if not configured
   if (!sendgridApiKey) {

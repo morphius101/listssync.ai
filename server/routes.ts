@@ -386,7 +386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📧 Attempting to send verification email to: ${email}`);
         console.log(`📧 Code: ${code}`);
         console.log(`📧 SENDGRID_API_KEY status: ${!!process.env.SENDGRID_API_KEY ? 'Present' : 'Missing'}`);
-        console.log(`📧 SENDER_EMAIL: notifications@listssync.ai`);
+        console.log(`📧 SENDER_EMAIL: greyson@listssync.ai`);
         console.log('================================================');
         
         try {
