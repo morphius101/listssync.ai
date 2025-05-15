@@ -313,14 +313,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Verification system routes
   app.post(`${API_BASE}/verification/send`, async (req, res) => {
+    console.log('================================================');
+    console.log('📨 VERIFICATION EMAIL SEND REQUEST RECEIVED');
+    console.log('================================================');
+    
     try {
       // Log the entire request body for debugging
-      console.log('verification/send raw request body:', req.body);
-      console.log('verification/send request headers:', req.headers);
+      console.log('📝 verification/send raw request body:', req.body);
+      console.log('📝 verification/send request headers:', req.headers);
       
       let { recipientId, email, phone, checklistId, recipientName } = req.body;
       
-      console.log('verification/send parsed fields:', { 
+      console.log('📋 verification/send parsed fields:', { 
         recipientId, 
         email, 
         phone, 
@@ -328,16 +332,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recipientName 
       });
       
+      // Verify environment variables are available
+      console.log('🔑 SENDGRID_API_KEY available:', !!process.env.SENDGRID_API_KEY);
+      
       // Input validation with more detailed logging
       if (!email && !phone) {
-        console.error("Verification request missing both email and phone");
+        console.error("❌ Verification request missing both email and phone");
         return res.status(400).json({ 
           message: "Missing required fields: either email or phone must be provided" 
         });
       }
       
       if (!checklistId) {
-        console.error("Verification request missing checklistId");
+        console.error("❌ Verification request missing checklistId");
         return res.status(400).json({ 
           message: "Missing required field: checklistId" 
         });
@@ -346,7 +353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Generate a recipientId if not provided
       if (!recipientId) {
         recipientId = `recipient_${Date.now()}`;
-        console.log(`Generated recipientId: ${recipientId}`);
+        console.log(`📌 Generated recipientId: ${recipientId}`);
       }
       
       // Clean phone number if provided (remove any non-numeric characters)

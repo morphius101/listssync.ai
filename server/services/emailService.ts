@@ -4,17 +4,29 @@ import { MailService } from '@sendgrid/mail';
 const mailService = new MailService();
 
 // Log environment variables for debugging (without revealing actual keys)
-console.log('Environment variables check:');
+console.log('📝 Email Environment variables check:');
 console.log('- NODE_ENV:', process.env.NODE_ENV || 'not set');
 console.log('- SENDGRID_API_KEY exists:', !!process.env.SENDGRID_API_KEY);
-console.log('- Available env variables:', Object.keys(process.env).join(', '));
+console.log('- SENDGRID_API_KEY value is string type:', typeof process.env.SENDGRID_API_KEY === 'string');
+console.log('- SENDGRID_API_KEY length:', process.env.SENDGRID_API_KEY ? process.env.SENDGRID_API_KEY.length : 0);
+console.log('- First characters of key (if exists):', process.env.SENDGRID_API_KEY ? process.env.SENDGRID_API_KEY.substring(0, 3) + '...' : 'N/A');
 
-if (process.env.SENDGRID_API_KEY) {
-  console.log('Setting up SendGrid with API key...');
-  mailService.setApiKey(process.env.SENDGRID_API_KEY);
-  console.log('SendGrid mail service initialized successfully');
+// SafeGetEnv - Helper to safely access env variables treating empty strings as undefined
+function safeGetEnv(key: string): string | undefined {
+  const value = process.env[key];
+  // Check if the value is undefined or empty string
+  return value && value.trim() !== '' ? value : undefined;
+}
+
+// Get the SendGrid API key safely
+const sendgridApiKey = safeGetEnv('SENDGRID_API_KEY');
+
+if (sendgridApiKey) {
+  console.log('🔑 Setting up SendGrid with valid API key...');
+  mailService.setApiKey(sendgridApiKey);
+  console.log('✅ SendGrid mail service initialized successfully');
 } else {
-  console.warn('SENDGRID_API_KEY not set, email delivery is disabled');
+  console.warn('⚠️ SENDGRID_API_KEY not set properly, email delivery is disabled');
 }
 
 interface EmailOptions {
@@ -34,14 +46,20 @@ interface EmailOptions {
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   const { to, subject, text, html, from = 'notifications@listssync.ai' } = options;
   
-  if (!process.env.SENDGRID_API_KEY) {
-    console.log('Email sending disabled - would have sent:', { to, subject, text });
+  // Use our safeGetEnv helper
+  if (!sendgridApiKey) {
+    console.log('📧 Email sending disabled - would have sent:', { to, subject, textLength: text.length });
+    console.log('===================================================');
+    console.log(`📧 SIMULATED EMAIL CONTENT: `);
+    console.log(`To: ${to}`);
+    console.log(`Subject: ${subject}`);
+    console.log(`Content: ${text.substring(0, 100)}...`);
+    console.log('===================================================');
     return false;
   }
   
   try {
-    console.log(`Attempting to send email via SendGrid to ${to}...`);
-    console.log('SendGrid API key available:', !!process.env.SENDGRID_API_KEY);
+    console.log(`📧 Attempting to send email via SendGrid to ${to}...`);
     
     // Create the message
     const message = {
@@ -52,11 +70,12 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       html,
     };
     
-    console.log('Sending message with payload:', {
+    console.log('📧 Sending message with payload:', {
       to,
       from,
       subject,
-      textLength: text.length,
+      textLength: text ? text.length : 0,
+      htmlLength: html ? html.length : 0
     });
     
     // Send the email
@@ -64,14 +83,24 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     
     console.log(`✅ SUCCESS: Email sent through SendGrid to ${to}`);
     return true;
-  } catch (error) {
-    console.error('Failed to send email. Error details:', error);
+  } catch (error: any) {
+    console.error('❌ Failed to send email. Error details:', error.message || 'Unknown error');
+    
     if (error.response) {
-      console.error('SendGrid API error response:', {
+      console.error('❌ SendGrid API error response:', {
         body: error.response.body,
         statusCode: error.response.statusCode,
       });
     }
+    
+    // Add a fallback to simulation mode if SendGrid fails
+    console.log('===================================================');
+    console.log(`📧 FALLBACK TO SIMULATION: EMAIL CONTENT: `);
+    console.log(`To: ${to}`);
+    console.log(`Subject: ${subject}`);
+    console.log(`Content: ${text.substring(0, 100)}...`);
+    console.log('===================================================');
+    
     return false;
   }
 }
