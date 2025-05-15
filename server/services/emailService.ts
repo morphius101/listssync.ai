@@ -3,8 +3,16 @@ import { MailService } from '@sendgrid/mail';
 // Initialize the SendGrid mail service
 const mailService = new MailService();
 
+// Log environment variables for debugging (without revealing actual keys)
+console.log('Environment variables check:');
+console.log('- NODE_ENV:', process.env.NODE_ENV || 'not set');
+console.log('- SENDGRID_API_KEY exists:', !!process.env.SENDGRID_API_KEY);
+console.log('- Available env variables:', Object.keys(process.env).join(', '));
+
 if (process.env.SENDGRID_API_KEY) {
+  console.log('Setting up SendGrid with API key...');
   mailService.setApiKey(process.env.SENDGRID_API_KEY);
+  console.log('SendGrid mail service initialized successfully');
 } else {
   console.warn('SENDGRID_API_KEY not set, email delivery is disabled');
 }
@@ -33,18 +41,37 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   
   try {
     console.log(`Attempting to send email via SendGrid to ${to}...`);
-    await mailService.send({
+    console.log('SendGrid API key available:', !!process.env.SENDGRID_API_KEY);
+    
+    // Create the message
+    const message = {
       to,
       from,
       subject,
       text,
       html,
+    };
+    
+    console.log('Sending message with payload:', {
+      to,
+      from,
+      subject,
+      textLength: text.length,
     });
+    
+    // Send the email
+    await mailService.send(message);
     
     console.log(`✅ SUCCESS: Email sent through SendGrid to ${to}`);
     return true;
   } catch (error) {
-    console.error('Failed to send email:', error);
+    console.error('Failed to send email. Error details:', error);
+    if (error.response) {
+      console.error('SendGrid API error response:', {
+        body: error.response.body,
+        statusCode: error.response.statusCode,
+      });
+    }
     return false;
   }
 }
