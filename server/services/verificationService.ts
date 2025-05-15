@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
 import { storage } from '../storage';
 import { VerificationDTO } from '@shared/schema';
+import { sendVerificationEmail as sendEmailWithSendGrid } from './emailService';
 
 // Generate a 6-digit verification code
 function generateVerificationCode(): string {
@@ -166,27 +167,24 @@ export async function sendVerificationSMS(phone: string, code: string): Promise<
 
 /**
  * Send verification code via email
- * In production, this would integrate with a service like SendGrid
+ * Uses SendGrid for email delivery
  */
 export async function sendVerificationEmail(email: string, code: string): Promise<boolean> {
   try {
-    // For now we're simulating the email sending with clear logging
-    console.log('===================================================');
-    console.log(`📧 SIMULATION: EMAIL VERIFICATION CODE: ${code}`);
-    console.log(`📧 For email: ${formatEmailForDisplay(email)}`);
-    console.log('===================================================');
+    // Log redacted version of the email for debugging
+    console.log(`Sending verification code to: ${formatEmailForDisplay(email)}`);
     
-    // Here you would integrate with an email service
-    // Example with SendGrid would be:
-    // await sendgrid.send({
-    //   to: email,
-    //   from: 'notifications@listssync.ai',
-    //   subject: 'Your verification code for ListsSync.ai',
-    //   text: `Your verification code is: ${code}`,
-    //   html: `<p>Your verification code is: <strong>${code}</strong></p>`
-    // });
+    // If SendGrid API key is missing, fall back to simulation
+    if (!process.env.SENDGRID_API_KEY) {
+      console.log('===================================================');
+      console.log(`📧 SIMULATION: EMAIL VERIFICATION CODE: ${code}`);
+      console.log(`📧 For email: ${formatEmailForDisplay(email)}`);
+      console.log('===================================================');
+      return true;
+    }
     
-    return true;
+    // Use SendGrid to send the email
+    return await sendEmailWithSendGrid(email, code);
   } catch (error) {
     console.error('Error sending email:', error);
     return false;

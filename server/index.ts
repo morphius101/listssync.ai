@@ -6,6 +6,15 @@ const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
+// Middleware to redirect from root domain to www
+app.use((req, res, next) => {
+  const host = req.headers.host || '';
+  if (host === 'listssync.ai') {
+    return res.redirect(301, `https://www.listssync.ai${req.url}`);
+  }
+  next();
+});
+
 // Add health check endpoint on a separate route
 app.get('/api/health', (_req, res) => {
   res.status(200).send('OK');
