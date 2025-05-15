@@ -38,14 +38,22 @@ export default function SharedChecklist() {
   const { checkVerificationStatus, token: verificationToken, maskedContact } = useVerification();
   const { subscribeToChecklist, sendChecklistUpdate } = useWebSocket();
 
-  // Check verification status
+  // Check verification status - only runs once when token is available
   useEffect(() => {
     if (!token) return;
 
+    // Create a reference to track if the component is still mounted
+    const isMounted = { current: true };
+
     const verifyAccess = async () => {
+      if (!isMounted.current) return;
+      
       setIsLoading(true);
       try {
+        console.log(`Checking verification status for token: ${token} (one-time check)`);
         const status = await checkVerificationStatus(token);
+        
+        if (!isMounted.current) return;
         
         if (status) {
           setIsVerified(status.verified);
@@ -69,18 +77,27 @@ export default function SharedChecklist() {
       } catch (error) {
         console.error('Error verifying access:', error);
         
-        toast({
-          title: 'Error',
-          description: 'Unable to verify access. Please try again later.',
-          variant: 'destructive',
-        });
+        if (isMounted.current) {
+          toast({
+            title: 'Error',
+            description: 'Unable to verify access. Please try again later.',
+            variant: 'destructive',
+          });
+        }
       } finally {
-        setIsLoading(false);
+        if (isMounted.current) {
+          setIsLoading(false);
+        }
       }
     };
     
     verifyAccess();
-  }, [token, toast, checkVerificationStatus]);
+    
+    // Cleanup function to prevent state updates if component unmounts
+    return () => {
+      isMounted.current = false;
+    };
+  }, [token]); // Only depend on token to prevent re-runs
 
   // Load checklist data
   const loadChecklist = async (id: string) => {

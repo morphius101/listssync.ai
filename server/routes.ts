@@ -458,26 +458,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Cache for verification status checks to reduce database load
+  const verificationStatusCache = new Map();
+  const CACHE_TTL = 60 * 1000; // 60 seconds cache TTL
+  
   app.get(`${API_BASE}/verification/status/:token`, async (req, res) => {
     try {
       const { token } = req.params;
       
+      // Check if we have a cached response for this token
+      const cachedResult = verificationStatusCache.get(token);
+      if (cachedResult && (Date.now() - cachedResult.timestamp < CACHE_TTL)) {
+        console.log(`Using cached verification status for token: ${token}`);
+        return res.json(cachedResult.data);
+      }
+      
+      console.log(`Checking verification status for token: ${token}`);
       const verified = await isVerified(token);
       const verification = await getVerification(token);
       
       if (verification) {
-        res.json({ 
+        const isExpired = verification.expiresAt < new Date();
+        const result = { 
           verified, 
-          expired: verification.expiresAt < new Date(),
+          expired: isExpired,
           recipientId: verification.recipientId,
           checklistId: verification.checklistId
+        };
+        
+        // Cache the result
+        verificationStatusCache.set(token, {
+          timestamp: Date.now(),
+          data: result
         });
+        
+        res.json(result);
       } else {
         res.status(404).json({ 
           message: "Verification not found" 
         });
       }
     } catch (error: any) {
+      console.error("Error in verification status check:", error);
       res.status(500).json({ message: error.message });
     }
   });
