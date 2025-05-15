@@ -44,7 +44,7 @@ interface EmailOptions {
  * @returns Promise resolving to true if email sent successfully, false otherwise
  */
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
-  const { to, subject, text, html, from = 'notifications@listssync.ai' } = options;
+  const { to, subject, text, html, from = 'greyson@listssync.ai' } = options;
   
   // Use our safeGetEnv helper
   if (!sendgridApiKey) {
