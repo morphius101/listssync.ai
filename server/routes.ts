@@ -465,6 +465,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Test email endpoint for debugging SendGrid issues
+  app.post(`${API_BASE}/debug/test-email`, async (req, res) => {
+    console.log('🧪 TEST EMAIL ENDPOINT called');
+    try {
+      const { email } = req.body;
+      
+      if (!email) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+      
+      console.log(`🧪 Attempting to send a test email to ${email}`);
+      
+      // Generate a test code
+      const testCode = Math.floor(100000 + Math.random() * 900000).toString();
+      
+      // Try to send email via our service
+      const result = await sendVerificationEmail(email, testCode);
+      
+      console.log(`🧪 Test email sending result: ${result ? 'SUCCESS' : 'FAILED'}`);
+      
+      return res.json({
+        success: true,
+        message: `Test email ${result ? 'sent' : 'attempted'} with code: ${testCode}`,
+        code: testCode
+      });
+    } catch (error: any) {
+      console.error('🧪 Test email error:', error);
+      return res.status(500).json({
+        success: false,
+        message: `Error sending test email: ${error.message || 'Unknown error'}`
+      });
+    }
+  });
+
   // Cache for verification status checks to reduce database load
   const verificationStatusCache = new Map();
   const CACHE_TTL = 60 * 1000; // 60 seconds cache TTL

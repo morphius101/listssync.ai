@@ -78,11 +78,17 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       htmlLength: html ? html.length : 0
     });
     
-    // Send the email
-    await mailService.send(message);
-    
-    console.log(`✅ SUCCESS: Email sent through SendGrid to ${to}`);
-    return true;
+    // Send the email with additional trace logs
+    console.log(`🔄 EXECUTING: mailService.send() with message to ${to}...`);
+    try {
+      const response = await mailService.send(message);
+      console.log(`✅ SUCCESS: Email sent through SendGrid to ${to}`);
+      console.log(`✅ SendGrid API Response:`, JSON.stringify(response));
+      return true;
+    } catch (sendGridError: any) {
+      console.error(`❌ SendGrid.send() threw an error:`, sendGridError);
+      throw sendGridError; // Re-throw to be caught by the outer catch block
+    }
   } catch (error: any) {
     console.error('❌ Failed to send email. Error details:', error.message || 'Unknown error');
     

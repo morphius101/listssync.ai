@@ -7,6 +7,7 @@ import NotFound from "@/pages/not-found";
 import AdminDashboard from "@/pages/AdminDashboard";
 import ChecklistView from "@/pages/ChecklistView";
 import SharedChecklist from "@/pages/SharedChecklist";
+import EmailDebug from "@/pages/EmailDebug"; // Import email debug page
 import Header from "@/components/Header";
 import LandingPage from "@/components/LandingPage";
 import ProtectedRoute from "@/components/ProtectedRoute";
@@ -41,6 +42,9 @@ function Router() {
       
       {/* Publicly shared checklist with verification */}
       <Route path="/shared/:token" component={SharedChecklist} />
+      
+      {/* Email debugging page */}
+      <Route path="/debug/email" component={EmailDebug} />
       
       {/* 404 page */}
       <Route component={NotFound} />
