@@ -386,6 +386,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📧 Attempting to send verification email to: ${email}`);
         console.log(`📧 Code: ${code}`);
         console.log(`📧 SENDGRID_API_KEY status: ${!!process.env.SENDGRID_API_KEY ? 'Present' : 'Missing'}`);
+        console.log(`📧 SENDER_EMAIL: notifications@listssync.ai`);
         console.log('================================================');
         
         try {
@@ -407,10 +408,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.error(`📧 Verification email failure details:`);
             console.error(`- Email: ${email.substring(0, 3)}...${email.substring(email.indexOf('@'))}`);
             console.error(`- Environment: ${process.env.NODE_ENV}`);
+            
+            return res.status(500).json({ 
+              message: "Failed to send verification email. Please check the email address and try again." 
+            });
           }
         } catch (emailError: any) {
           console.error(`❌ Exception during verification email sending:`, emailError.message);
           console.error(`❌ Stack trace: ${emailError.stack}`);
+          
+          return res.status(500).json({ 
+            message: `Email verification error: ${emailError.message}` 
+          });
         }
       }
       

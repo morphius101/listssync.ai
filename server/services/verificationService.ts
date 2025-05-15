@@ -178,24 +178,24 @@ export async function sendVerificationEmail(email: string, code: string): Promis
     console.log(`📧 Code: ${code}`);
     console.log('===================================================');
     
-    // Use our abstracted email sending service which handles
-    // both real sending and simulation fallback automatically
-    const result = await sendEmailWithSendGrid(email, code);
+    // Send verification email through SendGrid - no fallbacks
+    await sendEmailWithSendGrid(email, code);
     
-    console.log(`📧 Verification email result: ${result ? 'SUCCESS ✅' : 'FAILED ❌'}`);
-    
-    // Always tell the frontend that sending succeeded even in simulation mode
-    // This ensures the flow works even if real email sending fails
+    console.log(`📧 Verification email sent successfully to: ${maskedEmail} ✅`);
     return true;
   } catch (error: any) {
     console.error('❌ Error sending verification email:', error.message || 'Unknown error');
-    // Return success even on error to ensure the app flow doesn't break
-    // The user will still see the code in the logs for testing
-    console.log('===================================================');
-    console.log(`📧 EMERGENCY FALLBACK - VERIFICATION CODE: ${code}`);
-    console.log(`📧 For email: ${formatEmailForDisplay(email)}`);
-    console.log(`📧 Please use this code for testing since email sending failed`);
-    console.log('===================================================');
-    return true;
+    
+    if (error.response) {
+      console.error('SendGrid API error details:', error.response.body || 'No response body');
+    }
+    
+    console.error('===================================================');
+    console.error(`❌ VERIFICATION EMAIL FAILED TO: ${formatEmailForDisplay(email)}`);
+    console.error(`❌ Error: ${error.message || 'Unknown error'}`);
+    console.error('===================================================');
+    
+    // Propagate the failure to the calling code
+    return false;
   }
 }

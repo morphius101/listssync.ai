@@ -44,18 +44,14 @@ interface EmailOptions {
  * @returns Promise resolving to true if email sent successfully, false otherwise
  */
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
-  const { to, subject, text, html, from = 'greyson@listssync.ai' } = options;
+  // Default FROM address - use an available verified sender domain from SendGrid
+  // NOTE: SendGrid requires sender domain verification to avoid emails going to spam/being blocked
+  const { to, subject, text, html, from = 'notifications@listssync.ai' } = options;
   
-  // Use our safeGetEnv helper
+  // API Key validation - fail early if not configured
   if (!sendgridApiKey) {
-    console.log('📧 Email sending disabled - would have sent:', { to, subject, textLength: text.length });
-    console.log('===================================================');
-    console.log(`📧 SIMULATED EMAIL CONTENT: `);
-    console.log(`To: ${to}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Content: ${text.substring(0, 100)}...`);
-    console.log('===================================================');
-    return false;
+    console.error('❌ ERROR: SENDGRID_API_KEY not set - cannot send emails');
+    throw new Error('SendGrid API key is required for email delivery');
   }
   
   try {
@@ -99,15 +95,16 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
       });
     }
     
-    // Add a fallback to simulation mode if SendGrid fails
-    console.log('===================================================');
-    console.log(`📧 FALLBACK TO SIMULATION: EMAIL CONTENT: `);
-    console.log(`To: ${to}`);
-    console.log(`Subject: ${subject}`);
-    console.log(`Content: ${text.substring(0, 100)}...`);
-    console.log('===================================================');
+    // Log the full error for debugging without any simulation fallback
+    console.error('===================================================');
+    console.error(`❌ EMAIL SENDING FAILED! DETAILS:`);
+    console.error(`- To: ${to}`);
+    console.error(`- Subject: ${subject}`);
+    console.error(`- Error: ${error.message || 'Unknown error'}`);
+    console.error('===================================================');
     
-    return false;
+    // Throw the error to propagate it upwards - no fallbacks
+    throw error;
   }
 }
 
