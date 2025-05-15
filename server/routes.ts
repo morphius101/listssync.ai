@@ -382,13 +382,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let sendSuccess = false;
       
       if (email) {
-        console.log(`Attempting to send verification email to: ${email}`);
-        const emailSuccess = await sendVerificationEmail(email, code);
-        if (emailSuccess) {
-          console.log(`Successfully sent verification email to: ${email}`);
-          sendSuccess = true;
-        } else {
-          console.error(`Failed to send verification email to ${email}`);
+        console.log('================================================');
+        console.log(`📧 Attempting to send verification email to: ${email}`);
+        console.log(`📧 Code: ${code}`);
+        console.log(`📧 SENDGRID_API_KEY status: ${!!process.env.SENDGRID_API_KEY ? 'Present' : 'Missing'}`);
+        console.log('================================================');
+        
+        try {
+          // Add extra timeout to ensure SendGrid has enough time to process
+          const emailSuccess = await Promise.race([
+            sendVerificationEmail(email, code),
+            new Promise<boolean>((resolve) => setTimeout(() => {
+              console.log('📧 Email send operation timed out after 10 seconds');
+              resolve(false);
+            }, 10000))
+          ]);
+          
+          if (emailSuccess) {
+            console.log(`✅ Successfully sent verification email to: ${email}`);
+            sendSuccess = true;
+          } else {
+            console.error(`❌ Failed to send verification email to ${email}`);
+            // Add detailed logging
+            console.error(`📧 Verification email failure details:`);
+            console.error(`- Email: ${email.substring(0, 3)}...${email.substring(email.indexOf('@'))}`);
+            console.error(`- Environment: ${process.env.NODE_ENV}`);
+          }
+        } catch (emailError: any) {
+          console.error(`❌ Exception during verification email sending:`, emailError.message);
+          console.error(`❌ Stack trace: ${emailError.stack}`);
         }
       }
       
@@ -465,39 +487,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Test email endpoint for debugging SendGrid issues
-  app.post(`${API_BASE}/debug/test-email`, async (req, res) => {
-    console.log('🧪 TEST EMAIL ENDPOINT called');
-    try {
-      const { email } = req.body;
-      
-      if (!email) {
-        return res.status(400).json({ message: "Email is required" });
+  // Test email endpoint for debugging SendGrid issues - DEVELOPMENT ONLY
+  if (process.env.NODE_ENV === 'development') {
+    app.post(`${API_BASE}/debug/test-email`, async (req, res) => {
+      console.log('🧪 TEST EMAIL ENDPOINT called (DEV MODE ONLY)');
+      try {
+        const { email } = req.body;
+        
+        if (!email) {
+          return res.status(400).json({ message: "Email is required" });
+        }
+        
+        console.log(`🧪 Attempting to send a test email to ${email}`);
+        
+        // Generate a test code
+        const testCode = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // Try to send email via our service
+        const result = await sendVerificationEmail(email, testCode);
+        
+        console.log(`🧪 Test email sending result: ${result ? 'SUCCESS' : 'FAILED'}`);
+        
+        return res.json({
+          success: true,
+          message: `Test email ${result ? 'sent' : 'attempted'} with code: ${testCode}`,
+          code: testCode
+        });
+      } catch (error: any) {
+        console.error('🧪 Test email error:', error);
+        return res.status(500).json({
+          success: false,
+          message: `Error sending test email: ${error.message || 'Unknown error'}`
+        });
       }
-      
-      console.log(`🧪 Attempting to send a test email to ${email}`);
-      
-      // Generate a test code
-      const testCode = Math.floor(100000 + Math.random() * 900000).toString();
-      
-      // Try to send email via our service
-      const result = await sendVerificationEmail(email, testCode);
-      
-      console.log(`🧪 Test email sending result: ${result ? 'SUCCESS' : 'FAILED'}`);
-      
-      return res.json({
-        success: true,
-        message: `Test email ${result ? 'sent' : 'attempted'} with code: ${testCode}`,
-        code: testCode
-      });
-    } catch (error: any) {
-      console.error('🧪 Test email error:', error);
-      return res.status(500).json({
-        success: false,
-        message: `Error sending test email: ${error.message || 'Unknown error'}`
-      });
-    }
-  });
+    });
+  } else {
+    // In production, return 404 for the debug endpoint
+    app.post(`${API_BASE}/debug/test-email`, (req, res) => {
+      console.warn('⚠️ Someone tried to access the debug email endpoint in production mode');
+      res.status(404).json({ error: 'Not found' });
+    });
+  }
 
   // Cache for verification status checks to reduce database load
   const verificationStatusCache = new Map();
