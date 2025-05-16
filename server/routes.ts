@@ -392,7 +392,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         try {
           // Add extra timeout to ensure SendGrid has enough time to process
           const emailSuccess = await Promise.race([
-            sendVerificationEmail(email, code),
+            sendVerificationEmail(email, code, token),
             new Promise<boolean>((resolve) => setTimeout(() => {
               console.log('📧 Email send operation timed out after 10 seconds');
               resolve(false);
