@@ -2,6 +2,17 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
+// Debug log environment variables
+console.log('=== ENVIRONMENT VARIABLES DEBUG ===');
+console.log('NODE_ENV:', process.env.NODE_ENV);
+console.log('TWILIO_ACCOUNT_SID exists:', !!process.env.TWILIO_ACCOUNT_SID);
+console.log('TWILIO_AUTH_TOKEN exists:', !!process.env.TWILIO_AUTH_TOKEN);
+console.log('TWILIO_PHONE_NUMBER exists:', !!process.env.TWILIO_PHONE_NUMBER);
+console.log('Twilio SID first chars:', process.env.TWILIO_ACCOUNT_SID?.substring(0, 5));
+console.log('Twilio Auth first chars:', process.env.TWILIO_AUTH_TOKEN?.substring(0, 5));
+console.log('Twilio Phone:', process.env.TWILIO_PHONE_NUMBER);
+console.log('================================');
+
 const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));

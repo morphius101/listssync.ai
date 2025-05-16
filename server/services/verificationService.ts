@@ -170,15 +170,21 @@ export async function sendVerificationSMS(phone: string, code: string, token?: s
     console.log(`📱 Sending verification code to: ${formatPhoneForDisplay(phone)}`);
     console.log(`📱 Code: ${code}`);
     
-    // Construct checklist URL
-    const baseUrl = process.env.NODE_ENV === 'production' 
-      ? 'https://www.listssync.ai'
-      : `http://localhost:5000`;
-    const shareUrl = `${baseUrl}/shared/${token}`;
+    // Construct message body with or without URL
+    let messageBody = `Your ListsSync.ai verification code is: ${code}`;
+    
+    // Add URL if token is available
+    if (token) {
+      const baseUrl = process.env.NODE_ENV === 'production' 
+        ? 'https://www.listssync.ai'
+        : `http://localhost:5000`;
+      const shareUrl = `${baseUrl}/shared/${token}`;
+      messageBody += `\n\nAccess your checklist here: ${shareUrl}`;
+    }
 
     // Real SMS sending with Twilio
     const message = await client.messages.create({
-      body: `Your ListsSync.ai verification code is: ${code}\n\nAccess your checklist here: ${shareUrl}`,
+      body: messageBody,
       from: process.env.TWILIO_PHONE_NUMBER,
       to: phone
     });
@@ -197,7 +203,7 @@ export async function sendVerificationSMS(phone: string, code: string, token?: s
  * Send verification code via email
  * Uses SendGrid for email delivery with improved error handling
  */
-export async function sendVerificationEmail(email: string, code: string): Promise<boolean> {
+export async function sendVerificationEmail(email: string, code: string, token?: string): Promise<boolean> {
   try {
     // Log redacted version of the email for debugging
     const maskedEmail = formatEmailForDisplay(email);
