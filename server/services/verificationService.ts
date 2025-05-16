@@ -2,6 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { storage } from '../storage';
 import { VerificationDTO } from '@shared/schema';
 import { sendVerificationEmail as sendEmailWithSendGrid } from './emailService';
+import * as twilioLib from 'twilio';
 
 // Generate a 6-digit verification code
 function generateVerificationCode(): string {
@@ -136,15 +137,6 @@ export function formatEmailForDisplay(email: string): string {
   return `${username.charAt(0)}*****@${domain}`;
 }
 
-// External service imports
-import twilio from 'twilio';
-import { sendEmail } from './emailService';
-
-// Initialize Twilio client
-const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN 
-  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
-  : null;
-
 /**
  * Send verification code via SMS using Twilio
  */
@@ -158,8 +150,8 @@ export async function sendVerificationSMS(phone: string, code: string): Promise<
     console.log(`📱 TWILIO_PHONE_NUMBER: ${process.env.TWILIO_PHONE_NUMBER || 'Missing'}`);
     console.log('===================================================');
 
-    if (!twilioClient) {
-      console.error('Cannot send SMS: Twilio client is not initialized due to missing credentials');
+    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+      console.error('Cannot send SMS: Missing Twilio credentials');
       return false;
     }
 
@@ -168,12 +160,18 @@ export async function sendVerificationSMS(phone: string, code: string): Promise<
       return false;
     }
     
+    // Initialize the Twilio client for each request
+    const client = twilioLib.default(
+      process.env.TWILIO_ACCOUNT_SID,
+      process.env.TWILIO_AUTH_TOKEN
+    );
+    
     // Only display formatted phone in logs for privacy
     console.log(`📱 Sending verification code to: ${formatPhoneForDisplay(phone)}`);
     console.log(`📱 Code: ${code}`);
     
     // Real SMS sending with Twilio
-    const message = await twilioClient.messages.create({
+    const message = await client.messages.create({
       body: `Your ListsSync.ai verification code is: ${code}`,
       from: process.env.TWILIO_PHONE_NUMBER,
       to: phone
