@@ -136,27 +136,51 @@ export function formatEmailForDisplay(email: string): string {
   return `${username.charAt(0)}*****@${domain}`;
 }
 
-// Simulated SMS/Email sending - logs the code for testing
+// External service imports
+import twilio from 'twilio';
+import { sendEmail } from './emailService';
+
+// Initialize Twilio client
+const twilioClient = process.env.TWILIO_ACCOUNT_SID && process.env.TWILIO_AUTH_TOKEN 
+  ? twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN)
+  : null;
 
 /**
- * Send verification code via SMS
- * In production, this would integrate with a service like Twilio
+ * Send verification code via SMS using Twilio
  */
 export async function sendVerificationSMS(phone: string, code: string): Promise<boolean> {
   try {
-    // For now we're simulating the SMS sending with clear logging
     console.log('===================================================');
-    console.log(`📱 SIMULATION: SMS VERIFICATION CODE: ${code}`);
-    console.log(`📱 For phone number: ${formatPhoneForDisplay(phone)}`);
+    console.log(`📱 Attempting to send SMS verification to: ${formatPhoneForDisplay(phone)}`);
+    console.log(`📱 Code: ${code}`);
+    console.log(`📱 TWILIO_ACCOUNT_SID status: ${process.env.TWILIO_ACCOUNT_SID ? 'Present' : 'Missing'}`);
+    console.log(`📱 TWILIO_AUTH_TOKEN status: ${process.env.TWILIO_AUTH_TOKEN ? 'Present' : 'Missing'}`);
+    console.log(`📱 TWILIO_PHONE_NUMBER: ${process.env.TWILIO_PHONE_NUMBER || 'Missing'}`);
     console.log('===================================================');
+
+    if (!twilioClient) {
+      console.error('Cannot send SMS: Twilio client is not initialized due to missing credentials');
+      return false;
+    }
+
+    if (!process.env.TWILIO_PHONE_NUMBER) {
+      console.error('Cannot send SMS: Missing Twilio phone number');
+      return false;
+    }
     
-    // Here you would integrate with an SMS service
-    // Example with Twilio would be:
-    // await twilioClient.messages.create({
-    //   body: `Your ListsSync.ai verification code is: ${code}`,
-    //   from: process.env.TWILIO_PHONE_NUMBER,
-    //   to: phone
-    // });
+    // Only display formatted phone in logs for privacy
+    console.log(`📱 Sending verification code to: ${formatPhoneForDisplay(phone)}`);
+    console.log(`📱 Code: ${code}`);
+    
+    // Real SMS sending with Twilio
+    const message = await twilioClient.messages.create({
+      body: `Your ListsSync.ai verification code is: ${code}`,
+      from: process.env.TWILIO_PHONE_NUMBER,
+      to: phone
+    });
+    
+    console.log(`📱 Verification SMS sent successfully to: ${formatPhoneForDisplay(phone)} ✅`);
+    console.log(`📱 Twilio message SID: ${message.sid}`);
     
     return true;
   } catch (error) {
