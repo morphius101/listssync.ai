@@ -267,6 +267,19 @@ export default function ShareLinkModal({
               <p className="text-xs mt-1">
                 The recipient will need this verification code to access the checklist.
               </p>
+              
+              {/* Display verification code in development mode */}
+              {response?.verificationCode && (
+                <div className="mt-2 p-2 bg-yellow-100 rounded border border-yellow-300">
+                  <p className="text-yellow-800 text-xs font-medium">Development Mode: Verification Code</p>
+                  <p className="font-mono text-center text-lg font-bold tracking-wider text-yellow-900 mt-1">
+                    {response.verificationCode}
+                  </p>
+                  <p className="text-yellow-700 text-xs mt-1">
+                    This code appears only in development mode to help with testing.
+                  </p>
+                </div>
+              )}
             </div>
             
             <div className="flex items-center space-x-2">
