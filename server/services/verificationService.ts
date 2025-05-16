@@ -2,7 +2,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { storage } from '../storage';
 import { VerificationDTO } from '@shared/schema';
 import { sendVerificationEmail as sendEmailWithSendGrid } from './emailService';
-import * as twilioLib from 'twilio';
+import twilio from 'twilio';
 
 // Generate a 6-digit verification code
 function generateVerificationCode(): string {
@@ -142,29 +142,31 @@ export function formatEmailForDisplay(email: string): string {
  */
 export async function sendVerificationSMS(phone: string, code: string, token?: string): Promise<boolean> {
   try {
+    // Create local variables from environment variables for safety
+    const accountSid = process.env.TWILIO_ACCOUNT_SID;
+    const authToken = process.env.TWILIO_AUTH_TOKEN;
+    const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+    
     console.log('===================================================');
     console.log(`📱 Attempting to send SMS verification to: ${formatPhoneForDisplay(phone)}`);
     console.log(`📱 Code: ${code}`);
-    console.log(`📱 TWILIO_ACCOUNT_SID status: ${process.env.TWILIO_ACCOUNT_SID ? 'Present' : 'Missing'}`);
-    console.log(`📱 TWILIO_AUTH_TOKEN status: ${process.env.TWILIO_AUTH_TOKEN ? 'Present' : 'Missing'}`);
-    console.log(`📱 TWILIO_PHONE_NUMBER: ${process.env.TWILIO_PHONE_NUMBER || 'Missing'}`);
+    console.log(`📱 TWILIO_ACCOUNT_SID status: ${accountSid ? 'Present' : 'Missing'}`);
+    console.log(`📱 TWILIO_AUTH_TOKEN status: ${authToken ? 'Present' : 'Missing'}`);
+    console.log(`📱 TWILIO_PHONE_NUMBER: ${twilioPhone || 'Missing'}`);
     console.log('===================================================');
 
-    if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN) {
+    if (!accountSid || !authToken) {
       console.error('Cannot send SMS: Missing Twilio credentials');
       return false;
     }
 
-    if (!process.env.TWILIO_PHONE_NUMBER) {
+    if (!twilioPhone) {
       console.error('Cannot send SMS: Missing Twilio phone number');
       return false;
     }
     
     // Initialize the Twilio client for each request
-    const client = twilioLib.default(
-      process.env.TWILIO_ACCOUNT_SID,
-      process.env.TWILIO_AUTH_TOKEN
-    );
+    const client = twilio(accountSid, authToken);
     
     // Only display formatted phone in logs for privacy
     console.log(`📱 Sending verification code to: ${formatPhoneForDisplay(phone)}`);
@@ -185,7 +187,7 @@ export async function sendVerificationSMS(phone: string, code: string, token?: s
     // Real SMS sending with Twilio
     const message = await client.messages.create({
       body: messageBody,
-      from: process.env.TWILIO_PHONE_NUMBER,
+      from: twilioPhone,
       to: phone
     });
     
