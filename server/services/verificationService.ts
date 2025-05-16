@@ -153,23 +153,55 @@ export async function sendVerificationSMS(phone: string, code: string, token?: s
     console.log(`📱 TWILIO_ACCOUNT_SID status: ${accountSid ? 'Present' : 'Missing'}`);
     console.log(`📱 TWILIO_AUTH_TOKEN status: ${authToken ? 'Present' : 'Missing'}`);
     console.log(`📱 TWILIO_PHONE_NUMBER: ${twilioPhone || 'Missing'}`);
+    
+    // Log environment for debugging
+    console.log(`📱 NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
     console.log('===================================================');
 
     if (!accountSid || !authToken) {
       console.error('Cannot send SMS: Missing Twilio credentials');
+      
+      // In development mode, allow the flow to continue for testing
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📱 DEVELOPMENT MODE: Skipping actual SMS send but returning success');
+        return true;
+      }
+      
       return false;
     }
 
     if (!twilioPhone) {
       console.error('Cannot send SMS: Missing Twilio phone number');
+      
+      // In development mode, allow the flow to continue for testing
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📱 DEVELOPMENT MODE: Skipping actual SMS send but returning success');
+        return true;
+      }
+      
       return false;
+    }
+    
+    // Format the phone number to E.164 format for Twilio
+    // Twilio requires the format +1XXXXXXXXXX for US numbers
+    let formattedPhone = phone;
+    if (!phone.startsWith('+')) {
+      // If it's a US number without country code, add +1
+      if (phone.length === 10) {
+        formattedPhone = `+1${phone}`;
+        console.log(`📱 Formatted phone from ${phone} to E.164 format: ${formattedPhone}`);
+      } else {
+        // For other cases, just add +
+        formattedPhone = `+${phone}`;
+        console.log(`📱 Added + prefix to phone: ${formattedPhone}`);
+      }
     }
     
     // Initialize the Twilio client for each request
     const client = twilio(accountSid, authToken);
     
     // Only display formatted phone in logs for privacy
-    console.log(`📱 Sending verification code to: ${formatPhoneForDisplay(phone)}`);
+    console.log(`📱 Sending verification code to: ${formatPhoneForDisplay(formattedPhone)}`);
     console.log(`📱 Code: ${code}`);
     
     // Construct message body with or without URL
@@ -185,18 +217,42 @@ export async function sendVerificationSMS(phone: string, code: string, token?: s
     }
 
     // Real SMS sending with Twilio
-    const message = await client.messages.create({
-      body: messageBody,
-      from: twilioPhone,
-      to: phone
-    });
+    try {
+      const message = await client.messages.create({
+        body: messageBody,
+        from: twilioPhone,
+        to: formattedPhone
+      });
+      
+      console.log(`📱 Verification SMS sent successfully to: ${formatPhoneForDisplay(formattedPhone)} ✅`);
+      console.log(`📱 Twilio message SID: ${message.sid}`);
+      
+      return true;
+    } catch (twilioError: any) {
+      console.error('📱 Twilio API Error:', twilioError.message);
+      console.error('📱 Twilio Error Code:', twilioError.code);
+      
+      if (twilioError.code === 21211) {
+        console.error('📱 Invalid phone number format. Please check the number and try again.');
+      }
+      
+      // In development mode, allow the flow to continue for testing
+      if (process.env.NODE_ENV === 'development') {
+        console.log('📱 DEVELOPMENT MODE: Returning success despite Twilio error');
+        return true;
+      }
+      
+      return false;
+    }
+  } catch (error: any) {
+    console.error('Error sending SMS:', error.message || error);
     
-    console.log(`📱 Verification SMS sent successfully to: ${formatPhoneForDisplay(phone)} ✅`);
-    console.log(`📱 Twilio message SID: ${message.sid}`);
+    // In development mode, allow the flow to continue for testing
+    if (process.env.NODE_ENV === 'development') {
+      console.log('📱 DEVELOPMENT MODE: Returning success despite error');
+      return true;
+    }
     
-    return true;
-  } catch (error) {
-    console.error('Error sending SMS:', error);
     return false;
   }
 }
