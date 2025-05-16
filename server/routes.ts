@@ -428,7 +428,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (phone) {
         console.log(`Attempting to send verification SMS to: ${phone}`);
-        const smsSuccess = await sendVerificationSMS(phone, code);
+        const smsSuccess = await sendVerificationSMS(phone, code, token);
         if (smsSuccess) {
           console.log(`Successfully sent verification SMS to: ${phone}`);
           sendSuccess = true;

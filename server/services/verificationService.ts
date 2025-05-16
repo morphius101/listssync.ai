@@ -140,7 +140,7 @@ export function formatEmailForDisplay(email: string): string {
 /**
  * Send verification code via SMS using Twilio
  */
-export async function sendVerificationSMS(phone: string, code: string): Promise<boolean> {
+export async function sendVerificationSMS(phone: string, code: string, token?: string): Promise<boolean> {
   try {
     console.log('===================================================');
     console.log(`📱 Attempting to send SMS verification to: ${formatPhoneForDisplay(phone)}`);
