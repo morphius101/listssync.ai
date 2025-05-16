@@ -115,12 +115,18 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
  * @param code Verification code
  * @returns Promise resolving to true if email sent successfully
  */
-export async function sendVerificationEmail(email: string, code: string): Promise<boolean> {
+export async function sendVerificationEmail(email: string, code: string, token?: string): Promise<boolean> {
   const subject = 'Your ListsSync.ai Verification Code';
+  
+  const baseUrl = process.env.NODE_ENV === 'production' 
+    ? 'https://www.listssync.ai'
+    : `http://localhost:5000`;
+  const shareUrl = token ? `${baseUrl}/shared/${token}` : undefined;
   
   const text = `
 Your verification code for ListsSync.ai is: ${code}
 
+${shareUrl ? `Access your checklist here: ${shareUrl}\n` : ''}
 This code will expire in 10 minutes.
 
 Thank you,

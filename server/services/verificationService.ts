@@ -170,9 +170,15 @@ export async function sendVerificationSMS(phone: string, code: string): Promise<
     console.log(`📱 Sending verification code to: ${formatPhoneForDisplay(phone)}`);
     console.log(`📱 Code: ${code}`);
     
+    // Construct checklist URL
+    const baseUrl = process.env.NODE_ENV === 'production' 
+      ? 'https://www.listssync.ai'
+      : `http://localhost:5000`;
+    const shareUrl = `${baseUrl}/shared/${token}`;
+
     // Real SMS sending with Twilio
     const message = await client.messages.create({
-      body: `Your ListsSync.ai verification code is: ${code}`,
+      body: `Your ListsSync.ai verification code is: ${code}\n\nAccess your checklist here: ${shareUrl}`,
       from: process.env.TWILIO_PHONE_NUMBER,
       to: phone
     });
@@ -201,7 +207,7 @@ export async function sendVerificationEmail(email: string, code: string): Promis
     console.log('===================================================');
     
     // Send verification email through SendGrid - no fallbacks
-    await sendEmailWithSendGrid(email, code);
+    await sendEmailWithSendGrid(email, code, token);
     
     console.log(`📧 Verification email sent successfully to: ${maskedEmail} ✅`);
     return true;
