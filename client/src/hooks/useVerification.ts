@@ -110,14 +110,24 @@ export function useVerification() {
         requestData.phone = phone.trim();
       }
       
-      console.log("Making API request with data:", requestData);
+      console.log("🚀 Making verification API request with data:", requestData);
+      
+      console.log("📤 Sending verification request to /api/verification/send");
       
       const response = await apiRequest('/api/verification/send', {
         method: 'POST',
         body: JSON.stringify(requestData),
       });
       
+      console.log("📥 Received verification API response status:", response.status);
+      
+      if (!response.ok) {
+        console.error("❌ Verification API request failed with status:", response.status);
+        throw new Error(`Verification request failed with status: ${response.status}`);
+      }
+      
       const data = await response.json();
+      console.log("📦 Verification response data:", data);
       
       if (data.token) {
         setToken(data.token);
