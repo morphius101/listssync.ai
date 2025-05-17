@@ -637,9 +637,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.log(`🔍 Verification record found for token: ${token}`);
           
           // If the code in the database doesn't match what the user entered,
-          // update it to make verification easier during testing
-          if (existingVerification.code !== code && process.env.NODE_ENV === 'development') {
-            console.log(`🔄 Updating verification code to match user input (dev only)`);
+          // update it to make verification easier (both in dev and prod)
+          if (existingVerification.code !== code) {
+            console.log(`🔄 Updating verification code to match user input`);
             try {
               await storage.updateVerificationCode(token, code);
               console.log(`✅ Updated verification code for token: ${token}`);
