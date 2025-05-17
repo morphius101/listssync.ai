@@ -159,6 +159,17 @@ The ListsSync.ai Team
       text-align: center;
       letter-spacing: 5px;
     }
+    .button {
+      display: inline-block;
+      background-color: #4f46e5;
+      color: white;
+      text-decoration: none;
+      padding: 12px 24px;
+      border-radius: 5px;
+      font-weight: bold;
+      margin: 20px 0;
+      text-align: center;
+    }
     .footer {
       margin-top: 30px;
       font-size: 12px;
@@ -172,6 +183,12 @@ The ListsSync.ai Team
     <h2>Your Verification Code</h2>
     <p>Please use the following code to verify your identity on ListsSync.ai:</p>
     <div class="code">${code}</div>
+    ${shareUrl ? `
+    <p>You can also access your checklist directly by clicking the button below:</p>
+    <div style="text-align: center;">
+      <a href="${shareUrl}" class="button">View Checklist</a>
+    </div>
+    ` : ''}
     <p>This code will expire in 10 minutes.</p>
     <p>If you didn't request this code, you can safely ignore this email.</p>
     <div class="footer">

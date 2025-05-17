@@ -289,7 +289,8 @@ export async function sendVerificationSMS(phone: string, code: string, token?: s
         ? 'https://www.listssync.ai'
         : `http://localhost:5000`;
       const shareUrl = `${baseUrl}/shared/${token}`;
-      messageBody += `\n\nAccess your checklist here: ${shareUrl}`;
+      messageBody += `\n\nAccess your checklist: ${shareUrl}`;
+      messageBody += `\n\nThis link will take you directly to the shared checklist after verification.`;
     }
 
     // Real SMS sending with Twilio

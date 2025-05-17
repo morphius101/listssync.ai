@@ -495,8 +495,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             // Special handling for when credentials are missing
             if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
               console.log('⚠️ Twilio credentials missing or not properly configured');
-              // Only log verification code in development mode
-              if (process.env.NODE_ENV === 'development') {
+              
+              if (process.env.NODE_ENV === 'production') {
+                // In production, provide professional error response
+                return res.status(500).json({ 
+                  message: "SMS verification is currently unavailable. Please try email verification instead.",
+                  type: "error" 
+                });
+              } else {
+                // Only log verification code in development mode
                 console.log(`📱 Verification code for ${phone}: ${code}`);
                 sendSuccess = true; // Allow flow to continue in development
               }
@@ -514,7 +521,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else {
             // In production, handle more professionally
             console.error('⚠️ SMS verification failed in production environment');
-            sendSuccess = false; // In production, don't continue without SMS
+            // Return a professional error message immediately
+            return res.status(500).json({ 
+              message: "SMS verification is currently unavailable. Please try email verification instead.",
+              type: "error" 
+            });
           }
         }
       }
