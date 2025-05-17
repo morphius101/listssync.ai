@@ -8,7 +8,7 @@ import {
   verifications 
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 
 export interface IStorage {
@@ -272,10 +272,10 @@ export class DatabaseStorage implements IStorage {
     try {
       console.log(`Retrieving all verifications from database...`);
       
+      // Get all verifications - no specific ordering needed
       const allVerifications = await db
         .select()
-        .from(verifications)
-        .orderBy(desc(verifications.createdAt));
+        .from(verifications);
         
       console.log(`Found ${allVerifications.length} verifications`);
       

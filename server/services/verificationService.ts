@@ -101,7 +101,7 @@ export async function createVerification(
       try {
         // Try to retrieve the existing verification for this recipient
         const existingVerifications = await storage.getAllVerifications();
-        const existingVerification = existingVerifications.find(v => 
+        const existingVerification = existingVerifications.find((v: VerificationDTO) => 
           v.recipientId === recipientId &&
           !v.verified &&
           v.expiresAt > new Date()
