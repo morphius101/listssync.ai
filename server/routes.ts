@@ -643,13 +643,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
             try {
               await storage.updateVerificationCode(token, code);
               console.log(`✅ Updated verification code for token: ${token}`);
-            } catch (updateError) {
-              console.log(`⚠️ Could not update verification code: ${updateError.message}`);
+            } catch (error) {
+              console.log(`⚠️ Could not update verification code: ${error instanceof Error ? error.message : 'Unknown error'}`);
             }
           }
         }
-      } catch (dbError) {
-        console.log(`⚠️ Verification check/creation error: ${dbError.message}`);
+      } catch (error) {
+        console.log(`⚠️ Verification check/creation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
         // Continue to verification attempt anyway
       }
       
