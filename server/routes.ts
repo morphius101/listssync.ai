@@ -615,7 +615,110 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Test email endpoint for debugging SendGrid issues - DEVELOPMENT ONLY
   if (process.env.NODE_ENV === 'development') {
-    app.post(`${API_BASE}/debug/test-email`, async (req, res) => {
+    // Test endpoint for Twilio SMS
+  app.post(`${API_BASE}/debug/test-sms`, async (req, res) => {
+    try {
+      const { phone } = req.body;
+      
+      if (!phone) {
+        return res.status(400).json({ success: false, message: "Phone number is required" });
+      }
+      
+      console.log('🧪 Testing SMS to phone:', phone);
+      
+      // Show Twilio configuration
+      console.log('TWILIO CONFIG CHECK:');
+      console.log('TWILIO_ACCOUNT_SID status:', process.env.TWILIO_ACCOUNT_SID ? 'Present' : 'Missing');
+      console.log('TWILIO_AUTH_TOKEN status:', process.env.TWILIO_AUTH_TOKEN ? 'Present' : 'Missing');
+      console.log('TWILIO_PHONE_NUMBER:', process.env.TWILIO_PHONE_NUMBER);
+      
+      // Create a test message
+      const testCode = Math.floor(100000 + Math.random() * 900000).toString();
+      const testMessage = `This is a test message from ListsSync.ai. Your verification code is: ${testCode}`;
+      
+      try {
+        // Initialize Twilio client
+        const accountSid = process.env.TWILIO_ACCOUNT_SID;
+        const authToken = process.env.TWILIO_AUTH_TOKEN;
+        const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+        
+        if (!accountSid || !authToken || !twilioPhone) {
+          return res.status(500).json({ 
+            success: false, 
+            message: "Twilio credentials are missing",
+            missingCredentials: {
+              accountSid: !accountSid,
+              authToken: !authToken,
+              twilioPhone: !twilioPhone
+            }
+          });
+        }
+        
+        // Format phone to E.164 if needed
+        let formattedPhone = phone;
+        if (!phone.startsWith('+')) {
+          if (phone.length === 10) {
+            formattedPhone = `+1${phone}`; // US number
+          } else {
+            formattedPhone = `+${phone}`;
+          }
+        }
+        
+        console.log(`📱 Formatted phone number: ${formattedPhone}`);
+        
+        // Direct Twilio import for testing
+        const twilio = require('twilio');
+        const client = twilio(accountSid, authToken);
+        
+        // Send the test message
+        const message = await client.messages.create({
+          body: testMessage,
+          from: twilioPhone,
+          to: formattedPhone
+        });
+        
+        console.log(`✅ Test SMS sent successfully. SID: ${message.sid}`);
+        
+        return res.json({ 
+          success: true, 
+          message: `Test SMS sent to ${formattedPhone}`,
+          testCode,
+          twilioMessageSid: message.sid,
+          status: message.status
+        });
+      } catch (smsError) {
+        console.error('❌ Twilio SMS Error:', smsError);
+        
+        // Try to extract more helpful error information
+        let errorDetails = {
+          code: smsError.code,
+          message: smsError.message,
+          status: smsError.status
+        };
+        
+        if (smsError.code === 21211) {
+          errorDetails.suggestion = "This error typically means the phone number format is invalid. Make sure it includes the country code.";
+        } else if (smsError.code === 21608) {
+          errorDetails.suggestion = "This error typically means the phone number is not verified in your Twilio trial account. Go to https://www.twilio.com/console/phone-numbers/verified to verify it.";
+        }
+        
+        return res.status(500).json({ 
+          success: false, 
+          message: "Failed to send test SMS", 
+          error: errorDetails
+        });
+      }
+      
+    } catch (error) {
+      console.error('❌ Test SMS endpoint error:', error);
+      return res.status(500).json({ 
+        success: false, 
+        message: "Server error when testing SMS" 
+      });
+    }
+  });
+  
+  app.post(`${API_BASE}/debug/test-email`, async (req, res) => {
       console.log('🧪 TEST EMAIL ENDPOINT called (DEV MODE ONLY)');
       try {
         const { email } = req.body;
