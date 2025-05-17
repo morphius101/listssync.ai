@@ -149,13 +149,21 @@ export async function verifyCode(token: string, code: string): Promise<boolean> 
       return false;
     }
     
+    // Enhanced logging to debug code matching issues
+    console.log(`Verification attempt - Token: ${token}`);
+    console.log(`Verification attempt - Provided code: ${code}`);
+    console.log(`Verification attempt - Stored code: ${record.code}`);
+    console.log(`Verification attempt - Codes match: ${record.code === code}`);
+    
     // Check if the code matches
     if (record.code === code) {
       // Mark as verified in database
+      console.log(`Verification successful - marking as verified in database`);
       const success = await storage.markVerificationAsVerified(token);
       return success;
     }
     
+    console.log(`Verification failed - code mismatch`);
     return false;
   } catch (error) {
     console.error("Error verifying code:", error);
