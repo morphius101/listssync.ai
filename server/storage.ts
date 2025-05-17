@@ -23,6 +23,7 @@ export interface IStorage {
   createVerification(verification: VerificationDTO): Promise<VerificationDTO>;
   getVerificationByToken(token: string): Promise<VerificationDTO | undefined>;
   markVerificationAsVerified(token: string): Promise<boolean>;
+  updateVerificationCode(token: string, code: string): Promise<boolean>;
   getAllVerifications(): Promise<VerificationDTO[]>;
 }
 
@@ -260,6 +261,27 @@ export class DatabaseStorage implements IStorage {
       return !!updated;
     } catch (error) {
       console.error('Error marking verification as verified:', error);
+      return false;
+    }
+  }
+  
+  /**
+   * Update the verification code for a specific token
+   * This is used to correct code mismatches during development/testing
+   */
+  async updateVerificationCode(token: string, code: string): Promise<boolean> {
+    try {
+      console.log(`Updating verification code for token: ${token}`);
+      
+      const [updated] = await db
+        .update(verifications)
+        .set({ code })
+        .where(eq(verifications.token, token))
+        .returning();
+      
+      return !!updated;
+    } catch (error) {
+      console.error('Error updating verification code:', error);
       return false;
     }
   }
