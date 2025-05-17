@@ -564,10 +564,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
                                          !process.env.TWILIO_AUTH_TOKEN || 
                                          !process.env.TWILIO_PHONE_NUMBER;
       
-      if (process.env.NODE_ENV === 'development' || (process.env.NODE_ENV === 'production' && isMissingTwilioCredentials)) {
-        response.verificationCode = code;
-        const envMsg = process.env.NODE_ENV === 'development' ? 'development mode' : 'missing Twilio credentials';
-        response.message += `. Check response for verification code (${envMsg}).`;
+      // TEMPORARY: Always include verification code in responses for testing
+      // This allows testing without SMS delivery during development phase
+      response.verificationCode = code;
+      response.message += `. Verification code: ${code}`;
+      
+      // Add debug info about environment
+      if (process.env.NODE_ENV === 'development') {
+        response.debug = {
+          environment: 'development',
+          twilioStatus: isMissingTwilioCredentials ? 'missing credentials' : 'configured'
+        };
       }
       
       res.json(response);
