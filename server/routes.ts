@@ -666,8 +666,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`📱 Formatted phone number: ${formattedPhone}`);
         
-        // Direct Twilio import for testing
-        const twilio = require('twilio');
+        // Use the already imported Twilio
+        const twilio = await import('twilio').then(module => module.default);
         const client = twilio(accountSid, authToken);
         
         // Send the test message
@@ -686,20 +686,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           twilioMessageSid: message.sid,
           status: message.status
         });
-      } catch (smsError) {
-        console.error('❌ Twilio SMS Error:', smsError);
+      } catch (error: any) {
+        console.error('❌ Twilio SMS Error:', error);
         
         // Try to extract more helpful error information
-        let errorDetails = {
-          code: smsError.code,
-          message: smsError.message,
-          status: smsError.status
+        let errorDetails: any = {
+          message: error.message || 'Unknown error'
         };
         
-        if (smsError.code === 21211) {
-          errorDetails.suggestion = "This error typically means the phone number format is invalid. Make sure it includes the country code.";
-        } else if (smsError.code === 21608) {
-          errorDetails.suggestion = "This error typically means the phone number is not verified in your Twilio trial account. Go to https://www.twilio.com/console/phone-numbers/verified to verify it.";
+        // Add Twilio-specific error info if available
+        if (error.code) {
+          errorDetails.code = error.code;
+          errorDetails.status = error.status;
+          
+          if (error.code === 21211) {
+            errorDetails.suggestion = "This error typically means the phone number format is invalid. Make sure it includes the country code.";
+          } else if (error.code === 21608) {
+            errorDetails.suggestion = "This error typically means the phone number is not verified in your Twilio trial account. Go to https://www.twilio.com/console/phone-numbers/verified to verify it.";
+          }
         }
         
         return res.status(500).json({ 
