@@ -492,20 +492,30 @@ export async function registerRoutes(app: Express): Promise<Server> {
           } else {
             console.error(`Failed to send verification SMS to ${phone}`);
             
-            // Special handling for when credentials are missing but we still want to provide verification
+            // Special handling for when credentials are missing
             if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
-              console.log('⚠️ Twilio credentials missing, but allowing verification flow to continue');
-              console.log(`📱 Verification code for ${phone}: ${code}`);
-              sendSuccess = true; // Allow flow to continue without actual SMS
+              console.log('⚠️ Twilio credentials missing or not properly configured');
+              // Only log verification code in development mode
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📱 Verification code for ${phone}: ${code}`);
+                sendSuccess = true; // Allow flow to continue in development
+              }
             }
           }
         } catch (smsError) {
           console.error('SMS SENDING ERROR (CAUGHT AT ROUTES LEVEL):', smsError);
           
-          // Continue even if SMS fails - especially important in production
-          console.log('⚠️ SMS sending failed, but allowing verification flow to continue');
-          console.log(`📱 Verification code would have been sent to ${phone}: ${code}`);
-          sendSuccess = true; // Allow flow to continue without actual SMS
+          // Different behavior based on environment
+          if (process.env.NODE_ENV === 'development') {
+            // In development, log more details and allow flow to continue
+            console.log('⚠️ SMS sending failed, but allowing verification flow to continue');
+            console.log(`📱 Verification code in development: ${code}`);
+            sendSuccess = true; // Allow flow to continue without actual SMS
+          } else {
+            // In production, handle more professionally
+            console.error('⚠️ SMS verification failed in production environment');
+            sendSuccess = false; // In production, don't continue without SMS
+          }
         }
       }
       
@@ -564,13 +574,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
                                          !process.env.TWILIO_AUTH_TOKEN || 
                                          !process.env.TWILIO_PHONE_NUMBER;
       
-      // TEMPORARY: Always include verification code in responses for testing
-      // This allows testing without SMS delivery during development phase
-      response.verificationCode = code;
-      response.message += `. Verification code: ${code}`;
-      
-      // Add debug info about environment
+      // Only include verification code in development environment
       if (process.env.NODE_ENV === 'development') {
+        response.verificationCode = code;
         response.debug = {
           environment: 'development',
           twilioStatus: isMissingTwilioCredentials ? 'missing credentials' : 'configured'
