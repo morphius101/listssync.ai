@@ -557,11 +557,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         response.maskedPhone = formatPhoneForDisplay(phone);
       }
       
-      // For development/testing - include verification code in response
-      // This helps with testing when email delivery is unreliable
-      if (process.env.NODE_ENV === 'development') {
+      // Show verification code in response in the following cases:
+      // 1. In development mode (for easier testing)
+      // 2. When Twilio credentials are missing in production (for testing without SMS)
+      const isMissingTwilioCredentials = !process.env.TWILIO_ACCOUNT_SID || 
+                                         !process.env.TWILIO_AUTH_TOKEN || 
+                                         !process.env.TWILIO_PHONE_NUMBER;
+      
+      if (process.env.NODE_ENV === 'development' || (process.env.NODE_ENV === 'production' && isMissingTwilioCredentials)) {
         response.verificationCode = code;
-        response.message += ". Check response for verification code (development mode only).";
+        const envMsg = process.env.NODE_ENV === 'development' ? 'development mode' : 'missing Twilio credentials';
+        response.message += `. Check response for verification code (${envMsg}).`;
       }
       
       res.json(response);
