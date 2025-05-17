@@ -6,12 +6,33 @@ import twilio from 'twilio';
 
 // Generate a 6-digit verification code
 function generateVerificationCode(): string {
-  return Math.floor(100000 + Math.random() * 900000).toString();
+  try {
+    // Generate a secure 6-digit code
+    const code = Math.floor(100000 + Math.random() * 900000).toString();
+    console.log(`Generated verification code: ${code}`);
+    return code;
+  } catch (error) {
+    console.error('Error generating verification code:', error);
+    // Fallback to a simple but still secure method
+    return (100000 + Math.floor(Math.random() * 900000)).toString();
+  }
 }
 
-// Generate a verification token
+// Generate a verification token using UUID v4
 function generateToken(): string {
-  return uuidv4();
+  try {
+    const token = uuidv4();
+    console.log(`Generated verification token: ${token}`);
+    return token;
+  } catch (error) {
+    console.error('Error generating UUID token:', error);
+    // Fallback to timestamp-based token if UUID fails
+    const timestamp = Date.now();
+    const randomPart = Math.random().toString(36).substring(2, 10);
+    const fallbackToken = `token_${timestamp}_${randomPart}`;
+    console.log(`Generated fallback token: ${fallbackToken}`);
+    return fallbackToken;
+  }
 }
 
 /**

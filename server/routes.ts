@@ -459,7 +459,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Create share URL with token, using custom domain in production
       const protocol = SITE_CONFIG.protocol || req.protocol;
       const host = SITE_CONFIG.host || req.get('host');
+      
+      console.log(`DEBUG URL GENERATION:
+- Protocol: ${protocol}
+- Host: ${host}
+- Token: ${token}
+- Environment: ${process.env.NODE_ENV || 'unknown'}
+- SITE_CONFIG: ${JSON.stringify(SITE_CONFIG)}`);
+      
+      // Token validation before building URL
+      if (!token) {
+        console.error('❌ Failed to generate verification token');
+        return res.status(500).json({ message: "Failed to generate share link. Please try again." });
+      }
+      
       const shareUrl = `${protocol}://${host}/shared/${token}`;
+      console.log(`✅ Generated share URL: ${shareUrl}`);
       
       // Return masked contact info, token, and share URL
       const response: any = { 
