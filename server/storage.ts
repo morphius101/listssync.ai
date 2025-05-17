@@ -23,6 +23,7 @@ export interface IStorage {
   createVerification(verification: VerificationDTO): Promise<VerificationDTO>;
   getVerificationByToken(token: string): Promise<VerificationDTO | undefined>;
   markVerificationAsVerified(token: string): Promise<boolean>;
+  getAllVerifications(): Promise<VerificationDTO[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -260,6 +261,39 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error marking verification as verified:', error);
       return false;
+    }
+  }
+  
+  /**
+   * Get all verifications from the database
+   * Useful for debug and finding active verifications
+   */
+  async getAllVerifications(): Promise<VerificationDTO[]> {
+    try {
+      console.log(`Retrieving all verifications from database...`);
+      
+      const allVerifications = await db
+        .select()
+        .from(verifications)
+        .orderBy(desc(verifications.createdAt));
+        
+      console.log(`Found ${allVerifications.length} verifications`);
+      
+      // Map database records to DTOs
+      return allVerifications.map(v => ({
+        token: v.token,
+        code: v.code,
+        createdAt: v.createdAt,
+        expiresAt: v.expiresAt,
+        verified: v.verified,
+        recipientId: v.recipientId,
+        recipientEmail: v.recipientEmail || undefined,
+        recipientPhone: v.recipientPhone || undefined,
+        checklistId: v.checklistId || undefined
+      }));
+    } catch (error) {
+      console.error("Error retrieving all verifications:", error);
+      return [];
     }
   }
 }

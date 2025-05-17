@@ -46,12 +46,20 @@ export async function createVerification(
   checklistId?: string
 ): Promise<{ token: string; code: string }> {
   try {
+    console.log(`🔑 Creating verification for recipient: ${recipientId}`);
+    console.log(`🔑 Contact methods: ${email ? 'Email ✓' : 'Email ✗'}, ${phone ? 'Phone ✓' : 'Phone ✗'}`);
+    console.log(`🔑 Checklist ID: ${checklistId || 'Not provided'}`);
+    
     const code = generateVerificationCode();
     const token = generateToken();
+    
+    console.log(`🔑 Generated code: ${code}, token: ${token}`);
     
     // Set expiration time (30 minutes from now)
     const now = new Date();
     const expires = new Date(now.getTime() + 30 * 60 * 1000);
+    
+    console.log(`🔑 Verification expires at: ${expires.toISOString()}`);
     
     // Create verification record in database
     const verificationData: VerificationDTO = {
@@ -67,16 +75,63 @@ export async function createVerification(
     };
     
     // Store in database
+    console.log(`🔑 Storing verification in database...`);
     await storage.createVerification(verificationData);
+    console.log(`✅ Verification stored successfully`);
     
-    console.log(`Created verification with token ${token} and code ${code}`);
+    console.log(`🔑 Created verification with token ${token} and code ${code}`);
     return { token, code };
-  } catch (error) {
-    console.error("Error creating verification:", error);
-    // Fallback to prevent blocking the user flow
-    const fallbackToken = uuidv4();
-    const fallbackCode = generateVerificationCode();
-    return { token: fallbackToken, code: fallbackCode };
+  } catch (error: any) {
+    console.error("❌ Error creating verification:", error);
+    
+    // Log detailed error information for debugging
+    if (typeof error === 'object' && error !== null) {
+      console.error("❌ Error details:", {
+        message: error.message,
+        name: error.name,
+        stack: error.stack,
+        code: error.code
+      });
+    }
+    
+    // Check for specific error types
+    if (error.message?.includes('duplicate key')) {
+      console.log("❌ Duplicate verification detected");
+      
+      try {
+        // Try to retrieve the existing verification for this recipient
+        const existingVerifications = await storage.getAllVerifications();
+        const existingVerification = existingVerifications.find(v => 
+          v.recipientId === recipientId &&
+          !v.verified &&
+          v.expiresAt > new Date()
+        );
+        
+        if (existingVerification) {
+          console.log(`📋 Found existing verification, returning it`);
+          return { 
+            token: existingVerification.token, 
+            code: existingVerification.code 
+          };
+        }
+      } catch (lookupError) {
+        console.error("❌ Error looking up existing verification:", lookupError);
+      }
+    }
+    
+    // Log environment for troubleshooting
+    console.log(`🔧 NODE_ENV: ${process.env.NODE_ENV || 'not set'}`);
+    
+    // Fallback to prevent blocking the user flow - only in development
+    if (process.env.NODE_ENV === 'development') {
+      console.log("🔧 Using fallback verification (development only)");
+      const fallbackToken = uuidv4();
+      const fallbackCode = generateVerificationCode();
+      return { token: fallbackToken, code: fallbackCode };
+    }
+    
+    // In production, throw the error to force proper handling
+    throw new Error(`Failed to create verification: ${error.message || 'Unknown error'}`);
   }
 }
 
