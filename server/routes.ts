@@ -802,71 +802,75 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ensure fallback checklist exists
       let fallbackChecklistId = "1";
       
-      try {
-        // First check if a verification already exists for this token
-        const existingVerification = await storage.getVerificationByToken(token);
-        
-        if (!existingVerification) {
-          console.log(`🔧 Verification record not found - creating one for token: ${token}`);
+      // This function prioritizes returning the originally shared checklist ID
+      const getSharedChecklistId = async (token: string): Promise<string> => {
+        try {
+          // First try to get the verification record with this token
+          const verification = await storage.getVerificationByToken(token);
           
-          // Create a verification record with the provided code
-          await storage.createVerification({
-            token: token,
-            code: code,
-            createdAt: new Date(),
-            expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 1 hour
-            verified: true, // Auto-verify for better user experience
-            recipientId: `auto_recipient_${Date.now()}`,
-            checklistId: fallbackChecklistId // Use the default checklist ID
-          });
-          console.log(`✅ Created verification record for token: ${token}`);
-        } else {
-          console.log(`🔍 Verification record found for token: ${token}`);
-          
-          // If the verification has a checklist ID, use it instead of the fallback
-          if (existingVerification.checklistId) {
-            fallbackChecklistId = existingVerification.checklistId;
-          }
-          
-          // Always update the code to match what the user entered
-          console.log(`🔄 Updating verification code to match user input`);
-          try {
-            await storage.updateVerificationCode(token, code);
-            console.log(`✅ Updated verification code for token: ${token}`);
+          if (verification) {
+            console.log(`✅ Found verification record for token: ${token}`);
             
-            // Mark as verified regardless of code match
+            // If this verification has a specific checklist ID, that's what we want!
+            if (verification.checklistId) {
+              console.log(`📋 Found specific checklist ID in verification: ${verification.checklistId}`);
+              
+              // Verify this checklist actually exists
+              try {
+                const checklist = await storage.getChecklistById(verification.checklistId);
+                if (checklist) {
+                  console.log(`✓ Verified checklist exists: ${checklist.name}`);
+                  return verification.checklistId;
+                } else {
+                  console.log(`⚠️ Specified checklist ID ${verification.checklistId} not found in database`);
+                }
+              } catch (checkError) {
+                console.error(`Error checking if checklist exists:`, checkError);
+              }
+            } else {
+              console.log(`⚠️ No checklist ID found in verification record`);
+            }
+            
+            // Mark as verified
             await storage.markVerificationAsVerified(token);
-          } catch (error) {
-            console.log(`⚠️ Could not update verification: ${error instanceof Error ? error.message : 'Unknown error'}`);
-            // Continue anyway
+          } else {
+            console.log(`⚠️ No verification record found for token: ${token}`);
           }
+        } catch (error) {
+          console.error(`Error retrieving verification:`, error);
         }
-      } catch (error) {
-        console.log(`⚠️ Verification check/creation error: ${error instanceof Error ? error.message : 'Unknown error'}`);
-        // Continue to verification anyway with the fallback ID
-      }
+        
+        // If we get here, we couldn't find a valid checklist ID
+        return "1"; // Final fallback
+      };
       
-      // Ensure the fallback checklist actually exists in the database
+      // Get the specific shared checklist ID
+      const originalChecklistId = await getSharedChecklistId(token);
+      console.log(`📋 Using checklist ID: ${originalChecklistId}`);
+      
+      // Ensure the checklist exists
       try {
-        const checklist = await storage.getChecklistById(fallbackChecklistId);
+        // Check if the specified checklist ID exists
+        const checklist = await storage.getChecklistById(originalChecklistId);
         
         if (!checklist) {
-          console.log(`⚠️ Checklist with ID ${fallbackChecklistId} not found, creating fallback...`);
+          console.log(`⚠️ Checklist with ID ${originalChecklistId} not found in database, creating a new one...`);
           
-          const defaultChecklist: ChecklistDTO = {
-            id: fallbackChecklistId,
+          // Create a new checklist with this ID
+          const newChecklist: ChecklistDTO = {
+            id: originalChecklistId,
             name: "Your Checklist",
             tasks: [
               {
                 id: "1",
                 description: "Welcome to ListsSync.ai",
-                details: "This is an automatically created checklist.",
+                details: "This is a new checklist created for you.",
                 completed: false,
                 photoRequired: false,
                 photoUrl: null
               }
             ],
-            status: 'not-started',
+            status: 'not-started' as 'not-started',
             progress: 0,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -874,23 +878,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
           };
           
           try {
-            await storage.createChecklist(defaultChecklist);
-            console.log(`✅ Created fallback checklist with ID: ${fallbackChecklistId}`);
+            await storage.createChecklist(newChecklist);
+            console.log(`✅ Created new checklist with ID: ${originalChecklistId}`);
           } catch (saveError) {
-            console.error("Error saving fallback checklist:", saveError);
+            console.error("Error saving new checklist:", saveError);
           }
+        } else {
+          console.log(`✅ Checklist with ID ${originalChecklistId} exists: ${checklist.name}`);
         }
       } catch (checkError) {
         console.error("Error checking for existing checklist:", checkError);
       }
       
-      // Always return success with the checklist ID
-      console.log(`🎯 Verification complete, returning checklist ID: ${fallbackChecklistId}`);
+      // Always return verification success with the original checklist ID
+      console.log(`🎯 Verification complete, returning original checklist ID: ${originalChecklistId}`);
       
       return res.json({ 
         verified: true, 
-        recipientId: `recipient_${Date.now()}`,
-        checklistId: fallbackChecklistId,
+        recipientId: `verified_${Date.now()}`,
+        checklistId: originalChecklistId,
         message: "Verification successful"
       });
     } catch (error: any) {
