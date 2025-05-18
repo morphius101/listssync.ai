@@ -827,6 +827,71 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
+  // Special endpoint to get a valid checklist for verification fallbacks
+  app.get(`${API_BASE}/verification/fallback-checklist`, async (req, res) => {
+    try {
+      // Get all checklists
+      const checklists = await storage.getAllChecklists();
+      
+      if (checklists && checklists.length > 0) {
+        // Return the first available checklist
+        res.json({
+          success: true,
+          checklistId: checklists[0].id
+        });
+      } else {
+        // Create a new fallback checklist
+        const taskId1 = `task_${Date.now()}_1`;
+        const taskId2 = `task_${Date.now()}_2`;
+        
+        const fallbackId = `fallback_${Date.now()}`;
+        
+        // Create a sample checklist
+        await db.insert(checklists).values({
+          id: fallbackId,
+          name: 'Welcome to ListsSync.ai',
+          status: 'not-started',
+          progress: 0,
+          remarks: 'Welcome to ListsSync.ai! This is your default checklist.',
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          tasksData: JSON.stringify([
+            {
+              id: taskId1,
+              description: 'Create your first checklist',
+              details: 'Click the "+" button on the dashboard to create a new checklist',
+              completed: false,
+              photoRequired: false,
+              photoUrl: null
+            },
+            {
+              id: taskId2,
+              description: 'Share your checklist with team members',
+              details: 'Use the share button to collaborate with others',
+              completed: false,
+              photoRequired: false,
+              photoUrl: null
+            }
+          ])
+        });
+        
+        // Return the ID of the new checklist
+        res.json({
+          success: true,
+          checklistId: fallbackId
+        });
+      }
+    } catch (error) {
+      console.error('Error getting fallback checklist:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to get or create fallback checklist'
+      });
+    }
+  });
+
+
+  
   // Cache for verification status checks to reduce database load
   const verificationStatusCache = new Map();
   const CACHE_TTL = 60 * 1000; // 60 seconds cache TTL

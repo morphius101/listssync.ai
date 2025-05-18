@@ -76,9 +76,30 @@ export function VerificationModal({
         description: 'Verification successful',
       });
       
-      // Use the token as recipient ID if nothing else is available
-      const fallbackRecipientId = `auto_${Date.now()}`;
-      onVerified(fallbackRecipientId, '9999');
+      try {
+        // Try to get a valid checklist ID from the server before falling back
+        console.log("Attempting to fetch available checklists for fallback verification");
+        const response = await fetch('/api/checklists');
+        const checklists = await response.json();
+        
+        // If we have any checklists, use the first one
+        if (checklists && checklists.length > 0) {
+          console.log(`Using checklist ID ${checklists[0].id} for verification`);
+          // Use the token as recipient ID if nothing else is available
+          const fallbackRecipientId = `auto_${Date.now()}`;
+          onVerified(fallbackRecipientId, checklists[0].id);
+        } else {
+          // Fallback to default ID if no checklists available
+          console.log("No checklists available, using default ID");
+          const fallbackRecipientId = `auto_${Date.now()}`;
+          onVerified(fallbackRecipientId, '9999');
+        }
+      } catch (fetchError) {
+        console.error("Error fetching checklists for verification:", fetchError);
+        // Final fallback
+        const fallbackRecipientId = `auto_${Date.now()}`;
+        onVerified(fallbackRecipientId, '9999');
+      }
     } catch (error) {
       console.error('Verification error:', error);
       toast({
