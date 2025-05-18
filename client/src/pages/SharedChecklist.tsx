@@ -171,7 +171,7 @@ export default function SharedChecklist() {
               photoUrl: null
             }
           ],
-          status: 'not-started',
+          status: 'not-started' as 'not-started',
           progress: 0,
           createdAt: new Date(),
           updatedAt: new Date(),
