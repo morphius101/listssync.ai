@@ -20,6 +20,7 @@ import {
   sendVerificationSMS,
   sendVerificationEmail
 } from "./services/verificationService";
+import { ChecklistDTO } from "../shared/schema";
 
 // Site configuration for URLs - use custom domain in production
 const SITE_CONFIG = {
@@ -672,6 +673,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create a fallback checklist helper function
+  function createDefaultChecklist(id: string): ChecklistDTO {
+    return {
+      id: id,
+      name: "Welcome to ListsSync.ai",
+      tasks: [
+        {
+          id: "1",
+          description: "Welcome to ListsSync.ai",
+          details: "This is an automatically created checklist to get you started.",
+          completed: false,
+          photoRequired: false,
+          photoUrl: null
+        },
+        {
+          id: "2",
+          description: "Create your own checklist",
+          details: "Visit the dashboard to create your own custom checklists.",
+          completed: false,
+          photoRequired: false,
+          photoUrl: null
+        }
+      ],
+      status: 'not-started',
+      progress: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      remarks: "This is a default welcome checklist."
+    };
+  }
+  
   // Special endpoint to ensure a fallback checklist is always available in production
   app.get(`${API_BASE}/verification/fallback-checklist`, async (req, res) => {
     try {
@@ -708,7 +740,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             photoUrl: null
           }
         ],
-        status: "not-started",
+        status: 'not-started',
         progress: 0,
         createdAt: new Date(),
         updatedAt: new Date(),
