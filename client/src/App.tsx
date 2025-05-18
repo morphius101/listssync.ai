@@ -8,6 +8,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import ChecklistView from "@/pages/ChecklistView";
 import SharedChecklist from "@/pages/SharedChecklist";
 import Header from "@/components/Header";
+import Footer from "@/components/Footer";
 import LandingPage from "@/components/LandingPage";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useEffect } from "react";
@@ -68,10 +69,13 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
-        <div className="min-h-screen bg-[#F1F5F9]">
+        <div className="min-h-screen flex flex-col bg-[#F1F5F9]">
           {showHeader && <Header />}
           <Toaster />
-          <Router />
+          <div className="flex-grow">
+            <Router />
+          </div>
+          <Footer />
         </div>
       </TooltipProvider>
     </QueryClientProvider>
