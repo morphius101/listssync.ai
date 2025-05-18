@@ -67,11 +67,21 @@ export function VerificationModal({
             description: 'Verification successful',
           });
           
-          // If checklist ID is missing, use a known good ID (1)
-          const effectiveChecklistId = result.checklistId || '1';
-          console.log(`📋 Using checklist ID: ${effectiveChecklistId}`);
-          
-          onVerified(result.recipientId || '', effectiveChecklistId);
+          // CRITICAL: Use the original checklist ID that was shared
+          // Never use a fallback ID unless absolutely necessary
+          if (result.checklistId) {
+            console.log(`📋 Using original shared checklist ID: ${result.checklistId}`);
+            onVerified(result.recipientId || '', result.checklistId);
+          } else {
+            console.error(`⚠️ No checklist ID received from verification - this should not happen`);
+            toast({
+              title: 'Warning',
+              description: 'We could not retrieve the original checklist information.',
+              variant: 'destructive',
+            });
+            // Only use fallback as a last resort
+            onVerified(result.recipientId || '', '1');
+          }
           return;
         } else {
           // Handle verification failure
