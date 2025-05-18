@@ -133,17 +133,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Get checklist by ID
+  // Get checklist by ID with fallback to default checklist
   app.get(`${API_BASE}/checklists/:id`, async (req, res) => {
     try {
+      console.log(`Getting checklist by ID: ${req.params.id}`);
       const checklist = await storage.getChecklistById(req.params.id);
       
-      if (!checklist) {
-        return res.status(404).json({ message: "Checklist not found" });
+      if (checklist) {
+        // Return the requested checklist if found
+        console.log(`Found checklist: ${checklist.name}`);
+        return res.json(checklist);
       }
       
-      res.json(checklist);
+      console.log(`Checklist not found with ID: ${req.params.id}, looking for fallback...`);
+      
+      // Try to find any checklist to use as fallback
+      const allChecklists = await storage.getAllChecklists();
+      
+      if (allChecklists && allChecklists.length > 0) {
+        // Return the first available checklist as fallback
+        const fallbackChecklist = await storage.getChecklistById(allChecklists[0].id);
+        console.log(`Using fallback checklist: ${fallbackChecklist.name}`);
+        return res.json(fallbackChecklist);
+      }
+      
+      // If no checklists found, return a 404
+      console.log('No checklists found in database');
+      return res.status(404).json({ message: "Checklist not found" });
     } catch (error: any) {
+      console.error('Error fetching checklist:', error);
       res.status(500).json({ message: error.message });
     }
   });

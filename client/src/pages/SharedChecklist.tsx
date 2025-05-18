@@ -107,21 +107,38 @@ export default function SharedChecklist() {
     try {
       console.log(`Attempting to load checklist with ID: ${id}`);
       
-      // Attempt to fetch the specific checklist
-      const data = await getChecklistById(id);
+      // Verify ID is valid
+      if (!id || id === 'undefined' || id === 'null') {
+        console.error(`Invalid checklist ID: ${id}, will try a fallback`);
+        throw new Error('Invalid checklist ID');
+      }
       
-      if (data) {
-        console.log(`Successfully loaded checklist: ${data.name}`);
-        setChecklist(data);
-        setRemarks(data.remarks || "");
+      // Before making the API call, log the exact URL being requested
+      const requestUrl = `/api/checklists/${id}`;
+      console.log(`Making API request to: ${requestUrl}`);
+      
+      // Add detailed logging around the API call
+      try {
+        // Attempt to fetch the specific checklist
+        const data = await getChecklistById(id);
+        console.log(`API response for checklist ${id}:`, data);
         
-        // Subscribe to realtime updates
-        subscribeToChecklist(id);
-        return data;
-      } else {
-        // If no data was returned for this specific ID, fetch a fallback
-        console.log(`No checklist found with ID: ${id}, fetching fallback...`);
-        throw new Error('Checklist not found');
+        if (data) {
+          console.log(`Successfully loaded checklist: ${data.name}`);
+          setChecklist(data);
+          setRemarks(data.remarks || "");
+          
+          // Subscribe to realtime updates
+          subscribeToChecklist(id);
+          return data;
+        } else {
+          // If no data was returned for this specific ID, fetch a fallback
+          console.log(`No checklist found with ID: ${id}, fetching fallback...`);
+          throw new Error('Checklist not found in API response');
+        }
+      } catch (apiError) {
+        console.error(`API error when fetching checklist ${id}:`, apiError);
+        throw apiError;
       }
     } catch (error) {
       console.error('Error fetching checklist:', error);
