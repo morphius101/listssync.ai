@@ -89,16 +89,16 @@ export function VerificationModal({
           const fallbackRecipientId = `auto_${Date.now()}`;
           onVerified(fallbackRecipientId, checklists[0].id);
         } else {
-          // Fallback to default ID if no checklists available
-          console.log("No checklists available, using default ID");
+          // Fallback to our known default checklist ID (1)
+          console.log("No checklists available, using default checklist ID 1");
           const fallbackRecipientId = `auto_${Date.now()}`;
-          onVerified(fallbackRecipientId, '9999');
+          onVerified(fallbackRecipientId, '1');
         }
       } catch (fetchError) {
         console.error("Error fetching checklists for verification:", fetchError);
         // Final fallback
         const fallbackRecipientId = `auto_${Date.now()}`;
-        onVerified(fallbackRecipientId, '9999');
+        onVerified(fallbackRecipientId, '1');
       }
     } catch (error) {
       console.error('Verification error:', error);
