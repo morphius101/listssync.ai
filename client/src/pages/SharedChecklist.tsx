@@ -260,13 +260,70 @@ export default function SharedChecklist() {
   };
 
   const handleVerified = async (verifiedRecipientId: string, verifiedChecklistId?: string) => {
+    console.log('🔐 Verification successful with recipient:', verifiedRecipientId);
+    console.log('📋 Verification successful with checklist ID:', verifiedChecklistId);
+    
     setIsVerified(true);
     setShowVerification(false);
     setRecipientId(verifiedRecipientId);
     
-    if (verifiedChecklistId) {
-      setChecklistId(verifiedChecklistId);
+    if (!verifiedChecklistId) {
+      console.error('⚠️ No checklist ID received after verification - this is unexpected');
+      toast({
+        title: 'Warning',
+        description: 'Could not determine which checklist to load. Using default.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    
+    // Store the verified checklist ID
+    setChecklistId(verifiedChecklistId);
+    
+    // Try to load the specific checklist (with multiple retry attempts)
+    console.log(`🔍 Attempting to load verified checklist with ID: ${verifiedChecklistId}`);
+    try {
+      // First make dedicated attempts to load the exact checklist
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          console.log(`📦 Attempt ${attempt} to fetch checklist ${verifiedChecklistId}`);
+          const data = await getChecklistById(verifiedChecklistId);
+          
+          if (data) {
+            console.log(`✅ Successfully loaded original checklist: ${data.name}`);
+            setChecklist(data);
+            setRemarks(data.remarks || "");
+            
+            // Subscribe to realtime updates for the specific checklist
+            subscribeToChecklist(verifiedChecklistId);
+            
+            toast({
+              title: 'Success',
+              description: 'Checklist loaded successfully!',
+            });
+            
+            return;
+          }
+        } catch (error) {
+          console.error(`❌ Attempt ${attempt} failed:`, error);
+          
+          if (attempt < 3) {
+            // Wait a bit before trying again
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
+        }
+      }
+      
+      // If all attempts failed, fall back to the generic loadChecklist function
+      console.warn('⚠️ All direct attempts failed, falling back to loadChecklist');
       await loadChecklist(verifiedChecklistId);
+    } catch (error) {
+      console.error('❌ Error loading verified checklist:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load the checklist. Please try refreshing.',
+        variant: 'destructive',
+      });
     }
   };
   

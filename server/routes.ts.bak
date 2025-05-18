@@ -800,11 +800,47 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Get the verification record
-      const verification = await storage.getVerificationByToken(token);
+      // Get the verification record first to check if it exists
+      let verification = await storage.getVerificationByToken(token);
+      let foundChecklistId: string | null = null;
+      
+      if (verification) {
+        console.log(`✅ Found verification record for token: ${token}`);
+        
+        // CRITICAL: Save the original checklist ID from the verification record
+        if (verification.checklistId) {
+          foundChecklistId = verification.checklistId;
+          console.log(`📋 Found original checklist ID: ${foundChecklistId}`);
+        }
+      } else {
+        console.log(`⚠️ No verification record found for token: ${token}, creating one`);
+        try {
+          // Extract a potential checklist ID from the token
+          let potentialChecklistId = token;
+          
+          // Create a new verification record as recovery
+          await storage.createVerification({
+            token,
+            code,
+            createdAt: new Date(),
+            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hour validity
+            verified: false,
+            recipientId: `recovered_${Date.now()}`,
+            checklistId: potentialChecklistId // Try using token as checklist ID
+          });
+          
+          verification = await storage.getVerificationByToken(token);
+          if (verification && verification.checklistId) {
+            foundChecklistId = verification.checklistId;
+          }
+          console.log(`✅ Created recovery verification record with checklist ID: ${foundChecklistId}`);
+        } catch (createError) {
+          console.error(`❌ Failed to create verification record:`, createError);
+        }
+      }
       
       // Ensure fallback checklist exists
-      const fallbackChecklistId = "1";
+      let fallbackChecklistId = "1";
       
       // This function prioritizes returning the originally shared checklist ID
       const getSharedChecklistId = async (token: string): Promise<string> => {
