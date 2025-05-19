@@ -102,83 +102,34 @@ export default function SharedChecklist() {
     };
   }, [token]); // Only depend on token to prevent re-runs
 
-  // Load checklist data with better error handling and fallbacks
+  // Load checklist data with better error handling and multi-source fetch strategy
   const loadChecklist = async (id: string) => {
     try {
-      console.log(`Attempting to load checklist with ID: ${id}`);
+      console.log(`📋 Attempting to load checklist with ID: ${id}`);
       
       // Verify ID is valid
       if (!id || id === 'undefined' || id === 'null') {
-        console.error(`Invalid checklist ID: ${id}, will try a fallback`);
+        console.error(`⚠️ Invalid checklist ID: ${id}`);
         throw new Error('Invalid checklist ID');
       }
       
-      // CRITICAL FIX: Try both API routes to load the checklist
-      // First try the server API route which accesses PostgreSQL
-      const serverRequestUrl = `/api/checklists/${id}`;
-      console.log(`Making server API request to: ${serverRequestUrl}`);
+      // CRITICAL FIX: For Firebase-style IDs, prioritize direct Firebase fetch
+      // Firebase IDs are typically longer strings with letters and numbers
+      const isLikelyFirebaseId = id.length > 20 && /[a-zA-Z]/.test(id);
       
-      // Enhanced error handling for checklist fetching
-      try {
-        console.log(`Attempting dual approach to fetch checklist with ID: ${id}`);
+      if (isLikelyFirebaseId) {
+        console.log(`🔥 ID appears to be a Firebase ID: ${id} - trying Firebase first`);
         
-        // 1. Try to fetch from the server API (PostgreSQL) 
+        // Attempt direct Firebase lookup as the first approach
         try {
-          const response = await fetch(serverRequestUrl);
-          if (response.ok) {
-            const data = await response.json();
-            console.log(`Server API response for checklist ${id}:`, data);
-            
-            if (data) {
-              console.log(`Successfully loaded checklist from server: ${data.name}`);
-              setChecklist(data);
-              setRemarks(data.remarks || "");
-              
-              // Subscribe to realtime updates
-              subscribeToChecklist(id);
-              return data;
-            }
-          } else {
-            throw new Error(`Server API returned ${response.status}`);
-          }
-        } catch (serverError) {
-          console.error(`Error fetching from server API: ${serverError}`);
-          // Continue to Firebase approach
-        }
-        
-        // 2. Try via Firebase directly as a backup
-        try {
-          console.log(`Attempting to fetch checklist via Firebase with ID: ${id}`);
-          const data = await getChecklistById(id);
-          console.log(`Firebase response for checklist ${id}:`, data);
+          const firebaseData = await getChecklistById(id);
           
-          if (data) {
-            console.log(`Successfully loaded checklist from Firebase: ${data.name}`);
-            setChecklist(data);
-            setRemarks(data.remarks || "");
+          if (firebaseData) {
+            console.log(`✅ Successfully loaded checklist from Firebase: ${firebaseData.name}`);
+            setChecklist(firebaseData);
+            setRemarks(firebaseData.remarks || "");
             
             // Subscribe to realtime updates
-            subscribeToChecklist(id);
-            return data;
-          }
-        } catch (firebaseError) {
-          console.error(`Error fetching specific checklist from Firebase ${id}:`, firebaseError);
-          // Continue to fallback mechanisms
-        }
-        
-        // CRITICAL FIX: Instead of falling back to an unrelated checklist,
-        // retry loading the original one with a delay
-        console.log(`🔄 Retrying to load the original checklist ID: ${id} after delay`);
-        try {
-          // Wait a short time to give the server a chance to catch up
-          await new Promise(resolve => setTimeout(resolve, 800));
-          
-          const retryData = await getChecklistById(id);
-          
-          if (retryData) {
-            console.log(`✅ Successfully loaded original checklist on retry: ${retryData.name}`);
-            setChecklist(retryData);
-            setRemarks(retryData.remarks || "");
             subscribeToChecklist(id);
             
             toast({
@@ -186,37 +137,106 @@ export default function SharedChecklist() {
               description: 'Your shared checklist has been loaded successfully.',
             });
             
-            return retryData;
+            return firebaseData;
           }
-        } catch (retryError) {
-          console.error(`❌ Error on retry attempt for original checklist ${id}:`, retryError);
+        } catch (firebaseError) {
+          console.error(`❌ Error fetching directly from Firebase: ${firebaseError}`);
         }
-        
-        // Show error instead of creating a fake checklist
-        console.log('❌ Unable to load the specified checklist after multiple attempts');
-        
-        // Display error toast
-        toast({
-          title: 'Error Loading Checklist',
-          description: 'We could not load the shared checklist. Please contact support with the checklist ID: ' + id,
-          variant: 'destructive',
-          duration: 10000, // Show longer
-        });
-        
-        return null;
-      } catch (apiError) {
-        console.error(`Critical error when fetching checklist:`, apiError);
-        
-        // Show an error message instead of fake checklist
-        toast({
-          title: 'Server Connection Error',
-          description: 'We\'re having trouble connecting to the server. Please try again in a few moments.',
-          variant: 'destructive',
-          duration: 10000,
-        });
-        
-        return null;
+      } else {
+        console.log(`🔢 ID appears to be a numeric/PostgreSQL ID: ${id}`);
       }
+      
+      // Try multiple fetch strategies in sequence
+      // 1. Try server API (PostgreSQL) route
+      try {
+        const serverRequestUrl = `/api/checklists/${id}`;
+        console.log(`🔍 Making server API request to: ${serverRequestUrl}`);
+        
+        const response = await fetch(serverRequestUrl);
+        if (response.ok) {
+          const data = await response.json();
+          console.log(`✅ Server API returned data for ${id}:`, data);
+          
+          if (data) {
+            setChecklist(data);
+            setRemarks(data.remarks || "");
+            subscribeToChecklist(id);
+            return data;
+          }
+        } else {
+          console.log(`❌ Server API returned status ${response.status}`);
+        }
+      } catch (serverError) {
+        console.error(`❌ Error fetching from server API: ${serverError}`);
+      }
+      
+      // 2. If not already tried, use Firebase as backup
+      if (!isLikelyFirebaseId) {
+        try {
+          console.log(`🔥 Trying Firebase as backup for ID: ${id}`);
+          const firebaseData = await getChecklistById(id);
+          
+          if (firebaseData) {
+            console.log(`✅ Successfully loaded checklist from Firebase: ${firebaseData.name}`);
+            setChecklist(firebaseData);
+            setRemarks(firebaseData.remarks || "");
+            subscribeToChecklist(id);
+            return firebaseData;
+          }
+        } catch (firebaseBackupError) {
+          console.error(`❌ Firebase backup attempt failed: ${firebaseBackupError}`);
+        }
+      }
+      
+      // 3. Final attempt - try with a delay (allows server processing time)
+      console.log(`⏱️ Making final attempt after delay for ID: ${id}`);
+      await new Promise(resolve => setTimeout(resolve, 1200));
+      
+      try {
+        // Try Firebase one last time
+        const finalData = await getChecklistById(id);
+        
+        if (finalData) {
+          console.log(`✅ Final attempt successful: ${finalData.name}`);
+          setChecklist(finalData);
+          setRemarks(finalData.remarks || "");
+          subscribeToChecklist(id);
+          
+          toast({
+            title: 'Success',
+            description: 'Your shared checklist has been loaded',
+          });
+          
+          return finalData;
+        }
+      } catch (finalError) {
+        console.error(`❌ Final attempt failed: ${finalError}`);
+      }
+        
+      // Show error instead of creating a fake checklist
+      console.log('❌ Unable to load the specified checklist after multiple attempts');
+      
+      // Display error toast with specific contact information
+      toast({
+        title: 'Error Loading Checklist',
+        description: 'We could not load the shared checklist. Please contact greyson@listssync.ai with the checklist ID: ' + id,
+        variant: 'destructive',
+        duration: 15000, // Show longer for user to see email
+      });
+      
+      return null;
+    } catch (apiError) {
+      console.error(`Critical error when fetching checklist:`, apiError);
+      
+      // Show a helpful error message with contact information
+      toast({
+        title: 'Loading Error',
+        description: 'There was a problem loading this checklist. Please refresh the page or contact greyson@listssync.ai for assistance.',
+        variant: 'destructive',
+        duration: 10000,
+      });
+      
+      return null;
     } catch (error) {
       console.error('Error fetching checklist:', error);
       
