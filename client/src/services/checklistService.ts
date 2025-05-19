@@ -54,17 +54,55 @@ export const getChecklists = async (): Promise<ChecklistSummary[]> => {
   });
 };
 
-// Get checklist by ID
-export const getChecklistById = async (id: string): Promise<Checklist> => {
-  const { db } = getFirebase();
-  const docRef = doc(db, CHECKLIST_COLLECTION, id);
+// Get checklist by ID with enhanced error handling and retry logic
+export const getChecklistById = async (id: string): Promise<Checklist | null> => {
+  console.log(`🔍 Client: Attempting to fetch checklist from Firebase with ID: ${id}`);
   
-  const docSnap = await getDoc(docRef);
-  if (!docSnap.exists()) {
-    throw new Error("Checklist not found");
+  try {
+    const { db } = getFirebase();
+    const docRef = doc(db, CHECKLIST_COLLECTION, id);
+    
+    // First attempt
+    const docSnap = await getDoc(docRef);
+    if (docSnap.exists()) {
+      console.log(`✅ Client: Successfully found checklist in Firebase: ${id}`);
+      return convertFirestoreData(docSnap.data(), docSnap.id);
+    }
+    
+    // If not found, try checking if this is a verification token
+    console.log(`⚠️ Client: No checklist found with direct ID: ${id}. Checking if it's a verification token...`);
+    
+    // Call our server API to check if this is a verification token that maps to a checklist
+    try {
+      const response = await fetch(`/api/verification/status/${id}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        if (data.checklistId && data.checklistId !== id) {
+          console.log(`🔄 Client: Found a different checklist ID via verification: ${data.checklistId}`);
+          
+          // Try fetching with this new ID
+          const verifiedDocRef = doc(db, CHECKLIST_COLLECTION, data.checklistId);
+          const verifiedDocSnap = await getDoc(verifiedDocRef);
+          
+          if (verifiedDocSnap.exists()) {
+            console.log(`✅ Client: Successfully found checklist via verification token`);
+            return convertFirestoreData(verifiedDocSnap.data(), verifiedDocSnap.id);
+          }
+        }
+      }
+    } catch (verificationError) {
+      console.error('Error checking verification status:', verificationError);
+    }
+    
+    // Log that we couldn't find the checklist
+    console.error(`❌ Client: Checklist not found with ID: ${id}`);
+    return null;
+  } catch (error) {
+    console.error(`❌ Client: Error fetching checklist: ${error}`);
+    throw error;
   }
-  
-  return convertFirestoreData(docSnap.data(), docSnap.id);
 };
 
 // Create new checklist
