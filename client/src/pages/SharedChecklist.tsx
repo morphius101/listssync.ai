@@ -113,21 +113,47 @@ export default function SharedChecklist() {
         throw new Error('Invalid checklist ID');
       }
       
-      // Before making the API call, log the exact URL being requested
-      const requestUrl = `/api/checklists/${id}`;
-      console.log(`Making API request to: ${requestUrl}`);
+      // CRITICAL FIX: Try both API routes to load the checklist
+      // First try the server API route which accesses PostgreSQL
+      const serverRequestUrl = `/api/checklists/${id}`;
+      console.log(`Making server API request to: ${serverRequestUrl}`);
       
       // Enhanced error handling for checklist fetching
       try {
-        console.log(`Attempting to fetch checklist with ID: ${id}`);
+        console.log(`Attempting dual approach to fetch checklist with ID: ${id}`);
         
-        // First try the specific checklist ID
+        // 1. Try to fetch from the server API (PostgreSQL) 
         try {
+          const response = await fetch(serverRequestUrl);
+          if (response.ok) {
+            const data = await response.json();
+            console.log(`Server API response for checklist ${id}:`, data);
+            
+            if (data) {
+              console.log(`Successfully loaded checklist from server: ${data.name}`);
+              setChecklist(data);
+              setRemarks(data.remarks || "");
+              
+              // Subscribe to realtime updates
+              subscribeToChecklist(id);
+              return data;
+            }
+          } else {
+            throw new Error(`Server API returned ${response.status}`);
+          }
+        } catch (serverError) {
+          console.error(`Error fetching from server API: ${serverError}`);
+          // Continue to Firebase approach
+        }
+        
+        // 2. Try via Firebase directly as a backup
+        try {
+          console.log(`Attempting to fetch checklist via Firebase with ID: ${id}`);
           const data = await getChecklistById(id);
-          console.log(`API response for checklist ${id}:`, data);
+          console.log(`Firebase response for checklist ${id}:`, data);
           
           if (data) {
-            console.log(`Successfully loaded checklist: ${data.name}`);
+            console.log(`Successfully loaded checklist from Firebase: ${data.name}`);
             setChecklist(data);
             setRemarks(data.remarks || "");
             
@@ -135,8 +161,8 @@ export default function SharedChecklist() {
             subscribeToChecklist(id);
             return data;
           }
-        } catch (specificError) {
-          console.error(`Error fetching specific checklist ${id}:`, specificError);
+        } catch (firebaseError) {
+          console.error(`Error fetching specific checklist from Firebase ${id}:`, firebaseError);
           // Continue to fallback mechanisms
         }
         
