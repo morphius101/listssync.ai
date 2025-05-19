@@ -140,122 +140,72 @@ export default function SharedChecklist() {
           // Continue to fallback mechanisms
         }
         
-        // If we get here, the specific ID didn't work - try fetching ID '1' which we know exists
-        console.log(`Trying fallback checklist with ID: 1`);
+        // CRITICAL FIX: Instead of falling back to an unrelated checklist,
+        // retry loading the original one with a delay
+        console.log(`🔄 Retrying to load the original checklist ID: ${id} after delay`);
         try {
-          const fallbackData = await getChecklistById('1');
+          // Wait a short time to give the server a chance to catch up
+          await new Promise(resolve => setTimeout(resolve, 800));
           
-          if (fallbackData) {
-            console.log(`Successfully loaded fallback checklist: ${fallbackData.name}`);
-            setChecklist(fallbackData);
-            setRemarks(fallbackData.remarks || "");
-            subscribeToChecklist('1');
-            return fallbackData;
+          const retryData = await getChecklistById(id);
+          
+          if (retryData) {
+            console.log(`✅ Successfully loaded original checklist on retry: ${retryData.name}`);
+            setChecklist(retryData);
+            setRemarks(retryData.remarks || "");
+            subscribeToChecklist(id);
+            
+            toast({
+              title: 'Success',
+              description: 'Your shared checklist has been loaded successfully.',
+            });
+            
+            return retryData;
           }
-        } catch (fallbackError) {
-          console.error('Error fetching fallback checklist:', fallbackError);
+        } catch (retryError) {
+          console.error(`❌ Error on retry attempt for original checklist ${id}:`, retryError);
         }
         
-        // Last resort - create a client-side checklist
-        console.log('Creating client-side emergency checklist');
-        const emergencyChecklist = {
-          id: id || '1',
-          name: "Emergency Checklist",
-          tasks: [
-            {
-              id: "1",
-              description: "Refresh the page",
-              details: "There was a temporary connection issue",
-              completed: false,
-              photoRequired: false,
-              photoUrl: null
-            }
-          ],
-          status: 'not-started' as 'not-started',
-          progress: 0,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          remarks: "This is a temporary checklist. Please try refreshing the page."
-        };
+        // Show error instead of creating a fake checklist
+        console.log('❌ Unable to load the specified checklist after multiple attempts');
         
-        setChecklist(emergencyChecklist);
-        setRemarks(emergencyChecklist.remarks);
-        return emergencyChecklist;
+        // Display error toast
+        toast({
+          title: 'Error Loading Checklist',
+          description: 'We could not load the shared checklist. Please contact support with the checklist ID: ' + id,
+          variant: 'destructive',
+          duration: 10000, // Show longer
+        });
+        
+        return null;
       } catch (apiError) {
         console.error(`Critical error when fetching checklist:`, apiError);
         
-        // Even in case of critical error, show something to the user
-        const criticalFallbackChecklist = {
-          id: '1',
-          name: "Connection Error",
-          tasks: [
-            {
-              id: "1",
-              description: "Please try again later",
-              details: "Our server is experiencing temporary issues",
-              completed: false,
-              photoRequired: false,
-              photoUrl: null
-            }
-          ],
-          status: 'not-started',
-          progress: 0,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          remarks: "We're experiencing temporary issues. Please try again soon."
-        };
-        
-        setChecklist(criticalFallbackChecklist);
-        setRemarks(criticalFallbackChecklist.remarks);
-        return criticalFallbackChecklist;
-      }
-    } catch (error) {
-      console.error('Error fetching checklist:', error);
-      
-      // Attempt to fetch any available checklist as fallback
-      try {
-        console.log('Fetching fallback checklist...');
-        // Use the special endpoint we created for this purpose
-        const response = await fetch('/api/verification/fallback-checklist');
-        const result = await response.json();
-        
-        if (result.success && result.checklistId) {
-          // Use the provided checklist ID
-          const fallbackChecklist = await getChecklistById(result.checklistId);
-          console.log(`Using fallback checklist: ${fallbackChecklist.name}`);
-          
-          setChecklist(fallbackChecklist);
-          setRemarks(fallbackChecklist.remarks || "");
-          subscribeToChecklist(fallbackChecklist.id);
-          return fallbackChecklist;
-        } else {
-          // Create a default checklist if nothing else is available
-          const defaultChecklist = {
-            id: '9999',
-            name: 'Sample Checklist',
-            tasks: [],
-            status: 'not-started' as 'not-started',
-            progress: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            remarks: 'This is a sample checklist.'
-          };
-          
-          setChecklist(defaultChecklist);
-          setRemarks(defaultChecklist.remarks);
-          return defaultChecklist;
-        }
-      } catch (fallbackError) {
-        console.error('Failed to load fallback checklist:', fallbackError);
-        
+        // Show an error message instead of fake checklist
         toast({
-          title: 'Error',
-          description: 'Unable to load any checklists. Please try again later.',
+          title: 'Server Connection Error',
+          description: 'We\'re having trouble connecting to the server. Please try again in a few moments.',
           variant: 'destructive',
+          duration: 10000,
         });
         
         return null;
       }
+    } catch (error) {
+      console.error('Error fetching checklist:', error);
+      
+      // Instead of showing a random checklist, display a clear error
+      console.error('Failed to load the specific shared checklist:', error);
+      
+      toast({
+        title: 'Error Loading Checklist',
+        description: 'The shared checklist could not be loaded. Please contact support and provide the token from your URL.',
+        variant: 'destructive',
+        duration: 10000,
+      });
+      
+      // Return null - we won't show any checklist rather than showing the wrong one
+      return null;
     }
   };
 
