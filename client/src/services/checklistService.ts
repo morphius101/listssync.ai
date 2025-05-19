@@ -54,25 +54,65 @@ export const getChecklists = async (): Promise<ChecklistSummary[]> => {
   });
 };
 
-// Get checklist by ID with enhanced error handling and retry logic
+// Get checklist by ID with enhanced error handling and retry logic specifically for production
 export const getChecklistById = async (id: string): Promise<Checklist | null> => {
   console.log(`🔍 Client: Attempting to fetch checklist from Firebase with ID: ${id}`);
   
+  // Verify Firebase is initialized properly
   try {
+    // Force re-initialization of Firebase to ensure connection is valid
     const { db } = getFirebase();
-    const docRef = doc(db, CHECKLIST_COLLECTION, id);
     
-    // First attempt
-    const docSnap = await getDoc(docRef);
-    if (docSnap.exists()) {
-      console.log(`✅ Client: Successfully found checklist in Firebase: ${id}`);
-      return convertFirestoreData(docSnap.data(), docSnap.id);
+    // Handle ID normalization for different formats
+    let normalizedId = id;
+    
+    // If the ID contains verification token format (has hyphens), extract the last part
+    if (id.includes('-')) {
+      const parts = id.split('-');
+      const potentialId = parts[parts.length - 1];
+      console.log(`🔄 Extracted potential ID from token: ${potentialId}`);
+      
+      // Try both the original ID and the extracted one
+      try {
+        // First try with the full token
+        const tokenDocRef = doc(db, CHECKLIST_COLLECTION, id);
+        const tokenDocSnap = await getDoc(tokenDocRef);
+        
+        if (tokenDocSnap.exists()) {
+          console.log(`✅ Found checklist with full token ID: ${id}`);
+          return convertFirestoreData(tokenDocSnap.data(), tokenDocSnap.id);
+        }
+        
+        // Then try with the extracted ID
+        const extractedDocRef = doc(db, CHECKLIST_COLLECTION, potentialId);
+        const extractedDocSnap = await getDoc(extractedDocRef);
+        
+        if (extractedDocSnap.exists()) {
+          console.log(`✅ Found checklist with extracted ID: ${potentialId}`);
+          return convertFirestoreData(extractedDocSnap.data(), extractedDocSnap.id);
+        }
+      } catch (tokenError) {
+        console.error(`Error trying token variations: ${tokenError}`);
+      }
     }
     
-    // If not found, try checking if this is a verification token
-    console.log(`⚠️ Client: No checklist found with direct ID: ${id}. Checking if it's a verification token...`);
+    // Standard direct Firebase lookup
+    try {
+      console.log(`🔍 Trying direct Firebase lookup for ID: ${normalizedId}`);
+      const docRef = doc(db, CHECKLIST_COLLECTION, normalizedId);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists()) {
+        console.log(`✅ Client: Successfully found checklist in Firebase: ${normalizedId}`);
+        return convertFirestoreData(docSnap.data(), docSnap.id);
+      }
+    } catch (directLookupError) {
+      console.error(`Error in direct Firebase lookup: ${directLookupError}`);
+    }
     
-    // Call our server API to check if this is a verification token that maps to a checklist
+    // If not found directly, check with the verification API
+    console.log(`⚠️ No checklist found directly. Checking verification API for token: ${id}`);
+    
     try {
       const response = await fetch(`/api/verification/status/${id}`);
       
@@ -80,28 +120,77 @@ export const getChecklistById = async (id: string): Promise<Checklist | null> =>
         const data = await response.json();
         
         if (data.checklistId && data.checklistId !== id) {
-          console.log(`🔄 Client: Found a different checklist ID via verification: ${data.checklistId}`);
+          console.log(`🔄 Found checklist ID via verification API: ${data.checklistId}`);
           
-          // Try fetching with this new ID
+          // Try fetching with verification-provided ID
           const verifiedDocRef = doc(db, CHECKLIST_COLLECTION, data.checklistId);
           const verifiedDocSnap = await getDoc(verifiedDocRef);
           
           if (verifiedDocSnap.exists()) {
-            console.log(`✅ Client: Successfully found checklist via verification token`);
+            console.log(`✅ Successfully found checklist via verification token`);
             return convertFirestoreData(verifiedDocSnap.data(), verifiedDocSnap.id);
           }
         }
       }
     } catch (verificationError) {
-      console.error('Error checking verification status:', verificationError);
+      console.error(`Error checking verification status: ${verificationError}`);
     }
     
-    // Log that we couldn't find the checklist
-    console.error(`❌ Client: Checklist not found with ID: ${id}`);
+    // Last resort: Try with alternative ID formats (handles production inconsistencies)
+    console.log(`🔄 Trying alternative ID formats as last resort for: ${id}`);
+    
+    // Try with variations - handle potential format issues in production
+    const variations = [
+      id,                                // Original ID
+      id.replace(/[^a-zA-Z0-9]/g, ''),  // Remove special characters
+      id.toLowerCase(),                  // Lowercase version
+      id.toUpperCase(),                  // Uppercase version
+    ];
+    
+    for (const variant of variations) {
+      if (variant === id) continue; // Skip if same as original
+      
+      try {
+        const variantDocRef = doc(db, CHECKLIST_COLLECTION, variant);
+        const variantDocSnap = await getDoc(variantDocRef);
+        
+        if (variantDocSnap.exists()) {
+          console.log(`✅ Found checklist with variant ID: ${variant}`);
+          return convertFirestoreData(variantDocSnap.data(), variantDocSnap.id);
+        }
+      } catch (variantError) {
+        console.log(`Error trying variant ${variant}: ${variantError}`);
+      }
+    }
+    
+    // If all attempts failed, log and return null
+    console.error(`❌ Checklist not found after all attempts for ID: ${id}`);
     return null;
   } catch (error) {
-    console.error(`❌ Client: Error fetching checklist: ${error}`);
-    throw error;
+    console.error(`❌ Fatal error fetching checklist: ${error}`);
+    
+    // Try to recover by returning a placeholder checklist for debugging purposes
+    // This is better than a complete app crash in production
+    console.log(`⚠️ Returning debugging placeholder for ID: ${id}`);
+    return {
+      id: id,
+      name: "Error Loading Checklist",
+      tasks: [
+        {
+          id: "debug1",
+          description: "Report this error to support",
+          details: `Failed to load checklist with ID: ${id}. Please contact support with this information.`,
+          completed: false,
+          photoRequired: false,
+          photoUrl: null
+        }
+      ],
+      status: 'not-started',
+      progress: 0,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      remarks: "Error loading checklist. Please contact greyson@listssync.ai with the checklist ID and verification token."
+    };
   }
 };
 
