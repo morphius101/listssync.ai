@@ -314,9 +314,41 @@ export default function SharedChecklist() {
         }
       }
       
-      // If all attempts failed, fall back to the generic loadChecklist function
-      console.warn('⚠️ All direct attempts failed, falling back to loadChecklist');
-      await loadChecklist(verifiedChecklistId);
+      // CRITICAL FIX: Never fall back to a different checklist ID!
+      // Instead, try again with the SAME ID but with extra debug information
+      console.warn('⚠️ Initial attempts failed, trying again with the original ID: ' + verifiedChecklistId);
+      
+      try {
+        // Give the server a moment to ensure the checklist is available
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Make one final attempt with the original ID - no fallbacks!
+        const finalAttempt = await getChecklistById(verifiedChecklistId);
+        
+        if (finalAttempt) {
+          console.log(`✅ Final attempt successful: ${finalAttempt.name}`);
+          setChecklist(finalAttempt);
+          setRemarks(finalAttempt.remarks || "");
+          subscribeToChecklist(verifiedChecklistId);
+          
+          toast({
+            title: 'Success',
+            description: 'Shared checklist loaded successfully',
+          });
+          
+          return;
+        }
+      } catch (finalError) {
+        console.error('Final attempt error:', finalError);
+      }
+      
+      // Only if all attempts with the original ID fail, show an error
+      toast({
+        title: 'Error',
+        description: 'The requested checklist could not be loaded. Please contact support.',
+        variant: 'destructive',
+        duration: 10000,
+      });
     } catch (error) {
       console.error('❌ Error loading verified checklist:', error);
       toast({
