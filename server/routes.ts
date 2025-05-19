@@ -868,14 +868,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Ensure the checklist exists
       try {
         // Check if the specified checklist ID exists
-        const checklist = await storage.getChecklistById(originalChecklistId);
+        const checklist = await storage.getChecklistById(sharedChecklistId);
         
         if (!checklist) {
-          console.log(`⚠️ Checklist with ID ${originalChecklistId} not found in database, creating a new one...`);
+          console.log(`⚠️ Checklist with ID ${sharedChecklistId} not found in database, creating a new one...`);
           
           // Create a new checklist with this ID
           const newChecklist: ChecklistDTO = {
-            id: originalChecklistId,
+            id: sharedChecklistId,
             name: "Your Checklist",
             tasks: [
               {
@@ -896,12 +896,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           try {
             await storage.createChecklist(newChecklist);
-            console.log(`✅ Created new checklist with ID: ${originalChecklistId}`);
+            console.log(`✅ Created new checklist with ID: ${sharedChecklistId}`);
           } catch (saveError) {
             console.error("Error saving new checklist:", saveError);
           }
         } else {
-          console.log(`✅ Checklist with ID ${originalChecklistId} exists: ${checklist.name}`);
+          console.log(`✅ Checklist with ID ${sharedChecklistId} exists: ${checklist.name}`);
         }
       } catch (checkError) {
         console.error("Error checking for existing checklist:", checkError);

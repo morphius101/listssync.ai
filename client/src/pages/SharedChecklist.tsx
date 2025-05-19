@@ -199,7 +199,7 @@ export default function SharedChecklist() {
       
       toast({
         title: 'Error Loading Checklist',
-        description: 'The shared checklist could not be loaded. Please contact support and provide the token from your URL.',
+        description: 'The shared checklist could not be loaded. Please contact greyson@listssync.ai and provide the token from your URL.',
         variant: 'destructive',
         duration: 10000,
       });
@@ -303,8 +303,9 @@ export default function SharedChecklist() {
       console.error('❌ Error loading verified checklist:', error);
       toast({
         title: 'Error',
-        description: 'Failed to load the checklist. Please try refreshing.',
+        description: 'Failed to load the checklist. Please contact greyson@listssync.ai for assistance.',
         variant: 'destructive',
+        duration: 10000,
       });
     }
   };
