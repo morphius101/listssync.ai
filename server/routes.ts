@@ -908,12 +908,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Always return verification success with the original checklist ID
-      console.log(`🎯 Verification complete, returning original checklist ID: ${originalChecklistId}`);
+      console.log(`🎯 Verification complete, returning shared checklist ID: ${sharedChecklistId}`);
       
       return res.json({ 
         verified: true, 
         recipientId: `verified_${Date.now()}`,
-        checklistId: originalChecklistId,
+        checklistId: sharedChecklistId,
         message: "Verification successful"
       });
     } catch (error: any) {
