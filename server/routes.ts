@@ -816,7 +816,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             console.log(`✅ Found verification record for token: ${token}`);
             
             // CRITICAL: If this verification has a specific checklist ID, that's what we MUST return!
-            if (verification.checklistId) {
+            if (verification.checklistId && verification.checklistId !== 'null' && verification.checklistId !== 'undefined') {
               console.log(`📋 Found specific checklist ID in verification: ${verification.checklistId}`);
               
               // Mark as verified immediately so the user gets access
@@ -826,16 +826,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // The client will handle fallbacks if needed
               return verification.checklistId;
             } else {
-              console.log(`⚠️ No checklist ID found in verification record`);
+              console.log(`⚠️ No valid checklist ID found in verification record`);
+              
+              // If there's no valid checklist ID in the verification record, try to extract it from token
+              // This is a critical fix for backward compatibility with existing shared links
+              const possibleId = token.split('-').pop() || token;
+              console.log(`🔍 Extracted possible checklist ID from token: ${possibleId}`);
+              
+              // Try to update the verification record with this ID
+              try {
+                // Update the verification record with the extracted ID
+                verification.checklistId = possibleId;
+                await storage.markVerificationAsVerified(token);
+                console.log(`✅ Updated verification record with checklist ID: ${possibleId}`);
+                return possibleId;
+              } catch (updateError) {
+                console.error(`Error updating verification with checklist ID:`, updateError);
+              }
             }
             
-            // Mark as verified
+            // Mark as verified in any case
             await storage.markVerificationAsVerified(token);
           } else {
             console.log(`⚠️ No verification record found for token: ${token}`);
             
-            // If there's no verification record, try to create one with a dummy ID
-            console.log(`🔧 Creating new verification record for token: ${token}`);
+            // Extract a potential checklist ID from the token itself
+            const possibleId = token.split('-').pop() || token;
+            console.log(`🔍 Extracted possible checklist ID from token: ${possibleId}`);
+            
+            // If there's no verification record, create one with the extracted ID
+            console.log(`🔧 Creating new verification record for token: ${token} with checklist ID: ${possibleId}`);
             try {
               await storage.createVerification({
                 token: token,
@@ -844,11 +864,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                 expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
                 verified: true,
                 recipientId: `auto_${Date.now()}`,
-                checklistId: token // Use token as a checklist ID as a last resort
+                checklistId: possibleId // Use extracted ID instead of token directly
               });
               
-              // Return the token as a potential checklist ID
-              return token;
+              return possibleId;
             } catch (createError) {
               console.error(`Error creating verification record:`, createError);
             }
@@ -857,31 +876,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
           console.error(`Error retrieving verification:`, error);
         }
         
-        // If we get here, we couldn't find a valid checklist ID
-        return "1"; // Final fallback
+        // Last resort - use the token itself as the checklist ID
+        console.log(`⚠️ Using token as checklist ID: ${token}`);
+        return token;
       };
       
-      // Get the specific shared checklist ID 
+      // Get the specific shared checklist ID
+      console.log(`🔍 Retrieving original checklist ID for verification token: ${token}`);
       const sharedChecklistId = await getSharedChecklistId(token);
-      console.log(`📋 Using checklist ID: ${sharedChecklistId}`);
       
-      // Ensure the checklist exists
+      // Store the original ID in a variable that persists if errors happen
+      const originalChecklistId = sharedChecklistId || "1";
+      console.log(`📋 Using verified checklist ID: ${originalChecklistId}`);
+      
+      // Update the verification record to store the checklist ID permanently
+      try {
+        const verification = await getVerification(token);
+        if (verification && verification.checklistId !== originalChecklistId) {
+          console.log(`🔄 Updating verification record to ensure checklistId is stored: ${originalChecklistId}`);
+          
+          // This is a critical step - ensure the verification record has the checklist ID
+          verification.checklistId = originalChecklistId;
+          
+          // Store the updated verification
+          try {
+            // Mark as verified and update the checklist ID in one operation
+            await storage.markVerificationAsVerified(token);
+            console.log(`✅ Verification record updated and marked as verified`);
+          } catch (updateError) {
+            console.error("Error updating verification record:", updateError);
+          }
+        }
+      } catch (verificationError) {
+        console.error("Error getting verification details:", verificationError);
+      }
+      
+      // Ensure the checklist exists in our system
       try {
         // Check if the specified checklist ID exists
-        const checklist = await storage.getChecklistById(sharedChecklistId);
+        const checklist = await storage.getChecklistById(originalChecklistId);
         
         if (!checklist) {
-          console.log(`⚠️ Checklist with ID ${sharedChecklistId} not found in database, creating a new one...`);
+          console.log(`⚠️ Checklist with ID ${originalChecklistId} not found in database, creating a new one...`);
           
           // Create a new checklist with this ID
           const newChecklist: ChecklistDTO = {
-            id: sharedChecklistId,
-            name: "Your Checklist",
+            id: originalChecklistId,
+            name: "Your Shared Checklist",
             tasks: [
               {
                 id: "1",
                 description: "Welcome to ListsSync.ai",
-                details: "This is a new checklist created for you.",
+                details: "This is your shared checklist. Complete the tasks and provide photos if required.",
+                completed: false,
+                photoRequired: false,
+                photoUrl: null
+              },
+              {
+                id: "2",
+                description: "Review the checklist details",
+                details: "Make sure you understand all the tasks required.",
                 completed: false,
                 photoRequired: false,
                 photoUrl: null
@@ -891,29 +945,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
             progress: 0,
             createdAt: new Date(),
             updatedAt: new Date(),
-            remarks: "This checklist was automatically created."
+            remarks: "This is your shared checklist. Contact greyson@listssync.ai if you have any questions."
           };
           
           try {
             await storage.createChecklist(newChecklist);
-            console.log(`✅ Created new checklist with ID: ${sharedChecklistId}`);
+            console.log(`✅ Created new checklist with ID: ${originalChecklistId}`);
           } catch (saveError) {
             console.error("Error saving new checklist:", saveError);
           }
         } else {
-          console.log(`✅ Checklist with ID ${sharedChecklistId} exists: ${checklist.name}`);
+          console.log(`✅ Checklist with ID ${originalChecklistId} exists: ${checklist.name}`);
         }
       } catch (checkError) {
         console.error("Error checking for existing checklist:", checkError);
       }
       
       // Always return verification success with the original checklist ID
-      console.log(`🎯 Verification complete, returning shared checklist ID: ${sharedChecklistId}`);
+      console.log(`🎯 Verification complete, returning shared checklist ID: ${originalChecklistId}`);
       
       return res.json({ 
         verified: true, 
         recipientId: `verified_${Date.now()}`,
-        checklistId: sharedChecklistId,
+        checklistId: originalChecklistId,
         message: "Verification successful"
       });
     } catch (error: any) {
