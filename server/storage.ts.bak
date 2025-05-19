@@ -78,7 +78,7 @@ export class DatabaseStorage implements IStorage {
               createdAt: dbChecklist.createdAt,
               updatedAt: dbChecklist.updatedAt,
               remarks: dbChecklist.remarks || "",
-              userId: dbChecklist.userId || undefined
+              userId: dbChecklist.userId
             };
           }
         } catch (intError: any) {
@@ -104,7 +104,7 @@ export class DatabaseStorage implements IStorage {
             createdAt: tokenChecklist.createdAt,
             updatedAt: tokenChecklist.updatedAt,
             remarks: tokenChecklist.remarks || "",
-            userId: tokenChecklist.userId || undefined
+            userId: tokenChecklist.userId
           };
         }
       } catch (tokenError: any) {
@@ -142,7 +142,7 @@ export class DatabaseStorage implements IStorage {
                   createdAt: linkedChecklist.createdAt,
                   updatedAt: linkedChecklist.updatedAt,
                   remarks: linkedChecklist.remarks || "",
-                  userId: linkedChecklist.userId || undefined
+                  userId: linkedChecklist.userId
                 };
               }
             } catch (linkedError: any) {
@@ -160,7 +160,7 @@ export class DatabaseStorage implements IStorage {
               createdAt: new Date(),
               updatedAt: new Date(),
               remarks: "This checklist was shared with you. The data will be loaded from Firebase.",
-              userId: undefined
+              userId: null
             };
           }
         }
@@ -205,65 +205,50 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateChecklist(checklist: ChecklistDTO): Promise<ChecklistDTO | undefined> {
-    // Only proceed if this is a numeric ID
-    if (!isNaN(parseInt(checklist.id)) && checklist.id.match(/^\d+$/)) {
-      const checklistId = parseInt(checklist.id);
-      
-      // Check if checklist exists
-      try {
-        const [existingChecklist] = await db.select().from(checklists).where(eq(checklists.id, checklistId));
-        
-        if (!existingChecklist) {
-          return undefined;
-        }
-        
-        // Update the checklist
-        const [updatedChecklist] = await db.update(checklists)
-          .set({
-            name: checklist.name,
-            status: checklist.status,
-            progress: checklist.progress,
-            remarks: checklist.remarks,
-            tasksData: checklist.tasks,
-            updatedAt: new Date()
-          })
-          .where(eq(checklists.id, checklistId))
-          .returning();
-        
-        if (!updatedChecklist) {
-          return undefined;
-        }
-        
-        const tasksData = updatedChecklist.tasksData as TaskDTO[] || [];
-        
-        return {
-          id: updatedChecklist.id.toString(),
-          name: updatedChecklist.name,
-          status: updatedChecklist.status as 'not-started' | 'in-progress' | 'completed',
-          progress: updatedChecklist.progress,
-          tasks: tasksData,
-          remarks: updatedChecklist.remarks || "",
-          createdAt: updatedChecklist.createdAt,
-          updatedAt: updatedChecklist.updatedAt,
-          userId: updatedChecklist.userId || undefined
-        };
-      } catch (error) {
-        console.error("Error updating checklist:", error);
-        return undefined;
-      }
+    const checklistId = parseInt(checklist.id);
+    
+    // Check if checklist exists
+    const existingChecklist = await this.getChecklistById(checklist.id);
+    if (!existingChecklist) {
+      return undefined;
     }
     
-    // If we can't convert to a numeric ID, return undefined
-    return undefined;
+    // Update the checklist
+    const [updatedChecklist] = await db.update(checklists)
+      .set({
+        name: checklist.name,
+        status: checklist.status,
+        progress: checklist.progress,
+        remarks: checklist.remarks,
+        tasksData: checklist.tasks,
+        updatedAt: new Date()
+      })
+      .where(eq(checklists.id, checklistId))
+      .returning();
+    
+    if (!updatedChecklist) {
+      return undefined;
+    }
+    
+    const tasksData = updatedChecklist.tasksData as TaskDTO[] || [];
+    
+    return {
+      id: updatedChecklist.id.toString(),
+      name: updatedChecklist.name,
+      status: updatedChecklist.status as 'not-started' | 'in-progress' | 'completed',
+      progress: updatedChecklist.progress,
+      tasks: tasksData,
+      remarks: updatedChecklist.remarks || "",
+      createdAt: updatedChecklist.createdAt,
+      updatedAt: updatedChecklist.updatedAt,
+      userId: updatedChecklist.userId ? updatedChecklist.userId.toString() : undefined
+    };
   }
 
   async deleteChecklist(id: string): Promise<boolean> {
     try {
-      if (!isNaN(parseInt(id)) && id.match(/^\d+$/)) {
-        await db.delete(checklists).where(eq(checklists.id, parseInt(id)));
-        return true;
-      }
-      return false;
+      await db.delete(checklists).where(eq(checklists.id, parseInt(id)));
+      return true;
     } catch (error) {
       console.error("Error deleting checklist:", error);
       return false;
@@ -311,36 +296,31 @@ export class DatabaseStorage implements IStorage {
 
   // Verification Methods
   async createVerification(verification: VerificationDTO): Promise<VerificationDTO> {
-    try {
-      const [insertedVerification] = await db
-        .insert(verifications)
-        .values({
-          token: verification.token,
-          code: verification.code,
-          expiresAt: verification.expiresAt,
-          verified: verification.verified,
-          recipientId: verification.recipientId,
-          recipientEmail: verification.recipientEmail,
-          recipientPhone: verification.recipientPhone,
-          checklistId: verification.checklistId,
-        })
-        .returning();
-      
-      return {
-        token: insertedVerification.token,
-        code: insertedVerification.code,
-        createdAt: insertedVerification.createdAt,
-        expiresAt: insertedVerification.expiresAt,
-        verified: insertedVerification.verified,
-        recipientId: insertedVerification.recipientId,
-        recipientEmail: insertedVerification.recipientEmail || undefined,
-        recipientPhone: insertedVerification.recipientPhone || undefined,
-        checklistId: insertedVerification.checklistId || undefined,
-      };
-    } catch (error) {
-      console.error('Error creating verification:', error);
-      throw error;
-    }
+    const [insertedVerification] = await db
+      .insert(verifications)
+      .values({
+        token: verification.token,
+        code: verification.code,
+        expiresAt: verification.expiresAt,
+        verified: verification.verified,
+        recipientId: verification.recipientId,
+        recipientEmail: verification.recipientEmail,
+        recipientPhone: verification.recipientPhone,
+        checklistId: verification.checklistId,
+      })
+      .returning();
+    
+    return {
+      token: insertedVerification.token,
+      code: insertedVerification.code,
+      createdAt: insertedVerification.createdAt,
+      expiresAt: insertedVerification.expiresAt,
+      verified: insertedVerification.verified,
+      recipientId: insertedVerification.recipientId,
+      recipientEmail: insertedVerification.recipientEmail || undefined,
+      recipientPhone: insertedVerification.recipientPhone || undefined,
+      checklistId: insertedVerification.checklistId || undefined,
+    };
   }
   
   async getVerificationByToken(token: string): Promise<VerificationDTO | undefined> {
