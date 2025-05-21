@@ -554,14 +554,49 @@ export default function SharedChecklist() {
     );
   }
 
-  const isCompleted = checklist.status === 'completed';
+  // Safety check - if checklist is null, show a friendly error
+  if (!checklist) {
+    return (
+      <div className="container mx-auto py-4 px-4 max-w-4xl">
+        <div className="p-6 bg-white rounded-lg shadow-sm border border-gray-200 text-center">
+          <AlertTriangle className="h-12 w-12 text-amber-500 mx-auto mb-4" />
+          <h2 className="text-2xl font-semibold mb-2">Checklist Not Available</h2>
+          <p className="text-gray-600 mb-4">
+            {error || "The requested checklist could not be loaded. This may be due to invalid access or the checklist no longer exists."}
+          </p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button 
+              variant="outline" 
+              onClick={() => window.location.reload()}
+              className="flex items-center justify-center"
+            >
+              <span className="mr-2">↻</span> Retry Loading
+            </Button>
+            <Button 
+              onClick={() => navigate('/')}
+              className="flex items-center justify-center"
+            >
+              Return to Dashboard
+            </Button>
+          </div>
+          <div className="mt-6 text-sm text-gray-500">
+            <p>Contact greyson@listssync.ai for assistance with this checklist.</p>
+            <p className="mt-2">Token: {token || 'Unknown'}</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Only if checklist exists, we can safely access its properties
+  const isCompleted = checklist?.status === 'completed';
   
   return (
     <div className="container mx-auto py-4 px-4 max-w-4xl">
       <ChecklistHeader 
-        name={checklist.name}
-        progress={checklist.progress}
-        status={checklist.status}
+        name={checklist?.name || 'Untitled Checklist'}
+        progress={checklist?.progress || 0}
+        status={checklist?.status || 'not-started'}
       />
       
       <div className="border border-gray-200 rounded-lg p-4 mb-6 bg-white">
@@ -569,12 +604,12 @@ export default function SharedChecklist() {
           <h3 className="text-lg font-semibold">Tasks</h3>
           <div className="flex items-center space-x-2 text-sm text-gray-500">
             <Calendar className="h-4 w-4" />
-            <span>{new Date(checklist.updatedAt).toLocaleDateString()}</span>
+            <span>{new Date(checklist?.updatedAt || Date.now()).toLocaleDateString()}</span>
           </div>
         </div>
         
         <TasksList 
-          tasks={checklist.tasks} 
+          tasks={checklist?.tasks || []} 
           onUpdate={handleTaskUpdate}
           disabled={isCompleted}
         />
@@ -613,6 +648,11 @@ export default function SharedChecklist() {
           </div>
         </div>
       )}
+      
+      <div className="mt-8 text-center text-gray-500 text-sm">
+        <p>ListsSync.ai - Syncing checklists in real-time with instant photo proof.</p>
+        <p>© 2025 ListsSync.ai - All rights reserved</p>
+      </div>
     </div>
   );
 }
