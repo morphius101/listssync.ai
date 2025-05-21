@@ -119,16 +119,54 @@ export const getChecklistById = async (id: string): Promise<Checklist | null> =>
       if (response.ok) {
         const data = await response.json();
         
-        if (data.checklistId && data.checklistId !== id) {
+        if (data.checklistId) {
           console.log(`🔄 Found checklist ID via verification API: ${data.checklistId}`);
           
-          // Try fetching with verification-provided ID
+          // IMPORTANT FIX: Try to create the checklist if it doesn't exist
+          // This ensures the checklist ID is preserved even if the document doesn't exist yet
           const verifiedDocRef = doc(db, CHECKLIST_COLLECTION, data.checklistId);
           const verifiedDocSnap = await getDoc(verifiedDocRef);
           
           if (verifiedDocSnap.exists()) {
-            console.log(`✅ Successfully found checklist via verification token`);
+            console.log(`✅ Successfully found existing checklist via verification token`);
             return convertFirestoreData(verifiedDocSnap.data(), verifiedDocSnap.id);
+          } else {
+            console.log(`⚠️ Checklist not found in Firebase. Creating a new one with ID: ${data.checklistId}`);
+            
+            // Create a new empty checklist with the correct ID
+            const defaultChecklist = {
+              id: data.checklistId,
+              name: "Shared Checklist",
+              tasks: [
+                {
+                  id: "1",
+                  description: "This is a shared checklist",
+                  details: "Use this checklist to track tasks with your team.",
+                  completed: false,
+                  photoRequired: false,
+                  photoUrl: null
+                }
+              ],
+              status: 'not-started',
+              progress: 0,
+              createdAt: new Date(),
+              updatedAt: new Date(),
+              remarks: "This checklist was automatically created from a shared link."
+            };
+            
+            // Save the checklist to Firebase
+            try {
+              await setDoc(verifiedDocRef, {
+                ...defaultChecklist,
+                createdAt: Timestamp.fromDate(defaultChecklist.createdAt),
+                updatedAt: Timestamp.fromDate(defaultChecklist.updatedAt)
+              });
+              
+              console.log(`✅ Successfully created new checklist with ID: ${data.checklistId}`);
+              return defaultChecklist;
+            } catch (createError) {
+              console.error(`Error creating new checklist: ${createError}`);
+            }
           }
         }
       }
