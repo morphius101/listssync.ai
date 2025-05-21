@@ -7,10 +7,13 @@ import { Camera, ChevronDown, ChevronUp, Info } from 'lucide-react';
 
 interface TasksListProps {
   tasks: Task[];
-  onTaskUpdate: (taskId: string, updates: Partial<Task>) => Promise<void>;
+  onTaskUpdate?: (taskId: string, updates: Partial<Task>) => Promise<void>;
+  onUpdate?: (taskId: string, updates: Partial<Task>) => Promise<void>;
+  disabled?: boolean;
 }
 
-const TasksList = ({ tasks, onTaskUpdate }: TasksListProps) => {
+const TasksList = ({ tasks, onTaskUpdate, onUpdate, disabled = false }: TasksListProps) => {
+  const handleUpdateTask = onUpdate || onTaskUpdate || (async () => { console.log("Task update not implemented"); });
   const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
   const [photoUploadModalOpen, setPhotoUploadModalOpen] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
@@ -23,6 +26,8 @@ const TasksList = ({ tasks, onTaskUpdate }: TasksListProps) => {
   };
   
   const handleTaskCompletionChange = async (taskId: string, completed: boolean) => {
+    if (disabled) return;
+    
     const task = tasks.find(t => t.id === taskId);
     
     if (task?.photoRequired && completed && !task.photoUrl) {
@@ -31,13 +36,13 @@ const TasksList = ({ tasks, onTaskUpdate }: TasksListProps) => {
       setPhotoUploadModalOpen(true);
     } else {
       // Otherwise, just mark the task as completed/uncompleted
-      await onTaskUpdate(taskId, { completed });
+      await handleUpdateTask(taskId, { completed });
     }
   };
   
   const handlePhotoUpload = async (photoUrl: string) => {
-    if (currentTaskId) {
-      await onTaskUpdate(currentTaskId, { 
+    if (currentTaskId && !disabled) {
+      await handleUpdateTask(currentTaskId, { 
         photoUrl,
         completed: true 
       });

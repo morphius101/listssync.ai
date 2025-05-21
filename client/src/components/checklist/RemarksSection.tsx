@@ -4,16 +4,20 @@ import { MessageSquare } from 'lucide-react';
 
 interface RemarksSectionProps {
   initialRemarks?: string;
-  onChange: (remarks: string) => void;
+  onChange?: (remarks: string) => void;
+  value?: string;
+  disabled?: boolean;
 }
 
-const RemarksSection = ({ initialRemarks = "", onChange }: RemarksSectionProps) => {
-  const [remarks, setRemarks] = useState(initialRemarks);
+const RemarksSection = ({ initialRemarks = "", onChange, value, disabled = false }: RemarksSectionProps) => {
+  const [remarks, setRemarks] = useState(initialRemarks || value || "");
 
   const handleRemarksChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    const value = e.target.value;
-    setRemarks(value);
-    onChange(value);
+    const newValue = e.target.value;
+    setRemarks(newValue);
+    if (onChange) {
+      onChange(newValue);
+    }
   };
 
   return (
@@ -25,9 +29,10 @@ const RemarksSection = ({ initialRemarks = "", onChange }: RemarksSectionProps) 
       
       <Textarea 
         placeholder="Add notes, observations, or special circumstances that need to be documented..." 
-        value={remarks}
+        value={value !== undefined ? value : remarks}
         onChange={handleRemarksChange}
         className="min-h-[120px]"
+        disabled={disabled}
       />
       
       <p className="text-xs text-gray-500">

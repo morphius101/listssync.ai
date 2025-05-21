@@ -4,7 +4,7 @@ import { Calendar, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 
 interface ChecklistHeaderProps {
-  checklist: Checklist;
+  checklist?: Checklist;
   name?: string;
   status?: 'not-started' | 'in-progress' | 'completed';
   progress?: number;
