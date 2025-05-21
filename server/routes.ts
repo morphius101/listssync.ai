@@ -913,47 +913,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Ensure the checklist exists in our system
       try {
-        // Check if the specified checklist ID exists
+        // Check if the specified checklist ID exists, but DON'T create a new one if not found
         const checklist = await storage.getChecklistById(originalChecklistId);
         
         if (!checklist) {
-          console.log(`⚠️ Checklist with ID ${originalChecklistId} not found in database, creating a new one...`);
+          // FIXED! Don't create a new checklist here - just log that it wasn't found
+          // Client should be able to find the original checklist through Firebase directly
+          console.log(`ℹ️ Note: Checklist with ID ${originalChecklistId} not found in PostgreSQL database.`);
+          console.log(`ℹ️ Client will attempt to fetch original checklist from Firebase directly.`);
           
-          // Create a new checklist with this ID
-          const newChecklist: ChecklistDTO = {
-            id: originalChecklistId,
-            name: "Your Shared Checklist",
-            tasks: [
-              {
-                id: "1",
-                description: "Welcome to ListsSync.ai",
-                details: "This is your shared checklist. Complete the tasks and provide photos if required.",
-                completed: false,
-                photoRequired: false,
-                photoUrl: null
-              },
-              {
-                id: "2",
-                description: "Review the checklist details",
-                details: "Make sure you understand all the tasks required.",
-                completed: false,
-                photoRequired: false,
-                photoUrl: null
-              }
-            ],
-            status: 'not-started' as 'not-started',
-            progress: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            remarks: "This is your shared checklist. Contact greyson@listssync.ai if you have any questions."
-          };
-          
-          try {
-            await storage.createChecklist(newChecklist);
-            console.log(`✅ Created new checklist with ID: ${originalChecklistId}`);
-          } catch (saveError) {
-            console.error("Error saving new checklist:", saveError);
-          }
+          // We'll still return the original checklist ID to the client
+          // This lets the client know which checklist to request from Firebase
         } else {
           console.log(`✅ Checklist with ID ${originalChecklistId} exists: ${checklist.name}`);
         }

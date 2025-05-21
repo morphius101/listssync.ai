@@ -146,20 +146,6 @@ export const getChecklistById = async (id: string): Promise<Checklist | null> =>
               console.log(`✅ Found original checklist in shared-checklists collection: ${data.checklistId}`);
               return convertFirestoreData(sharedSnap.data(), sharedSnap.id);
             }
-            
-            // Look in the user's checklists collection
-            const usersRef = collection(db, 'users');
-            const usersSnapshot = await getDocs(usersRef);
-            
-            for (const userDoc of usersSnapshot.docs) {
-              const userChecklistRef = doc(collection(db, `users/${userDoc.id}/checklists`), data.checklistId);
-              const userChecklistSnap = await getDoc(userChecklistRef);
-              
-              if (userChecklistSnap.exists()) {
-                console.log(`✅ Found original checklist in user's collection: ${data.checklistId}`);
-                return convertFirestoreData(userChecklistSnap.data(), userChecklistSnap.id);
-              }
-            }
           } catch (alternatePathError) {
             console.error(`Error searching alternate paths: ${alternatePathError}`);
           }
@@ -196,7 +182,7 @@ export const getChecklistById = async (id: string): Promise<Checklist | null> =>
                 photoUrl: null
               }
             ],
-            status: 'not-started',
+            status: 'not-started' as const,
             progress: 0,
             createdAt: new Date(),
             updatedAt: new Date(),
@@ -215,7 +201,6 @@ export const getChecklistById = async (id: string): Promise<Checklist | null> =>
             return defaultChecklist;
           } catch (createError) {
             console.error(`Error creating placeholder checklist: ${createError}`);
-          }
           }
         }
       }
