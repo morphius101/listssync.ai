@@ -1278,7 +1278,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
             verified: false,
             recipientId: `auto_recipient_${Date.now()}`,
-            checklistId: validChecklistId // Use the valid checklist ID we found earlier
+            checklistId: originalChecklistId // Use the original checklist ID we found earlier
           });
           
           // Fetch the newly created verification
@@ -1327,7 +1327,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         verified, 
         expired: isExpired,
         recipientId: verification ? verification.recipientId : `auto_${Date.now()}`,
-        checklistId: verification && verification.checklistId ? verification.checklistId : validChecklistId
+        checklistId: verification && verification.checklistId ? verification.checklistId : originalChecklistId
       };
       
       // Cache the result
