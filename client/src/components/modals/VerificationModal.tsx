@@ -20,6 +20,11 @@ interface VerificationModalProps {
   token: string;
   maskedEmail?: string;
   maskedPhone?: string;
+  maskedContact?: {
+    email?: string;
+    phone?: string;
+  };
+  showCloseButton?: boolean;
 }
 
 export function VerificationModal({
@@ -29,6 +34,8 @@ export function VerificationModal({
   token,
   maskedEmail,
   maskedPhone,
+  maskedContact,
+  showCloseButton = true,
 }: VerificationModalProps) {
   const [verificationCode, setVerificationCode] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
@@ -166,18 +173,18 @@ export function VerificationModal({
         </DialogHeader>
 
         <div className="space-y-4">
-          {(maskedEmail || maskedPhone) && (
+          {((maskedEmail || maskedPhone) || (maskedContact?.email || maskedContact?.phone)) && (
             <div className="bg-muted p-3 rounded-md text-sm">
-              {maskedEmail && (
+              {(maskedEmail || maskedContact?.email) && (
                 <div className="flex items-center space-x-2">
                   <Mail className="w-4 h-4 text-gray-500" />
-                  <span>Code sent to: {maskedEmail}</span>
+                  <span>Code sent to: {maskedEmail || maskedContact?.email}</span>
                 </div>
               )}
-              {maskedPhone && (
+              {(maskedPhone || maskedContact?.phone) && (
                 <div className="flex items-center space-x-2 mt-1">
                   <Phone className="w-4 h-4 text-gray-500" />
-                  <span>Code sent to: {maskedPhone}</span>
+                  <span>Code sent to: {maskedPhone || maskedContact?.phone}</span>
                 </div>
               )}
             </div>

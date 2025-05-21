@@ -5,10 +5,17 @@ import { format } from 'date-fns';
 
 interface ChecklistHeaderProps {
   checklist: Checklist;
+  name?: string;
+  status?: 'not-started' | 'in-progress' | 'completed';
+  progress?: number;
 }
 
-const ChecklistHeader = ({ checklist }: ChecklistHeaderProps) => {
-  const { name, status, progress, createdAt, updatedAt } = checklist;
+const ChecklistHeader = ({ checklist, name: propName, status: propStatus, progress: propProgress }: ChecklistHeaderProps) => {
+  const name = propName || checklist?.name || "Untitled Checklist";
+  const status = propStatus || checklist?.status || "not-started";
+  const progress = propProgress !== undefined ? propProgress : (checklist?.progress || 0);
+  const createdAt = checklist?.createdAt;
+  const updatedAt = checklist?.updatedAt;
   
   const getStatusColor = () => {
     switch (status) {
