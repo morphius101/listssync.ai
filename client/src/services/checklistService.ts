@@ -122,51 +122,100 @@ export const getChecklistById = async (id: string): Promise<Checklist | null> =>
         if (data.checklistId) {
           console.log(`🔄 Found checklist ID via verification API: ${data.checklistId}`);
           
-          // IMPORTANT FIX: Try to create the checklist if it doesn't exist
-          // This ensures the checklist ID is preserved even if the document doesn't exist yet
+          // CRITICAL FIX: If we're loading a shared checklist, this is likely the original ID of a
+          // checklist that was shared. We should prioritize finding this exact checklist first.
+          // This fixes the issue where users are seeing blank checklists after verification.
+          
+          // First try directly with the verified checklist ID
           const verifiedDocRef = doc(db, CHECKLIST_COLLECTION, data.checklistId);
           const verifiedDocSnap = await getDoc(verifiedDocRef);
           
           if (verifiedDocSnap.exists()) {
-            console.log(`✅ Successfully found existing checklist via verification token`);
+            console.log(`✅ Successfully found original checklist via verification token: ${data.checklistId}`);
             return convertFirestoreData(verifiedDocSnap.data(), verifiedDocSnap.id);
-          } else {
-            console.log(`⚠️ Checklist not found in Firebase. Creating a new one with ID: ${data.checklistId}`);
+          }
+          
+          // If we can't find the checklist directly, try alternate collection paths
+          // This helps locate checklists that might be stored in user-specific subcollections
+          try {
+            // Try looking in shared-checklists collection
+            const sharedRef = doc(db, 'shared-checklists', data.checklistId);
+            const sharedSnap = await getDoc(sharedRef);
             
-            // Create a new empty checklist with the correct ID
-            const defaultChecklist = {
-              id: data.checklistId,
-              name: "Shared Checklist",
-              tasks: [
-                {
-                  id: "1",
-                  description: "This is a shared checklist",
-                  details: "Use this checklist to track tasks with your team.",
-                  completed: false,
-                  photoRequired: false,
-                  photoUrl: null
-                }
-              ],
-              status: 'not-started',
-              progress: 0,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              remarks: "This checklist was automatically created from a shared link."
-            };
-            
-            // Save the checklist to Firebase
-            try {
-              await setDoc(verifiedDocRef, {
-                ...defaultChecklist,
-                createdAt: Timestamp.fromDate(defaultChecklist.createdAt),
-                updatedAt: Timestamp.fromDate(defaultChecklist.updatedAt)
-              });
-              
-              console.log(`✅ Successfully created new checklist with ID: ${data.checklistId}`);
-              return defaultChecklist;
-            } catch (createError) {
-              console.error(`Error creating new checklist: ${createError}`);
+            if (sharedSnap.exists()) {
+              console.log(`✅ Found original checklist in shared-checklists collection: ${data.checklistId}`);
+              return convertFirestoreData(sharedSnap.data(), sharedSnap.id);
             }
+            
+            // Look in the user's checklists collection
+            const usersRef = collection(db, 'users');
+            const usersSnapshot = await getDocs(usersRef);
+            
+            for (const userDoc of usersSnapshot.docs) {
+              const userChecklistRef = doc(collection(db, `users/${userDoc.id}/checklists`), data.checklistId);
+              const userChecklistSnap = await getDoc(userChecklistRef);
+              
+              if (userChecklistSnap.exists()) {
+                console.log(`✅ Found original checklist in user's collection: ${data.checklistId}`);
+                return convertFirestoreData(userChecklistSnap.data(), userChecklistSnap.id);
+              }
+            }
+          } catch (alternatePathError) {
+            console.error(`Error searching alternate paths: ${alternatePathError}`);
+          }
+          
+          // IMPORTANT: Instead of creating a generic checklist, try to retrieve the original one again
+          // using the API directly - this would use the server-side database as a fallback
+          try {
+            console.log(`🔄 Trying server API to fetch original checklist: ${data.checklistId}`);
+            const apiResponse = await fetch(`/api/checklists/${data.checklistId}`);
+            
+            if (apiResponse.ok) {
+              const originalChecklist = await apiResponse.json();
+              console.log(`✅ Successfully retrieved original checklist from API: ${data.checklistId}`);
+              return originalChecklist;
+            }
+          } catch (apiError) {
+            console.error(`Error fetching from API: ${apiError}`);
+          }
+          
+          // Only create a new checklist as absolute last resort when we can't find the original
+          console.log(`⚠️ Original checklist not found anywhere. Creating new one as last resort: ${data.checklistId}`);
+            
+          // Create a copy of the original checklist with the correct ID
+          const defaultChecklist = {
+            id: data.checklistId,
+            name: "Shared Checklist",
+            tasks: [
+              {
+                id: "1",
+                description: "This is a shared checklist",
+                details: "The original shared checklist couldn't be found. Contact support if you believe this is an error.",
+                completed: false,
+                photoRequired: false,
+                photoUrl: null
+              }
+            ],
+            status: 'not-started',
+            progress: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            remarks: "This is a placeholder for a shared checklist that couldn't be found. Please contact greyson@listssync.ai with the checklist ID for assistance."
+          };
+          
+          // Save the checklist to Firebase as a last resort
+          try {
+            await setDoc(verifiedDocRef, {
+              ...defaultChecklist,
+              createdAt: Timestamp.fromDate(defaultChecklist.createdAt),
+              updatedAt: Timestamp.fromDate(defaultChecklist.updatedAt)
+            });
+            
+            console.log(`✅ Created placeholder checklist with ID: ${data.checklistId}`);
+            return defaultChecklist;
+          } catch (createError) {
+            console.error(`Error creating placeholder checklist: ${createError}`);
+          }
           }
         }
       }
