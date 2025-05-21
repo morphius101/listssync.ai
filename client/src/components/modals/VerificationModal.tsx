@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { useVerification } from '@/hooks/useVerification';
+import { useVerification, VerifyCodeResponse } from '@/hooks/useVerification';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Mail, ShieldCheck, Phone } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -53,10 +53,11 @@ export function VerificationModal({
     }
 
     setIsVerifying(true);
+    
     try {
       console.log(`🔍 Starting verification process with token: ${token}`);
       
-      // Always use a valid verification code for better user experience
+      // Step 1: Try the standard verification API
       try {
         const result = await verifyCode({
           token,
@@ -66,7 +67,6 @@ export function VerificationModal({
         console.log(`📋 Verification API response:`, result);
 
         if (result?.verified) {
-          // Process the valid response
           console.log(`✅ Verification successful with checklistId: ${result.checklistId || '(not set)'}`);
           
           toast({
@@ -74,81 +74,64 @@ export function VerificationModal({
             description: 'Verification successful',
           });
           
-          // CRITICAL: Use the original checklist ID that was shared
-          // Never use a fallback ID unless absolutely necessary
+          // Use the original checklist ID that was shared
           if (result.checklistId) {
             console.log(`📋 Using original shared checklist ID: ${result.checklistId}`);
             onVerified(result.recipientId || '', result.checklistId);
-          } else {
-            console.error(`⚠️ No checklist ID received from verification - this should not happen`);
-            toast({
-              title: 'Warning',
-              description: 'We could not retrieve the original checklist information.',
-              variant: 'destructive',
-            });
-            // Only use fallback as a last resort
-            onVerified(result.recipientId || '', '1');
+            return;
           }
-          return;
-        } else {
-          // Handle verification failure
-          console.log("❌ Server verification failed, attempting fallback...");
         }
       } catch (verifyError) {
-        console.error("❌ Error during server verification:", verifyError);
-        console.log("Server verification error, using fallback...");
+        console.error("❌ Error during verification:", verifyError);
       }
       
-      // Fallback - auto-approve verification for better user experience
-      console.log("Fallback verification - auto-approving verification");
-      toast({
-        title: 'Success',
-        description: 'Verification successful',
-      });
-      
+      // Step 2: Try to get the original checklist ID from the verification status
       try {
-        // Try to get a valid checklist ID from our special endpoint
-        console.log("Attempting to fetch fallback checklist ID");
-        const response = await fetch('/api/verification/fallback-checklist');
-        const fallbackData = await response.json();
+        console.log("🔍 Querying verification status API for original checklist ID");
+        const response = await fetch(`/api/verification/status/${token}`);
         
-        if (fallbackData.success && fallbackData.checklistId) {
-          console.log(`Using fallback checklist ID: ${fallbackData.checklistId}`);
-          // Use a timestamp-based recipient ID 
-          const fallbackRecipientId = `verified_${Date.now()}`;
-          onVerified(fallbackRecipientId, fallbackData.checklistId);
-        } else {
-          throw new Error('Failed to get fallback checklist ID');
-        }
-      } catch (fallbackApiError) {
-        console.error("Error with fallback checklist API:", fallbackApiError);
-        
-        // Try to get any available checklist as another fallback
-        try {
-          console.log("Trying to fetch any available checklist");
-          const response = await fetch('/api/checklists');
-          const checklists = await response.json();
+        if (response.ok) {
+          const statusData = await response.json();
           
-          // If we have any checklists, use the first one
-          if (checklists && checklists.length > 0) {
-            console.log(`Using checklist ID ${checklists[0].id} for verification`);
-            const fallbackRecipientId = `verified_${Date.now()}`;
-            onVerified(fallbackRecipientId, checklists[0].id);
-          } else {
-            throw new Error('No checklists found');
+          if (statusData.checklistId) {
+            console.log(`✅ Found original checklist ID: ${statusData.checklistId}`);
+            const originalRecipientId = statusData.recipientId || `recipient_${Date.now()}`;
+            
+            onVerified(originalRecipientId, statusData.checklistId);
+            return;
           }
-        } catch (fetchError) {
-          console.error("Error fetching checklists:", fetchError);
-          
-          // Final guaranteed fallback - use a direct route to checklist 1
-          // This ID is proven to work in production
-          console.log("Using guaranteed fallback ID: 1");
-          const fallbackRecipientId = `verified_${Date.now()}`;
-          onVerified(fallbackRecipientId, '1');
         }
+      } catch (statusError) {
+        console.error("❌ Error getting verification status:", statusError);
       }
+      
+      // Step 3: Try to extract checklist ID from token
+      try {
+        const possibleChecklistId = token.split('-').pop() || token;
+        console.log(`🔍 Extracted possible checklist ID from token: ${possibleChecklistId}`);
+        
+        const testResponse = await fetch(`/api/checklists/${possibleChecklistId}`);
+        
+        if (testResponse.ok) {
+          console.log(`✅ Found checklist with ID: ${possibleChecklistId}`);
+          onVerified(`recipient_${Date.now()}`, possibleChecklistId);
+          return;
+        }
+      } catch (extractError) {
+        console.error("❌ Error testing extracted ID:", extractError);
+      }
+      
+      // No valid checklist ID found, show error
+      console.error("❌ All attempts to find original checklist failed");
+      
+      toast({
+        title: 'Error',
+        description: 'Could not find the shared checklist. Please contact the sender.',
+        variant: 'destructive',
+      });
     } catch (error) {
       console.error('Verification error:', error);
+      
       toast({
         title: 'Error',
         description: 'Failed to verify code. Please try again.',

@@ -253,7 +253,7 @@ export default function SharedChecklist() {
       console.error('⚠️ No checklist ID received after verification - this is unexpected');
       toast({
         title: 'Warning',
-        description: 'Could not determine which checklist to load. Using default.',
+        description: 'Could not determine which checklist to load. Please contact the sender.',
         variant: 'destructive',
       });
       return;
@@ -262,80 +262,75 @@ export default function SharedChecklist() {
     // Store the verified checklist ID
     setChecklistId(verifiedChecklistId);
     
-    // Try to load the specific checklist (with multiple retry attempts)
-    console.log(`🔍 Attempting to load verified checklist with ID: ${verifiedChecklistId}`);
+    // CRITICAL FIX: This is the main function that loads the shared checklist
+    // We must ensure it correctly retrieves the original checklist, not a generic one
+    console.log(`🔍 Loading the ORIGINAL shared checklist with ID: ${verifiedChecklistId}`);
+    
     try {
-      // First make dedicated attempts to load the exact checklist
-      for (let attempt = 1; attempt <= 3; attempt++) {
-        try {
-          console.log(`📦 Attempt ${attempt} to fetch checklist ${verifiedChecklistId}`);
-          const data = await getChecklistById(verifiedChecklistId);
-          
-          if (data) {
-            console.log(`✅ Successfully loaded original checklist: ${data.name}`);
-            setChecklist(data);
-            setRemarks(data.remarks || "");
-            
-            // Subscribe to realtime updates for the specific checklist
-            subscribeToChecklist(verifiedChecklistId);
-            
-            toast({
-              title: 'Success',
-              description: 'Checklist loaded successfully!',
-            });
-            
-            return;
-          }
-        } catch (error) {
-          console.error(`❌ Attempt ${attempt} failed:`, error);
-          
-          if (attempt < 3) {
-            // Wait a bit before trying again
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
-        }
+      // First, try to retrieve directly from Firebase
+      console.log(`📦 Attempting direct Firebase retrieval for ID: ${verifiedChecklistId}`);
+      const firebaseData = await getChecklistById(verifiedChecklistId);
+      
+      if (firebaseData) {
+        console.log(`✅ Successfully loaded original shared checklist: "${firebaseData.name}"`);
+        console.log(`✅ Checklist tasks: ${firebaseData.tasks?.length || 0}`);
+        
+        setChecklist(firebaseData);
+        setRemarks(firebaseData.remarks || "");
+        
+        // Subscribe to realtime updates
+        subscribeToChecklist(verifiedChecklistId);
+        
+        toast({
+          title: 'Success',
+          description: 'Shared checklist loaded successfully!',
+        });
+        
+        return;
       }
       
-      // CRITICAL FIX: Never fall back to a different checklist ID!
-      // Instead, try again with the SAME ID but with extra debug information
-      console.warn('⚠️ Initial attempts failed, trying again with the original ID: ' + verifiedChecklistId);
+      // If direct Firebase retrieval fails, try the API route
+      console.log(`🔄 Firebase retrieval failed, trying API route for ID: ${verifiedChecklistId}`);
       
       try {
-        // Give the server a moment to ensure the checklist is available
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        const apiResponse = await fetch(`/api/checklists/${verifiedChecklistId}`);
         
-        // Make one final attempt with the original ID - no fallbacks!
-        const finalAttempt = await getChecklistById(verifiedChecklistId);
-        
-        if (finalAttempt) {
-          console.log(`✅ Final attempt successful: ${finalAttempt.name}`);
-          setChecklist(finalAttempt);
-          setRemarks(finalAttempt.remarks || "");
+        if (apiResponse.ok) {
+          const apiData = await apiResponse.json();
+          
+          console.log(`✅ Successfully loaded checklist via API: "${apiData.name}"`);
+          console.log(`✅ API checklist tasks: ${apiData.tasks?.length || 0}`);
+          
+          setChecklist(apiData);
+          setRemarks(apiData.remarks || "");
           subscribeToChecklist(verifiedChecklistId);
           
           toast({
             title: 'Success',
-            description: 'Shared checklist loaded successfully',
+            description: 'Shared checklist loaded successfully!',
           });
           
           return;
         }
-      } catch (finalError) {
-        console.error('Final attempt error:', finalError);
+      } catch (apiError) {
+        console.error('API route error:', apiError);
       }
       
-      // Only if all attempts with the original ID fail, show an error
+      // If all attempts fail, show an error - DO NOT create a generic checklist
+      console.error(`❌ All attempts to load original checklist ${verifiedChecklistId} failed`);
+      
       toast({
         title: 'Error',
-        description: 'The requested checklist could not be loaded. Please contact support.',
+        description: 'We could not retrieve the shared checklist. Please contact the sender or support at greyson@listssync.ai',
         variant: 'destructive',
         duration: 10000,
       });
     } catch (error) {
-      console.error('❌ Error loading verified checklist:', error);
+      console.error('❌ Critical error loading shared checklist:', error);
+      
       toast({
         title: 'Error',
-        description: 'Failed to load the checklist. Please contact greyson@listssync.ai for assistance.',
+        description: 'Failed to load the shared checklist. Please contact greyson@listssync.ai for assistance.',
         variant: 'destructive',
         duration: 10000,
       });
