@@ -33,6 +33,7 @@ export default function SharedChecklist() {
   const [showVerification, setShowVerification] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const { toast } = useToast();
   const { checkVerificationStatus, token: verificationToken, maskedContact } = useVerification();
