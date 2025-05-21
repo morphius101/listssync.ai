@@ -493,6 +493,9 @@ export default function SharedChecklist() {
   }
 
   if (!checklist) {
+    // Show details about the token to help debugging in production
+    const isProduction = import.meta.env.MODE === 'production';
+    
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <AlertTriangle className="h-12 w-12 text-orange-500 mb-4" />
@@ -500,9 +503,52 @@ export default function SharedChecklist() {
         <p className="text-gray-600 mb-6 text-center">
           This checklist may have been deleted or the link is invalid.
         </p>
-        <Button onClick={() => navigate('/')}>
-          Return Home
-        </Button>
+        
+        {/* Enhanced error details help when debugging in production */}
+        <div className="bg-red-50 border border-red-200 rounded-md p-4 mb-6 max-w-md w-full">
+          <h3 className="text-sm font-medium text-red-800 mb-2">Error Details</h3>
+          <p className="text-sm text-red-700 mb-1">
+            The checklist could not be loaded. Please contact support and provide the following information:
+          </p>
+          <ul className="text-xs text-red-700 list-disc pl-5 mb-2">
+            <li>Token: {token}</li>
+            <li>Environment: {isProduction ? 'Production' : 'Development'}</li>
+            <li>Time: {new Date().toISOString()}</li>
+          </ul>
+          <p className="text-xs text-red-700">
+            Email: greyson@listssync.ai
+          </p>
+        </div>
+        
+        <div className="flex space-x-4">
+          <Button onClick={() => navigate('/')}>
+            Return Home
+          </Button>
+          <Button 
+            variant="outline"
+            onClick={() => {
+              // Try again with a delay
+              setIsLoading(true);
+              setTimeout(async () => {
+                if (token) {
+                  try {
+                    // Retry loading with the token
+                    const status = await checkVerificationStatus(token);
+                    if (status && status.checklistId) {
+                      await loadChecklist(status.checklistId);
+                    }
+                  } catch (e) {
+                    console.error("Retry failed:", e);
+                  } finally {
+                    setIsLoading(false);
+                  }
+                }
+              }, 2000);
+            }}
+          >
+            Try Again
+          </Button>
+        </div>
       </div>
     );
   }
