@@ -789,8 +789,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { token, code } = req.body;
       
-      console.log(`🔍 Verification attempt for token: ${token}`);
-      console.log(`🔍 Verification attempt with code: ${code}`);
+      console.log(`🔍 VERIFICATION ATTEMPT for token: ${token}`);
+      console.log(`🔍 VERIFICATION ATTEMPT with code: ${code}`);
       
       if (!token || !code) {
         console.log(`❌ Missing token or code in request`);
@@ -800,8 +800,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Get the verification record
+      // Get the verification record and log everything about it for debugging
+      console.log(`🔍 LOOKING UP verification for token: ${token}`);
       const verification = await storage.getVerificationByToken(token);
+      console.log(`🔍 VERIFICATION RECORD FOUND:`, verification ? 'YES' : 'NO');
+      
+      if (verification) {
+        console.log(`VERIFICATION DETAILS: {
+          checklistId: ${verification.checklistId || 'NONE'},
+          recipientId: ${verification.recipientId || 'NONE'},
+          verified: ${verification.verified ? 'TRUE' : 'FALSE'},
+          expires: ${verification.expiresAt ? verification.expiresAt.toISOString() : 'NONE'}
+        }`);
+      }
       
       // Ensure fallback checklist exists
       const fallbackChecklistId = "1";
@@ -1176,29 +1187,66 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const { token } = req.params;
       
-      // Check for checklists first to find a valid ID
-      let validChecklistId = '9999'; // Default fallback
+      console.log(`Checking verification status for token: ${token}`);
       
+      // CRITICAL FIX: First check if there's a verification record with this token
+      // that already has a mapped checklist ID
+      let originalChecklistId = null;
       try {
-        const allChecklists = await storage.getAllChecklists();
-        if (allChecklists && allChecklists.length > 0) {
-          validChecklistId = allChecklists[0].id;
-          console.log(`Found valid checklist ID: ${validChecklistId} for verification`);
+        const verification = await storage.getVerificationByToken(token);
+        if (verification && verification.checklistId) {
+          originalChecklistId = verification.checklistId;
+          console.log(`Found original checklist ID in verification: ${originalChecklistId}`);
         }
-      } catch (listError) {
-        console.error('Error fetching checklists for verification:', listError);
+      } catch (verificationError) {
+        console.error('Error checking verification record:', verificationError);
+      }
+      
+      // If we didn't find a checklist ID in the verification record,
+      // check if the token itself might be a checklist ID
+      if (!originalChecklistId) {
+        try {
+          // Extract potential checklist ID from token
+          const extractedId = token.includes('-') ? token.split('-').pop() || token : token;
+          const checklist = await storage.getChecklistById(extractedId);
+          
+          if (checklist) {
+            originalChecklistId = extractedId;
+            console.log(`Found checklist by extracted ID: ${originalChecklistId}`);
+          }
+        } catch (checklistError) {
+          console.error('Error checking extracted checklist ID:', checklistError);
+        }
+      }
+      
+      // Always use the original checklist ID if we found it
+      if (originalChecklistId) {
+        console.log(`Using identified original checklist ID: ${originalChecklistId}`);
+      } else {
+        // Only use a fallback if we absolutely couldn't find the original
+        // Try to find any valid checklist ID as a last resort
+        originalChecklistId = 'test-checklist-original'; // Special test ID
+        try {
+          const allChecklists = await storage.getAllChecklists();
+          if (allChecklists && allChecklists.length > 0) {
+            originalChecklistId = allChecklists[0].id;
+          }
+        } catch (listError) {
+          console.error('Error fetching fallback checklists:', listError);
+        }
+        console.log(`⚠️ Using fallback checklist ID: ${originalChecklistId}`);
       }
       
       // In production, always provide a valid verification status response
       if (process.env.NODE_ENV === 'production') {
-        console.log(`[PRODUCTION] Providing guaranteed verification status response for token: ${token}`);
+        console.log(`[PRODUCTION] Providing verification status response for token: ${token}`);
         
-        // Standard format response that will never fail verification
+        // IMPORTANT: Always use the original checklist ID if available!
         return res.json({
           verified: false, // Will trigger verification form
           expired: false,
           recipientId: `auto_${Date.now()}`,
-          checklistId: validChecklistId
+          checklistId: originalChecklistId
         });
       }
       
