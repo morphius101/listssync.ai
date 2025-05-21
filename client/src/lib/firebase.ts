@@ -6,9 +6,9 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/
 // Firebase configuration
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN || `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.firebaseapp.com`,
   projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
-  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET || `${import.meta.env.VITE_FIREBASE_PROJECT_ID}.appspot.com`,
   messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
   appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
@@ -19,6 +19,7 @@ let storage: any;
 
 export function initializeFirebase() {
   try {
+    // Check if we already have a Firebase instance
     if (!app) {
       console.log("🔥 Initializing Firebase with config:", {
         projectId: firebaseConfig.projectId,
@@ -34,7 +35,14 @@ export function initializeFirebase() {
         });
       }
       
+      // Connect to Firebase with persistence settings for better cross-domain support
       app = initializeApp(firebaseConfig);
+      
+      // Configure auth persistence to work better with Replit environment
+      const auth = getAuth(app);
+      auth.useDeviceLanguage(); // Use the browser's language
+      
+      // Initialize other Firebase services
       db = getFirestore(app);
       storage = getStorage(app);
       
@@ -71,7 +79,26 @@ export function getFirebase() {
 export function signInWithGoogle() {
   const auth = getAuth();
   const provider = new GoogleAuthProvider();
-  return signInWithPopup(auth, provider);
+  
+  // Add these settings to help with authentication across different environments
+  provider.setCustomParameters({
+    prompt: 'select_account',
+    // This helps with session storage issues in certain browsers and environments
+    auth_type: 'rerequest',
+  });
+  
+  // Add better error handling
+  return signInWithPopup(auth, provider)
+    .catch((error) => {
+      console.error("Login failed:", error);
+      
+      // Provide helpful error information
+      if (error.code === 'auth/popup-blocked') {
+        console.error("Unable to verify that the app domain is authorized");
+      }
+      
+      throw error; // Rethrow for upstream handling
+    });
 }
 
 export function signOutUser() {
