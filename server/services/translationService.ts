@@ -35,6 +35,8 @@ export async function translateText(
   sourceLanguage?: LanguageCode
 ): Promise<string> {
   try {
+    console.log(`🔄 Translating: "${text}" from ${sourceLanguage || 'auto'} to ${targetLanguage}`);
+    
     // Prepare instruction based on source language
     const sourceInstruction = sourceLanguage 
       ? `Translate the following ${AVAILABLE_LANGUAGES[sourceLanguage]} text` 
@@ -42,6 +44,7 @@ export async function translateText(
     
     const targetInstruction = `into ${AVAILABLE_LANGUAGES[targetLanguage]}`;
     
+    console.log('📤 Making OpenAI API call...');
     const response = await openai.chat.completions.create({
       model: "gpt-4o", // the newest OpenAI model is "gpt-4o" which was released May 13, 2024. do not change this unless explicitly requested by the user
       messages: [
@@ -57,9 +60,11 @@ export async function translateText(
       temperature: 0.3, // Lower temperature for more consistent translations
     });
 
-    return response.choices[0].message.content?.trim() || text;
+    const translatedText = response.choices[0].message.content?.trim() || text;
+    console.log(`✅ Translation result: "${translatedText}"`);
+    return translatedText;
   } catch (error) {
-    console.error("Translation error:", error);
+    console.error("❌ Translation error:", error);
     // Return original text on error
     return text;
   }
