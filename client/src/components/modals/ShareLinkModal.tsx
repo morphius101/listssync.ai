@@ -98,28 +98,10 @@ export default function ShareLinkModal({
       // Make a copy of the checklist for potential translation
       let checklistToShare = checklist;
       
-      // Translate the checklist if needed
-      if (checklistToShare && selectedLanguage !== 'en') {
-        try {
-          // Use the checklistId if checklist object doesn't have an id
-          const idToUse = checklistToShare.id || checklistId;
-          console.log('Attempting to translate checklist:', idToUse, 'to', selectedLanguage);
-          
-          if (idToUse) {
-            const translatedChecklist = await translateChecklist(idToUse, selectedLanguage, 'en');
-            if (translatedChecklist) {
-              console.log('Translation successful:', translatedChecklist);
-              checklistToShare = translatedChecklist;
-            } else {
-              console.log('Translation returned null, using original checklist');
-            }
-          } else {
-            console.log('No valid ID found for translation, skipping translation');
-          }
-        } catch (error) {
-          console.error('Translation error:', error);
-          // Continue with original checklist if translation fails
-        }
+      // For now, skip translation to isolate the sharing issue
+      // TODO: Re-enable translation once basic sharing works
+      if (selectedLanguage !== 'en') {
+        console.log('Translation feature temporarily disabled for debugging - using original checklist');
       }
       
       // Always proceed with sharing regardless of checklist object state
