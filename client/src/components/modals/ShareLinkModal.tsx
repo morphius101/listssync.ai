@@ -101,13 +101,20 @@ export default function ShareLinkModal({
       // Translate the checklist if needed
       if (checklistToShare && selectedLanguage !== 'en') {
         try {
-          console.log('Attempting to translate checklist:', checklistToShare.id, 'to', selectedLanguage);
-          const translatedChecklist = await translateChecklist(checklistToShare.id, selectedLanguage, 'en');
-          if (translatedChecklist) {
-            console.log('Translation successful:', translatedChecklist);
-            checklistToShare = translatedChecklist;
+          // Use the checklistId if checklist object doesn't have an id
+          const idToUse = checklistToShare.id || checklistId;
+          console.log('Attempting to translate checklist:', idToUse, 'to', selectedLanguage);
+          
+          if (idToUse) {
+            const translatedChecklist = await translateChecklist(idToUse, selectedLanguage, 'en');
+            if (translatedChecklist) {
+              console.log('Translation successful:', translatedChecklist);
+              checklistToShare = translatedChecklist;
+            } else {
+              console.log('Translation returned null, using original checklist');
+            }
           } else {
-            console.log('Translation returned null, using original checklist');
+            console.log('No valid ID found for translation, skipping translation');
           }
         } catch (error) {
           console.error('Translation error:', error);
