@@ -43,7 +43,8 @@ export async function createVerification(
   recipientId: string,
   email?: string,
   phone?: string,
-  checklistId?: string
+  checklistId?: string,
+  targetLanguage?: string
 ): Promise<{ token: string; code: string }> {
   try {
     console.log(`🔑 Creating verification for recipient: ${recipientId}`);

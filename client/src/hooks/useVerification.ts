@@ -7,6 +7,7 @@ export interface SendVerificationParams {
   phone?: string;
   recipientName?: string;
   recipientId?: string;
+  targetLanguage?: string;
 }
 
 export interface VerifyCodeParams {

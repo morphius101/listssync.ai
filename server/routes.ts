@@ -1353,7 +1353,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(`${API_BASE}/checklists/:id/share`, async (req, res) => {
     try {
       const { id } = req.params;
-      const { recipientEmail, recipientPhone, recipientName } = req.body;
+      const { recipientEmail, recipientPhone, recipientName, targetLanguage } = req.body;
       
       const checklist = await storage.getChecklistById(id);
       
@@ -1375,7 +1375,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         recipientId,
         recipientEmail,
         recipientPhone,
-        id
+        id,
+        targetLanguage
       );
       
       // Create share URL with token, using custom domain in production

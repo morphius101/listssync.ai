@@ -125,7 +125,8 @@ export default function ShareLinkModal({
       const params: SendVerificationParams = {
         checklistId: checklistId, // Use the checklistId prop directly
         recipientName,
-        recipientId
+        recipientId,
+        targetLanguage: selectedLanguage // Include the target language
       };
       
       // Add contact method based on active tab

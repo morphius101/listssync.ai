@@ -130,4 +130,5 @@ export interface VerificationDTO {
   recipientEmail?: string;
   recipientPhone?: string;
   checklistId?: string;
+  targetLanguage?: string;
 }
