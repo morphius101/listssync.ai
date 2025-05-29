@@ -34,6 +34,7 @@ interface VerificationStatus {
   expired: boolean;
   recipientId?: string;
   checklistId?: string;
+  targetLanguage?: string;
 }
 
 interface VerificationMaskedContact {

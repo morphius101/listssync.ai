@@ -950,10 +950,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       // Always return verification success with the original checklist ID
       console.log(`🎯 Verification complete, returning shared checklist ID: ${originalChecklistId}`);
       
+      // Get verification data to include target language
+      const verificationData = await getVerification(token);
+      const targetLanguage = verificationData?.targetLanguage || 'en';
+      
       return res.json({ 
         verified: true, 
         recipientId: `verified_${Date.now()}`,
         checklistId: originalChecklistId,
+        targetLanguage: targetLanguage,
         message: "Verification successful"
       });
     } catch (error: any) {

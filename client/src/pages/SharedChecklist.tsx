@@ -67,6 +67,12 @@ export default function SharedChecklist() {
           setRecipientId(status.recipientId || null);
           setChecklistId(status.checklistId || null);
           
+          // Capture target language from verification
+          if (status.targetLanguage) {
+            console.log(`🌐 Setting target language: ${status.targetLanguage}`);
+            setTargetLanguage(status.targetLanguage);
+          }
+          
           if (status.verified && status.checklistId && !status.expired) {
             await loadChecklist(status.checklistId);
           } else {
