@@ -122,76 +122,30 @@ export default function ShareLinkModal({
         }
       }
       
-      // Make sure we have a valid checklist
-      if (!checklistToShare) {
-        // If we don't have a checklist object but have an ID, try using just the ID
-        if (checklistId) {
-          console.log('Using checklistId directly:', checklistId);
-          const recipientId = `recipient_${Date.now()}`;
-          
-          // Share checklist parameters
-          const params: SendVerificationParams = {
-            checklistId: checklistId,
-            recipientName,
-            recipientId
-          };
-          
-          // Add either email or phone based on active tab
-          if (activeTab === 'email' && recipientEmail) {
-            params.email = recipientEmail;
-            console.log('Using email for verification:', recipientEmail);
-          } else if (activeTab === 'phone' && recipientPhone) {
-            params.phone = recipientPhone;
-            console.log('Using phone for verification:', recipientPhone);
-          }
-          
-          // Log what we're sending to the API
-          console.log('Sending verification params:', params);
-          
-          // Share the checklist using the ID directly
-          const response = await shareChecklist(params);
-          
-          if (response?.shareUrl) {
-            setShareLink(response.shareUrl);
-            setResponse(response);
-            return;
-          }
-        }
-        
-        setError('Invalid checklist data');
+      // Always proceed with sharing regardless of checklist object state
+      // The important thing is that we have a valid checklistId
+      if (!checklistId) {
+        setError('No checklist ID available for sharing');
         return;
       }
       
-      // Generate a recipient ID if not provided
+      // Generate a recipient ID and prepare sharing parameters
       const recipientId = `recipient_${Date.now()}`;
       
-      // Make sure we have a valid checklistId 
-      let finalChecklistId;
-      if (checklistToShare?.id) {
-        finalChecklistId = checklistToShare.id;
-      } else if (checklistId) {
-        finalChecklistId = checklistId;
-      } else {
-        console.error("No valid checklist ID is available!");
-        setError("Unable to share checklist: No valid ID available");
-        return;
-      }
-      
-      // Prepare API request parameters
       const params: SendVerificationParams = {
-        checklistId: finalChecklistId,
+        checklistId: checklistId, // Use the checklistId prop directly
         recipientName,
         recipientId
       };
       
-      // Add the appropriate contact method based on the active tab
-      if (activeTab === 'email') {
+      // Add contact method based on active tab
+      if (activeTab === 'email' && recipientEmail) {
         params.email = recipientEmail;
-        console.log('Using email for verification:', params.email);
-      } else if (activeTab === 'phone') {
+      } else if (activeTab === 'phone' && recipientPhone) {
         params.phone = recipientPhone;
-        console.log('Using phone for verification:', params.phone);
       }
+      
+      console.log('Sharing checklist with simplified params:', params);
       
       // Log the complete parameters before making the API call
       console.log('Sharing checklist with params:', params);
