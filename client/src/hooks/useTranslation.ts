@@ -90,10 +90,9 @@ export function useTranslation(): TranslationHook {
     setError(null);
     
     try {
-      const response = await apiRequest('/api/translation/checklist', {
+      const response = await apiRequest(`/api/translate/checklist/${checklistId}`, {
         method: 'POST',
         body: JSON.stringify({
-          checklistId,
           targetLanguage,
           sourceLanguage: sourceLanguage || 'en'
         }),
