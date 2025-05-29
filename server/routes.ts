@@ -373,6 +373,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(`${API_BASE}/translate/checklist/:id`, async (req, res) => {
     try {
       const { targetLanguage, sourceLanguage } = req.body;
+      console.log('Translation request received:', { id: req.params.id, targetLanguage, sourceLanguage });
       
       if (!targetLanguage) {
         return res.status(400).json({ 
@@ -381,19 +382,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       const checklist = await storage.getChecklistById(req.params.id);
+      console.log('Found checklist for translation:', checklist ? 'Yes' : 'No');
       
       if (!checklist) {
         return res.status(404).json({ message: "Checklist not found" });
       }
       
+      console.log('Starting translation process...');
       const translatedChecklist = await translateChecklist(
         checklist,
         targetLanguage as LanguageCode,
         sourceLanguage as LanguageCode | undefined
       );
       
+      console.log('Translation completed successfully');
       res.json(translatedChecklist);
     } catch (error: any) {
+      console.error('Translation endpoint error:', error);
       res.status(500).json({ message: error.message });
     }
   });
