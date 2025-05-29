@@ -72,7 +72,8 @@ export async function createVerification(
       recipientId,
       recipientEmail: email,
       recipientPhone: phone,
-      checklistId
+      checklistId,
+      targetLanguage: targetLanguage || 'en'
     };
     
     // Store in database

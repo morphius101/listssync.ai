@@ -10,6 +10,7 @@ import TasksList from '@/components/checklist/TasksList';
 import RemarksSection from '@/components/checklist/RemarksSection';
 import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/hooks/useWebSocket';
+import { useTranslation } from '@/hooks/useTranslation';
 import { 
   Loader2, 
   ShieldCheck, 
@@ -34,10 +35,12 @@ export default function SharedChecklist() {
   const [isVerified, setIsVerified] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [targetLanguage, setTargetLanguage] = useState<string>('en');
 
   const { toast } = useToast();
   const { checkVerificationStatus, token: verificationToken, maskedContact } = useVerification();
   const { subscribeToChecklist, sendChecklistUpdate } = useWebSocket();
+  const { translateChecklist } = useTranslation();
 
   // Check verification status - only runs once when token is available
   useEffect(() => {
@@ -127,8 +130,24 @@ export default function SharedChecklist() {
           
           if (firebaseData) {
             console.log(`✅ Successfully loaded checklist from Firebase: ${firebaseData.name}`);
-            setChecklist(firebaseData);
-            setRemarks(firebaseData.remarks || "");
+            
+            // Check if we need to translate this checklist
+            let finalChecklist = firebaseData;
+            if (token && targetLanguage !== 'en') {
+              try {
+                console.log(`🌐 Translating checklist to ${targetLanguage}`);
+                const translatedData = await translateChecklist(id, targetLanguage as any, 'en');
+                if (translatedData) {
+                  finalChecklist = translatedData;
+                  console.log(`✅ Checklist translated successfully`);
+                }
+              } catch (translationError) {
+                console.error('Translation failed, using original:', translationError);
+              }
+            }
+            
+            setChecklist(finalChecklist);
+            setRemarks(finalChecklist.remarks || "");
             
             // Subscribe to realtime updates
             subscribeToChecklist(id);
@@ -138,7 +157,7 @@ export default function SharedChecklist() {
               description: 'Your shared checklist has been loaded successfully.',
             });
             
-            return firebaseData;
+            return finalChecklist;
           }
         } catch (firebaseError) {
           console.error(`❌ Error fetching directly from Firebase: ${firebaseError}`);
