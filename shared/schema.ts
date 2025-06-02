@@ -132,3 +132,41 @@ export interface VerificationDTO {
   checklistId?: string;
   targetLanguage?: string;
 }
+
+// Mailing List Subscriptions Schema for marketing campaigns
+export const mailingListSubscriptions = pgTable("mailing_list_subscriptions", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  subscribedAt: timestamp("subscribed_at").notNull().defaultNow(),
+  confirmed: boolean("confirmed").notNull().default(false),
+  confirmationToken: varchar("confirmation_token", { length: 128 }),
+  source: varchar("source", { length: 50 }).notNull().default("development_banner"), // Track where they signed up
+  userAgent: text("user_agent"), // For analytics
+  ipAddress: varchar("ip_address", { length: 45 }), // For compliance
+}, (table) => ({
+  // Index for faster email lookup
+  emailIdx: index("mailing_list_email_idx").on(table.email),
+  // Index for finding unconfirmed subscriptions
+  confirmedIdx: index("mailing_list_confirmed_idx").on(table.confirmed),
+  // Index for analytics by source
+  sourceIdx: index("mailing_list_source_idx").on(table.source)
+}));
+
+export const insertMailingListSubscriptionSchema = createInsertSchema(mailingListSubscriptions).omit({
+  id: true,
+  subscribedAt: true,
+});
+
+export type InsertMailingListSubscription = z.infer<typeof insertMailingListSubscriptionSchema>;
+export type MailingListSubscription = typeof mailingListSubscriptions.$inferSelect;
+
+export interface MailingListSubscriptionDTO {
+  id?: number;
+  email: string;
+  subscribedAt: Date;
+  confirmed: boolean;
+  confirmationToken?: string;
+  source: string;
+  userAgent?: string;
+  ipAddress?: string;
+}

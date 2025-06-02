@@ -3,9 +3,11 @@ import {
   TaskDTO, 
   ChecklistSummaryDTO, 
   VerificationDTO,
+  MailingListSubscriptionDTO,
   checklists, 
   tasks,
-  verifications 
+  verifications,
+  mailingListSubscriptions
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -25,6 +27,11 @@ export interface IStorage {
   markVerificationAsVerified(token: string): Promise<boolean>;
   updateVerificationCode(token: string, code: string): Promise<boolean>;
   getAllVerifications(): Promise<VerificationDTO[]>;
+  
+  // Mailing list methods for marketing campaigns
+  subscribeToMailingList(subscription: MailingListSubscriptionDTO): Promise<MailingListSubscriptionDTO>;
+  confirmMailingListSubscription(token: string): Promise<boolean>;
+  getMailingListSubscription(email: string): Promise<MailingListSubscriptionDTO | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -435,6 +442,74 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error("Error retrieving all verifications:", error);
       return [];
+    }
+  }
+
+  // Mailing list methods implementation
+  async subscribeToMailingList(subscription: MailingListSubscriptionDTO): Promise<MailingListSubscriptionDTO> {
+    try {
+      const [insertedSubscription] = await db.insert(mailingListSubscriptions).values({
+        email: subscription.email,
+        confirmed: subscription.confirmed,
+        confirmationToken: subscription.confirmationToken,
+        source: subscription.source,
+        userAgent: subscription.userAgent,
+        ipAddress: subscription.ipAddress
+      }).returning();
+
+      return {
+        id: insertedSubscription.id,
+        email: insertedSubscription.email,
+        subscribedAt: insertedSubscription.subscribedAt,
+        confirmed: insertedSubscription.confirmed,
+        confirmationToken: insertedSubscription.confirmationToken || undefined,
+        source: insertedSubscription.source,
+        userAgent: insertedSubscription.userAgent || undefined,
+        ipAddress: insertedSubscription.ipAddress || undefined
+      };
+    } catch (error) {
+      console.error('Error creating mailing list subscription:', error);
+      throw error;
+    }
+  }
+
+  async confirmMailingListSubscription(token: string): Promise<boolean> {
+    try {
+      const [updatedSubscription] = await db
+        .update(mailingListSubscriptions)
+        .set({ confirmed: true, confirmationToken: null })
+        .where(eq(mailingListSubscriptions.confirmationToken, token))
+        .returning();
+
+      return !!updatedSubscription;
+    } catch (error) {
+      console.error('Error confirming mailing list subscription:', error);
+      return false;
+    }
+  }
+
+  async getMailingListSubscription(email: string): Promise<MailingListSubscriptionDTO | undefined> {
+    try {
+      const [subscription] = await db
+        .select()
+        .from(mailingListSubscriptions)
+        .where(eq(mailingListSubscriptions.email, email));
+
+      if (!subscription) return undefined;
+
+      return {
+        id: subscription.id,
+        email: subscription.email,
+        subscribedAt: subscription.subscribedAt,
+        confirmed: subscription.confirmed,
+        confirmationToken: subscription.confirmationToken || undefined,
+        source: subscription.source,
+        userAgent: subscription.userAgent || undefined,
+        ipAddress: subscription.ipAddress || undefined
+      };
+    } catch (error) {
+      console.error('Error retrieving mailing list subscription:', error);
+      return undefined;
     }
   }
 }

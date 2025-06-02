@@ -1426,19 +1426,122 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Invalid email format" });
       }
 
-      console.log(`📧 Mailing list subscription request for: ${email.trim()}`);
+      const cleanEmail = email.trim().toLowerCase();
+      console.log(`📧 Mailing list subscription request for: ${cleanEmail}`);
       
-      // For now, just log the email subscription
-      // In production, you would integrate with your email service provider
-      console.log(`✅ Email ${email.trim()} added to mailing list`);
+      // Check if email already exists
+      const existing = await storage.getMailingListSubscription(cleanEmail);
+      if (existing) {
+        return res.json({ 
+          success: true, 
+          message: "You're already subscribed to our mailing list" 
+        });
+      }
+
+      // Generate confirmation token
+      const confirmationToken = `confirm_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
+      
+      // Get user agent and IP for analytics
+      const userAgent = req.get('User-Agent') || undefined;
+      const ipAddress = req.ip || req.connection.remoteAddress || undefined;
+
+      // Create subscription record
+      const subscription = await storage.subscribeToMailingList({
+        email: cleanEmail,
+        confirmed: false,
+        confirmationToken,
+        source: 'development_banner',
+        userAgent,
+        ipAddress,
+        subscribedAt: new Date()
+      });
+
+      // Send confirmation email
+      try {
+        const confirmationUrl = `${req.protocol}://${req.get('host')}/api/mailing-list/confirm/${confirmationToken}`;
+        
+        const emailHtml = `
+          <div style="max-width: 600px; margin: 0 auto; font-family: Arial, sans-serif;">
+            <h2 style="color: #2563eb;">Welcome to ListsSync.ai!</h2>
+            <p>Thank you for subscribing to our mailing list. We'll keep you updated on new features and improvements.</p>
+            <p>Please confirm your subscription by clicking the button below:</p>
+            <p style="text-align: center; margin: 30px 0;">
+              <a href="${confirmationUrl}" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; display: inline-block;">
+                Confirm Subscription
+              </a>
+            </p>
+            <p style="font-size: 14px; color: #666;">
+              If you didn't sign up for this, you can safely ignore this email.
+            </p>
+            <hr style="margin: 30px 0; border: none; border-top: 1px solid #eee;">
+            <p style="font-size: 12px; color: #888;">
+              ListsSync.ai - Sync real-time checklists with instant photo proof
+            </p>
+          </div>
+        `;
+
+        const { sendEmail } = await import('./services/emailService');
+        await sendEmail({
+          to: cleanEmail,
+          subject: 'Confirm your ListsSync.ai subscription',
+          text: `Please confirm your subscription by visiting: ${confirmationUrl}`,
+          html: emailHtml
+        });
+
+        console.log(`✅ Confirmation email sent to ${cleanEmail}`);
+      } catch (emailError) {
+        console.error('Failed to send confirmation email:', emailError);
+        // Don't fail the subscription if email fails
+      }
       
       res.json({ 
         success: true, 
-        message: "Successfully subscribed to mailing list" 
+        message: "Please check your email to confirm your subscription" 
       });
     } catch (error: any) {
       console.error('Mailing list subscription error:', error);
       res.status(500).json({ message: "Failed to subscribe to mailing list" });
+    }
+  });
+
+  // Email confirmation endpoint
+  app.get(`${API_BASE}/mailing-list/confirm/:token`, async (req, res) => {
+    try {
+      const { token } = req.params;
+      
+      const confirmed = await storage.confirmMailingListSubscription(token);
+      
+      if (confirmed) {
+        res.send(`
+          <html>
+            <head><title>Subscription Confirmed</title></head>
+            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+              <h1 style="color: #10b981;">Subscription Confirmed!</h1>
+              <p>Thank you for confirming your subscription to ListsSync.ai updates.</p>
+              <p>We'll keep you informed about new features and improvements.</p>
+              <a href="/" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-top: 20px; display: inline-block;">
+                Return to ListsSync.ai
+              </a>
+            </body>
+          </html>
+        `);
+      } else {
+        res.status(400).send(`
+          <html>
+            <head><title>Invalid Token</title></head>
+            <body style="font-family: Arial, sans-serif; text-align: center; padding: 50px;">
+              <h1 style="color: #ef4444;">Invalid or Expired Token</h1>
+              <p>This confirmation link is invalid or has already been used.</p>
+              <a href="/" style="background-color: #2563eb; color: white; padding: 12px 24px; text-decoration: none; border-radius: 5px; margin-top: 20px; display: inline-block;">
+                Return to ListsSync.ai
+              </a>
+            </body>
+          </html>
+        `);
+      }
+    } catch (error: any) {
+      console.error('Email confirmation error:', error);
+      res.status(500).send('Internal server error');
     }
   });
 
