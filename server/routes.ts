@@ -415,14 +415,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log('📝 verification/send request headers:', req.headers);
       console.log('📝 Environment:', process.env.NODE_ENV || 'not set');
       
-      let { recipientId, email, phone, checklistId, recipientName } = req.body;
+      let { recipientId, email, phone, checklistId, recipientName, targetLanguage } = req.body;
       
       console.log('📋 verification/send parsed fields:', { 
         recipientId, 
         email, 
         phone, 
         checklistId, 
-        recipientName 
+        recipientName,
+        targetLanguage 
       });
       
       // Verify environment variables are available
@@ -493,7 +494,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           recipientId, 
           email, 
           phone, 
-          checklistId
+          checklistId,
+          targetLanguage
         );
         token = result.token;
         code = result.code;
