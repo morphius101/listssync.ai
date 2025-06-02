@@ -1451,6 +1451,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         confirmed: false,
         confirmationToken,
         source: 'development_banner',
+        leadType: 'marketing_lead',
         userAgent,
         ipAddress,
         subscribedAt: new Date()

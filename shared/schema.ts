@@ -141,6 +141,7 @@ export const mailingListSubscriptions = pgTable("mailing_list_subscriptions", {
   confirmed: boolean("confirmed").notNull().default(false),
   confirmationToken: varchar("confirmation_token", { length: 128 }),
   source: varchar("source", { length: 50 }).notNull().default("development_banner"), // Track where they signed up
+  leadType: varchar("lead_type", { length: 50 }).notNull().default("marketing_lead"), // Categorize the type of lead
   userAgent: text("user_agent"), // For analytics
   ipAddress: varchar("ip_address", { length: 45 }), // For compliance
 }, (table) => ({
@@ -149,7 +150,9 @@ export const mailingListSubscriptions = pgTable("mailing_list_subscriptions", {
   // Index for finding unconfirmed subscriptions
   confirmedIdx: index("mailing_list_confirmed_idx").on(table.confirmed),
   // Index for analytics by source
-  sourceIdx: index("mailing_list_source_idx").on(table.source)
+  sourceIdx: index("mailing_list_source_idx").on(table.source),
+  // Index for filtering by lead type
+  leadTypeIdx: index("mailing_list_lead_type_idx").on(table.leadType)
 }));
 
 export const insertMailingListSubscriptionSchema = createInsertSchema(mailingListSubscriptions).omit({
@@ -167,6 +170,7 @@ export interface MailingListSubscriptionDTO {
   confirmed: boolean;
   confirmationToken?: string;
   source: string;
+  leadType: string;
   userAgent?: string;
   ipAddress?: string;
 }

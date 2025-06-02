@@ -453,6 +453,7 @@ export class DatabaseStorage implements IStorage {
         confirmed: subscription.confirmed,
         confirmationToken: subscription.confirmationToken,
         source: subscription.source,
+        leadType: subscription.leadType,
         userAgent: subscription.userAgent,
         ipAddress: subscription.ipAddress
       }).returning();
@@ -464,6 +465,7 @@ export class DatabaseStorage implements IStorage {
         confirmed: insertedSubscription.confirmed,
         confirmationToken: insertedSubscription.confirmationToken || undefined,
         source: insertedSubscription.source,
+        leadType: insertedSubscription.leadType,
         userAgent: insertedSubscription.userAgent || undefined,
         ipAddress: insertedSubscription.ipAddress || undefined
       };
@@ -504,6 +506,7 @@ export class DatabaseStorage implements IStorage {
         confirmed: subscription.confirmed,
         confirmationToken: subscription.confirmationToken || undefined,
         source: subscription.source,
+        leadType: subscription.leadType,
         userAgent: subscription.userAgent || undefined,
         ipAddress: subscription.ipAddress || undefined
       };
