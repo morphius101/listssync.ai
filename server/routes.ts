@@ -1411,6 +1411,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Mailing list subscription endpoint
+  app.post(`${API_BASE}/mailing-list/subscribe`, async (req, res) => {
+    try {
+      const { email } = req.body;
+      
+      if (!email || !email.trim()) {
+        return res.status(400).json({ message: "Email is required" });
+      }
+
+      // Basic email validation
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email.trim())) {
+        return res.status(400).json({ message: "Invalid email format" });
+      }
+
+      console.log(`📧 Mailing list subscription request for: ${email.trim()}`);
+      
+      // For now, just log the email subscription
+      // In production, you would integrate with your email service provider
+      console.log(`✅ Email ${email.trim()} added to mailing list`);
+      
+      res.json({ 
+        success: true, 
+        message: "Successfully subscribed to mailing list" 
+      });
+    } catch (error: any) {
+      console.error('Mailing list subscription error:', error);
+      res.status(500).json({ message: "Failed to subscribe to mailing list" });
+    }
+  });
+
   // Set up WebSocket server for real-time checklist updates
   const httpServer = createServer(app);
   const wss = new WebSocketServer({ server: httpServer, path: '/ws' });

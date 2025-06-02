@@ -4,6 +4,7 @@ import DashboardStats from "@/components/dashboard/DashboardStats";
 import ChecklistsManager from "@/components/dashboard/ChecklistsManager";
 import ChecklistEditor from "@/components/dashboard/ChecklistEditor";
 import ShareLinkModal from "@/components/modals/ShareLinkModal";
+import { DevelopmentBanner } from "@/components/DevelopmentBanner";
 import { Checklist, ChecklistSummary } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
@@ -184,6 +185,9 @@ const AdminDashboard = () => {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+      
+      {/* Development Banner */}
+      <DevelopmentBanner />
       
       {isEditing ? (
         <ChecklistEditor
