@@ -182,30 +182,30 @@ export function useVerification() {
     setError(null);
     
     try {
-      // Try to fetch verification status from server
-      try {
-        const response = await apiRequest(`/api/verification/status/${token}`, {
-          method: 'GET'
-        });
-        
-        return await response.json();
-      } catch (fetchError) {
-        // Log the original error
-        console.error('API error in verification status check:', fetchError);
-        
-        // Hard fallback for production - never fail verification in production
-        console.log('Providing fallback verification status to ensure verification works');
+      const response = await apiRequest(`/api/verification/status/${token}`, {
+        method: 'GET'
+      });
+      
+      if (!response.ok) {
+        // If status check fails, return a default state that will prompt verification
         return {
-          verified: false, // Will trigger verification modal
+          verified: false,
           expired: false,
-          recipientId: `fallback_${Date.now()}`,
-          checklistId: '9999' // Default checklist ID
+          recipientId: `recipient_${Date.now()}`,
+          checklistId: null
         };
       }
+      
+      const data = await response.json();
+      return data;
     } catch (err) {
-      setError('Failed to check verification status');
-      console.error('Check verification status error:', err);
-      return null;
+      // Silently handle errors and return a safe default state
+      return {
+        verified: false,
+        expired: false,
+        recipientId: `recipient_${Date.now()}`,
+        checklistId: null
+      };
     } finally {
       setIsLoading(false);
     }
