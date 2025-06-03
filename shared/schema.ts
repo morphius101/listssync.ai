@@ -101,6 +101,7 @@ export const verifications = pgTable("verifications", {
   recipientEmail: text("recipient_email"),
   recipientPhone: text("recipient_phone"),
   checklistId: text("checklist_id"),
+  targetLanguage: varchar("target_language", { length: 10 }).default('en'),
 }, (table) => ({
   // Index for faster token lookup
   tokenIdx: index("verification_token_idx").on(table.token),
