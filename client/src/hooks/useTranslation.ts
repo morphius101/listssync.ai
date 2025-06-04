@@ -61,7 +61,7 @@ export function useTranslation(): TranslationHook {
     setError(null);
     
     try {
-      const response = await apiRequest('/api/translation/text', {
+      const response = await apiRequest('/api/translate/text', {
         method: 'POST',
         body: JSON.stringify({
           text,
@@ -71,7 +71,7 @@ export function useTranslation(): TranslationHook {
       });
       
       const data = await response.json();
-      return data.translatedText || '';
+      return data.translated || '';
     } catch (err) {
       console.error('Translation error:', err);
       setError('Failed to translate text');
