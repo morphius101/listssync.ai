@@ -142,7 +142,8 @@ export default function SharedChecklist() {
             if (token && targetLanguage !== 'en') {
               try {
                 console.log(`🌐 Translating checklist to ${targetLanguage}`);
-                const translatedData = await translateChecklist(id, targetLanguage as any, 'en');
+                // Use the actual Firebase checklist ID, not the verification token
+                const translatedData = await translateChecklist(firebaseData.id, targetLanguage as any, 'en');
                 if (translatedData) {
                   finalChecklist = translatedData;
                   console.log(`✅ Checklist translated successfully`);
@@ -300,8 +301,23 @@ export default function SharedChecklist() {
         console.log(`✅ Successfully loaded original shared checklist: "${firebaseData.name}"`);
         console.log(`✅ Checklist tasks: ${firebaseData.tasks?.length || 0}`);
         
-        setChecklist(firebaseData);
-        setRemarks(firebaseData.remarks || "");
+        // Check if we need to translate this checklist
+        let finalChecklist = firebaseData;
+        if (targetLanguage !== 'en') {
+          try {
+            console.log(`🌐 Translating verified checklist to ${targetLanguage}`);
+            const translatedData = await translateChecklist(firebaseData.id, targetLanguage as any, 'en');
+            if (translatedData) {
+              finalChecklist = translatedData;
+              console.log(`✅ Verified checklist translated successfully`);
+            }
+          } catch (translationError) {
+            console.error('Translation failed for verified checklist, using original:', translationError);
+          }
+        }
+        
+        setChecklist(finalChecklist);
+        setRemarks(finalChecklist.remarks || "");
         
         // Subscribe to realtime updates
         subscribeToChecklist(verifiedChecklistId);
@@ -326,8 +342,23 @@ export default function SharedChecklist() {
           console.log(`✅ Successfully loaded checklist via API: "${apiData.name}"`);
           console.log(`✅ API checklist tasks: ${apiData.tasks?.length || 0}`);
           
-          setChecklist(apiData);
-          setRemarks(apiData.remarks || "");
+          // Check if we need to translate this checklist
+          let finalChecklist = apiData;
+          if (targetLanguage !== 'en') {
+            try {
+              console.log(`🌐 Translating API checklist to ${targetLanguage}`);
+              const translatedData = await translateChecklist(apiData.id, targetLanguage as any, 'en');
+              if (translatedData) {
+                finalChecklist = translatedData;
+                console.log(`✅ API checklist translated successfully`);
+              }
+            } catch (translationError) {
+              console.error('Translation failed for API checklist, using original:', translationError);
+            }
+          }
+          
+          setChecklist(finalChecklist);
+          setRemarks(finalChecklist.remarks || "");
           subscribeToChecklist(verifiedChecklistId);
           
           toast({
