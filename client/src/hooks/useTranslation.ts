@@ -41,7 +41,7 @@ export interface TranslationHook {
     sourceLanguage?: LanguageCode
   ) => Promise<string>;
   translateChecklist: (
-    checklistId: string, 
+    checklist: any, 
     targetLanguage: LanguageCode, 
     sourceLanguage?: LanguageCode
   ) => Promise<any>;
@@ -82,7 +82,7 @@ export function useTranslation(): TranslationHook {
   };
   
   const translateChecklist = async (
-    checklistId: string, 
+    checklist: any, 
     targetLanguage: LanguageCode, 
     sourceLanguage?: LanguageCode
   ): Promise<any> => {
@@ -90,15 +90,58 @@ export function useTranslation(): TranslationHook {
     setError(null);
     
     try {
-      const response = await apiRequest(`/api/translate/checklist/${checklistId}`, {
-        method: 'POST',
-        body: JSON.stringify({
-          targetLanguage,
-          sourceLanguage: sourceLanguage || 'en'
-        }),
-      });
+      // Clone the checklist to avoid modifying the original
+      const translatedChecklist = JSON.parse(JSON.stringify(checklist));
       
-      return await response.json();
+      // Translate checklist name
+      const translatedName = await translateText(
+        checklist.name, 
+        targetLanguage, 
+        sourceLanguage
+      );
+      translatedChecklist.name = translatedName;
+      
+      // Translate remarks if available
+      if (checklist.remarks) {
+        const translatedRemarks = await translateText(
+          checklist.remarks, 
+          targetLanguage, 
+          sourceLanguage
+        );
+        translatedChecklist.remarks = translatedRemarks;
+      }
+      
+      // Translate each task
+      if (checklist.tasks && Array.isArray(checklist.tasks)) {
+        for (let i = 0; i < checklist.tasks.length; i++) {
+          const task = checklist.tasks[i];
+          
+          // Translate task description
+          const translatedDescription = await translateText(
+            task.description, 
+            targetLanguage, 
+            sourceLanguage
+          );
+          translatedChecklist.tasks[i].description = translatedDescription;
+          
+          // Translate task details if available
+          if (task.details) {
+            const translatedDetails = await translateText(
+              task.details, 
+              targetLanguage, 
+              sourceLanguage
+            );
+            translatedChecklist.tasks[i].details = translatedDetails;
+          }
+        }
+      }
+      
+      // Add translation metadata
+      translatedChecklist.translatedFrom = sourceLanguage || "auto";
+      translatedChecklist.translatedTo = targetLanguage;
+      translatedChecklist.isTranslation = true;
+      
+      return translatedChecklist;
     } catch (err) {
       console.error('Checklist translation error:', err);
       setError('Failed to translate checklist');

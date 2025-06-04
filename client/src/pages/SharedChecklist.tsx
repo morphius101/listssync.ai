@@ -142,8 +142,8 @@ export default function SharedChecklist() {
             if (token && targetLanguage !== 'en') {
               try {
                 console.log(`🌐 Translating checklist to ${targetLanguage}`);
-                // Use the actual Firebase checklist ID, not the verification token
-                const translatedData = await translateChecklist(firebaseData.id, targetLanguage as any, 'en');
+                // Pass the full checklist object for client-side translation
+                const translatedData = await translateChecklist(firebaseData, targetLanguage as any, 'en');
                 if (translatedData) {
                   finalChecklist = translatedData;
                   console.log(`✅ Checklist translated successfully`);
@@ -306,7 +306,7 @@ export default function SharedChecklist() {
         if (targetLanguage !== 'en') {
           try {
             console.log(`🌐 Translating verified checklist to ${targetLanguage}`);
-            const translatedData = await translateChecklist(firebaseData.id, targetLanguage as any, 'en');
+            const translatedData = await translateChecklist(firebaseData, targetLanguage as any, 'en');
             if (translatedData) {
               finalChecklist = translatedData;
               console.log(`✅ Verified checklist translated successfully`);
@@ -347,7 +347,7 @@ export default function SharedChecklist() {
           if (targetLanguage !== 'en') {
             try {
               console.log(`🌐 Translating API checklist to ${targetLanguage}`);
-              const translatedData = await translateChecklist(apiData.id, targetLanguage as any, 'en');
+              const translatedData = await translateChecklist(apiData, targetLanguage as any, 'en');
               if (translatedData) {
                 finalChecklist = translatedData;
                 console.log(`✅ API checklist translated successfully`);
