@@ -653,8 +653,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(500).json({ message: "Failed to generate share link. Please try again." });
       }
       
-      // Create the final share URL with fallback for any undefined values
-      const shareUrl = `${protocol}://${host}/shared/${token}`;
+      // Create the final share URL with language parameter if specified
+      let shareUrl = `${protocol}://${host}/shared/${token}`;
+      if (targetLanguage && targetLanguage !== 'en') {
+        shareUrl += `?lang=${targetLanguage}`;
+      }
       console.log(`✅ Generated share URL: ${shareUrl}`);
       
       // Return masked contact info, token, and share URL

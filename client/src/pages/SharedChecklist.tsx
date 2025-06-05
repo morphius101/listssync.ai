@@ -25,6 +25,12 @@ export default function SharedChecklist() {
   const [, navigate] = useLocation();
   const token = params?.token;
 
+  // Extract language from URL query parameters
+  const urlParams = new URLSearchParams(window.location.search);
+  const langFromUrl = urlParams.get('lang') || 'en';
+  
+  console.log(`🌐 SharedChecklist initialized with language: ${langFromUrl}`);
+
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [remarks, setRemarks] = useState("");
   const [isLoading, setIsLoading] = useState(true);
@@ -35,7 +41,7 @@ export default function SharedChecklist() {
   const [isVerified, setIsVerified] = useState(false);
   const [isExpired, setIsExpired] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [targetLanguage, setTargetLanguage] = useState<string>('en');
+  const [targetLanguage, setTargetLanguage] = useState<string>(langFromUrl);
 
   const { toast } = useToast();
   const { checkVerificationStatus, token: verificationToken, maskedContact } = useVerification();
