@@ -86,6 +86,10 @@ export function useTranslation(): TranslationHook {
     targetLanguage: LanguageCode, 
     sourceLanguage?: LanguageCode
   ): Promise<any> => {
+    if (!checklist || targetLanguage === 'en') {
+      return checklist;
+    }
+
     setIsTranslating(true);
     setError(null);
     
@@ -93,22 +97,32 @@ export function useTranslation(): TranslationHook {
       // Clone the checklist to avoid modifying the original
       const translatedChecklist = JSON.parse(JSON.stringify(checklist));
       
-      // Translate checklist name
-      const translatedName = await translateText(
-        checklist.name, 
-        targetLanguage, 
-        sourceLanguage
-      );
-      translatedChecklist.name = translatedName;
+      // Translate checklist name using direct API call to avoid recursion
+      if (checklist.name) {
+        const nameResponse = await apiRequest('/api/translate/text', {
+          method: 'POST',
+          body: JSON.stringify({
+            text: checklist.name,
+            targetLanguage,
+            sourceLanguage: sourceLanguage || 'en'
+          }),
+        });
+        const nameData = await nameResponse.json();
+        translatedChecklist.name = nameData.translated || checklist.name;
+      }
       
       // Translate remarks if available
       if (checklist.remarks) {
-        const translatedRemarks = await translateText(
-          checklist.remarks, 
-          targetLanguage, 
-          sourceLanguage
-        );
-        translatedChecklist.remarks = translatedRemarks;
+        const remarksResponse = await apiRequest('/api/translate/text', {
+          method: 'POST',
+          body: JSON.stringify({
+            text: checklist.remarks,
+            targetLanguage,
+            sourceLanguage: sourceLanguage || 'en'
+          }),
+        });
+        const remarksData = await remarksResponse.json();
+        translatedChecklist.remarks = remarksData.translated || checklist.remarks;
       }
       
       // Translate each task
@@ -117,21 +131,31 @@ export function useTranslation(): TranslationHook {
           const task = checklist.tasks[i];
           
           // Translate task description
-          const translatedDescription = await translateText(
-            task.description, 
-            targetLanguage, 
-            sourceLanguage
-          );
-          translatedChecklist.tasks[i].description = translatedDescription;
+          if (task.description) {
+            const descResponse = await apiRequest('/api/translate/text', {
+              method: 'POST',
+              body: JSON.stringify({
+                text: task.description,
+                targetLanguage,
+                sourceLanguage: sourceLanguage || 'en'
+              }),
+            });
+            const descData = await descResponse.json();
+            translatedChecklist.tasks[i].description = descData.translated || task.description;
+          }
           
           // Translate task details if available
           if (task.details) {
-            const translatedDetails = await translateText(
-              task.details, 
-              targetLanguage, 
-              sourceLanguage
-            );
-            translatedChecklist.tasks[i].details = translatedDetails;
+            const detailsResponse = await apiRequest('/api/translate/text', {
+              method: 'POST',
+              body: JSON.stringify({
+                text: task.details,
+                targetLanguage,
+                sourceLanguage: sourceLanguage || 'en'
+              }),
+            });
+            const detailsData = await detailsResponse.json();
+            translatedChecklist.tasks[i].details = detailsData.translated || task.details;
           }
         }
       }
@@ -145,7 +169,7 @@ export function useTranslation(): TranslationHook {
     } catch (err) {
       console.error('Checklist translation error:', err);
       setError('Failed to translate checklist');
-      return null;
+      return checklist; // Return original checklist on error instead of null
     } finally {
       setIsTranslating(false);
     }

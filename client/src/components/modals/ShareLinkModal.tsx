@@ -98,19 +98,8 @@ export default function ShareLinkModal({
       // Make a copy of the checklist for potential translation
       let checklistToShare = checklist;
       
-      // Handle translation if needed - but don't let it break sharing
-      if (selectedLanguage !== 'en') {
-        try {
-          console.log('Attempting translation to:', selectedLanguage);
-          const translatedChecklist = await translateChecklist(checklistId, selectedLanguage, 'en');
-          if (translatedChecklist) {
-            console.log('Translation successful, but proceeding with original sharing flow');
-            // Note: We get the translation but still use the original checklistId for sharing
-          }
-        } catch (error) {
-          console.log('Translation failed, proceeding with original checklist:', error);
-        }
-      }
+      // Skip translation during sharing - it will happen on the recipient's side
+      console.log('Sharing with language preference:', selectedLanguage);
       
       // Always proceed with sharing regardless of checklist object state
       // The important thing is that we have a valid checklistId
