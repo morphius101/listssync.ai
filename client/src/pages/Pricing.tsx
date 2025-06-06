@@ -7,7 +7,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface PricingTier {
-  id: 'free' | 'pro' | 'enterprise';
+  id: 'free' | 'starter' | 'professional' | 'business' | 'enterprise';
   name: string;
   price: string;
   description: string;
@@ -15,6 +15,7 @@ interface PricingTier {
   popular?: boolean;
   icon: React.ComponentType<any>;
   buttonText: string;
+  yearlyDiscount?: string;
 }
 
 const pricingTiers: PricingTier[] = [
@@ -22,53 +23,101 @@ const pricingTiers: PricingTier[] = [
     id: 'free',
     name: 'Free',
     price: '$0',
-    description: 'Perfect for getting started',
+    description: 'Perfect for individuals',
     icon: Check,
     buttonText: 'Get Started',
     features: [
-      'Up to 2 checklists',
+      'Up to 5 checklists',
+      '1 user',
       'Manual sync every 6 hours',
       'English and Spanish translation',
+      '1GB storage',
       'Community support',
       'Mobile and web access'
     ]
   },
   {
-    id: 'pro',
-    name: 'Pro',
-    price: '$12',
-    description: 'Great for growing teams',
+    id: 'starter',
+    name: 'Starter',
+    price: '$19',
+    description: 'Great for small teams',
     icon: Zap,
+    buttonText: 'Start Free Trial',
+    yearlyDiscount: 'Save 20% yearly',
+    features: [
+      'Up to 25 checklists',
+      '3 team members',
+      'Hourly sync',
+      '8 language translations',
+      '10GB storage',
+      'Team collaboration',
+      'Priority support',
+      'Custom fields',
+      '14-day free trial'
+    ]
+  },
+  {
+    id: 'professional',
+    name: 'Professional',
+    price: '$49',
+    description: 'For growing businesses',
+    icon: Crown,
     popular: true,
     buttonText: 'Start Free Trial',
+    yearlyDiscount: 'Save 20% yearly',
     features: [
-      'Up to 10 checklists',
+      'Up to 100 checklists',
+      '10 team members',
       'Real-time sync',
-      '5 language translations',
-      'Custom field mapping',
-      'Automated conflict resolution',
-      'Airtable, Trello, Notion integrations',
-      'Priority email support',
-      '7-day free trial'
+      '15 language translations',
+      '50GB storage',
+      'Advanced analytics',
+      'API access',
+      'Workflow automation',
+      'Integrations (Slack, Teams, etc)',
+      '14-day free trial'
+    ]
+  },
+  {
+    id: 'business',
+    name: 'Business',
+    price: '$99',
+    description: 'For larger organizations',
+    icon: Building,
+    buttonText: 'Start Free Trial',
+    yearlyDiscount: 'Save 25% yearly',
+    features: [
+      'Up to 500 checklists',
+      '50 team members',
+      'Real-time sync',
+      '25 language translations',
+      '200GB storage',
+      'Advanced permissions',
+      'Custom branding',
+      'SSO integration',
+      'Audit logs',
+      'Dedicated support',
+      '30-day free trial'
     ]
   },
   {
     id: 'enterprise',
     name: 'Enterprise',
     price: 'Custom',
-    description: 'For large organizations',
+    description: 'For enterprise needs',
     icon: Building,
     buttonText: 'Contact Sales',
     features: [
       'Unlimited checklists',
-      'Advanced sync rules',
-      'Unlimited language translations',
-      'Custom platform integrations',
-      'Admin dashboard',
-      'Usage analytics',
-      'Early access to beta features',
+      'Unlimited users',
+      'Real-time sync',
+      'All languages supported',
+      'Unlimited storage',
+      'Custom deployment',
+      'Enterprise SLA',
+      'Custom integrations',
       'Dedicated onboarding',
-      'SLA-based support'
+      'Custom contracts'
     ]
   }
 ];

@@ -108,7 +108,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Define price IDs for each tier (configured in Stripe dashboard)
       const priceIds = {
-        pro: process.env.STRIPE_PRO_PRICE_ID || 'price_pro_monthly', // $12/month
+        starter: process.env.STRIPE_STARTER_PRICE_ID || 'price_starter_monthly', // $19/month
+        professional: process.env.STRIPE_PROFESSIONAL_PRICE_ID || 'price_professional_monthly', // $49/month
+        business: process.env.STRIPE_BUSINESS_PRICE_ID || 'price_business_monthly', // $99/month
         enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID || 'price_enterprise_monthly'
       };
 
@@ -177,7 +179,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           
           if (customer && !customer.deleted && customer.metadata?.userId) {
             const status = subscription.status === 'active' ? 'active' : 'inactive';
-            const tier = status === 'active' ? 'pro' : 'free';
+            const tier = status === 'active' ? 'professional' : 'free';
             
             await storage.updateUserSubscription(customer.metadata.userId, tier, {
               subscriptionId: subscription.id,

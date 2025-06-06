@@ -12,7 +12,7 @@ export const users = pgTable("users", {
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
   // Subscription fields
-  subscriptionTier: varchar("subscription_tier").notNull().default("free"), // free, pro, enterprise
+  subscriptionTier: varchar("subscription_tier").notNull().default("free"), // free, starter, professional, business, enterprise
   stripeCustomerId: varchar("stripe_customer_id"),
   stripeSubscriptionId: varchar("stripe_subscription_id"),
   subscriptionStatus: varchar("subscription_status").default("inactive"), // active, inactive, past_due, canceled
@@ -238,26 +238,48 @@ export interface UserDTO {
   allowedLanguages: string[];
 }
 
-// Subscription tier limits
+// Subscription tier limits based on competitive analysis
 export const TIER_LIMITS = {
   free: {
-    maxLists: 2,
+    maxLists: 5,
+    maxUsers: 1,
     syncFrequency: '6hours',
     allowedLanguages: ['en', 'es'],
     maxLanguages: 2,
-    features: ['manual_sync', 'basic_translation']
+    storageGB: 1,
+    features: ['manual_sync', 'basic_translation', 'mobile_access']
   },
-  pro: {
-    maxLists: 10,
+  starter: {
+    maxLists: 25,
+    maxUsers: 3,
+    syncFrequency: 'hourly',
+    maxLanguages: 8,
+    storageGB: 10,
+    features: ['automated_sync', 'team_collaboration', 'priority_support', 'custom_fields']
+  },
+  professional: {
+    maxLists: 100,
+    maxUsers: 10,
     syncFrequency: 'realtime',
-    maxLanguages: 5,
-    features: ['realtime_sync', 'custom_fields', 'conflict_resolution', 'integrations']
+    maxLanguages: 15,
+    storageGB: 50,
+    features: ['realtime_sync', 'advanced_analytics', 'integrations', 'workflow_automation', 'api_access']
+  },
+  business: {
+    maxLists: 500,
+    maxUsers: 50,
+    syncFrequency: 'realtime',
+    maxLanguages: 25,
+    storageGB: 200,
+    features: ['advanced_permissions', 'custom_branding', 'sso', 'audit_logs', 'dedicated_support']
   },
   enterprise: {
     maxLists: Infinity,
+    maxUsers: Infinity,
     syncFrequency: 'realtime',
     maxLanguages: Infinity,
-    features: ['unlimited', 'admin_dashboard', 'custom_integrations', 'sla_support']
+    storageGB: Infinity,
+    features: ['unlimited_everything', 'custom_deployment', 'enterprise_sla', 'custom_integrations', 'onboarding']
   }
 } as const;
 

@@ -8,7 +8,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface SubscriptionData {
-  tier: 'free' | 'pro' | 'enterprise';
+  tier: 'free' | 'starter' | 'professional' | 'business' | 'enterprise';
   status: string;
   endsAt?: string;
   usage: {
@@ -18,7 +18,9 @@ interface SubscriptionData {
   };
   limits: {
     maxLists: number;
+    maxUsers: number;
     maxLanguages: number;
+    storageGB: number;
     features: string[];
   };
   allowedLanguages: string[];
@@ -36,17 +38,29 @@ const tierConfig = {
     color: 'bg-gray-100 text-gray-800',
     description: 'Basic features'
   },
-  pro: {
-    name: 'Pro',
+  starter: {
+    name: 'Starter',
+    icon: Zap,
+    color: 'bg-green-100 text-green-800',
+    description: 'Team collaboration'
+  },
+  professional: {
+    name: 'Professional',
     icon: Crown,
     color: 'bg-blue-100 text-blue-800',
     description: 'Advanced features'
+  },
+  business: {
+    name: 'Business',
+    icon: Building,
+    color: 'bg-purple-100 text-purple-800',
+    description: 'Enterprise ready'
   },
   enterprise: {
     name: 'Enterprise',
     icon: Building,
     color: 'bg-purple-100 text-purple-800',
-    description: 'All features'
+    description: 'Custom solutions'
   }
 };
 
