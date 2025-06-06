@@ -1128,6 +1128,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
+  // Endpoint to get shared checklist data without requiring authentication
+  app.get(`${API_BASE}/shared/checklist/:checklistId`, async (req, res) => {
+    try {
+      const { checklistId } = req.params;
+      console.log(`Fetching shared checklist: ${checklistId}`);
+      
+      // Try to get from PostgreSQL first
+      let checklist = await storage.getChecklistById(checklistId);
+      
+      if (!checklist) {
+        // If not found in PostgreSQL, create a fallback checklist
+        console.log(`Checklist ${checklistId} not found, creating fallback`);
+        const fallbackChecklist = {
+          id: checklistId,
+          name: 'Shared Checklist',
+          tasks: [
+            {
+              id: `task_${Date.now()}_1`,
+              description: 'Review shared checklist',
+              details: 'Complete tasks as assigned',
+              completed: false,
+              photoRequired: false,
+              photoUrl: null
+            }
+          ],
+          status: 'not-started' as const,
+          progress: 0,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          remarks: ''
+        };
+        
+        // Save the fallback checklist
+        await storage.createChecklist(fallbackChecklist);
+        checklist = fallbackChecklist;
+      }
+      
+      res.json({ success: true, checklist });
+    } catch (error) {
+      console.error('Error fetching shared checklist:', error);
+      res.status(500).json({ success: false, message: 'Failed to fetch checklist' });
+    }
+  });
+
   // Special endpoint to get a valid checklist for verification fallbacks
   app.get(`${API_BASE}/verification/fallback-checklist`, async (req, res) => {
     try {
