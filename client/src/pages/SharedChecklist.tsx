@@ -309,17 +309,26 @@ export default function SharedChecklist() {
         
         // Check if we need to translate this checklist
         let finalChecklist = firebaseData;
+        console.log(`🔍 Checking translation need: targetLanguage=${targetLanguage}, checklist name="${firebaseData.name}"`);
+        
         if (targetLanguage !== 'en') {
           try {
-            console.log(`🌐 Translating verified checklist to ${targetLanguage}`);
+            console.log(`🌐 Starting translation of verified checklist to ${targetLanguage}`);
+            console.log(`🌐 Original checklist:`, { name: firebaseData.name, tasksCount: firebaseData.tasks?.length });
+            
             const translatedData = await translateChecklist(firebaseData, targetLanguage as any, 'en');
             if (translatedData) {
               finalChecklist = translatedData;
               console.log(`✅ Verified checklist translated successfully`);
+              console.log(`✅ Translated name: "${translatedData.name}"`);
+            } else {
+              console.warn('Translation returned null/undefined, using original');
             }
           } catch (translationError) {
             console.error('Translation failed for verified checklist, using original:', translationError);
           }
+        } else {
+          console.log(`⏭️ Skipping translation - target language is English`);
         }
         
         setChecklist(finalChecklist);

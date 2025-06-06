@@ -86,10 +86,18 @@ export function useTranslation(): TranslationHook {
     targetLanguage: LanguageCode, 
     sourceLanguage?: LanguageCode
   ): Promise<any> => {
+    console.log('🔧 translateChecklist called with:', { 
+      checklistName: checklist?.name, 
+      targetLanguage, 
+      sourceLanguage 
+    });
+    
     if (!checklist || targetLanguage === 'en') {
+      console.log('🔧 Skipping translation - no checklist or target is English');
       return checklist;
     }
 
+    console.log('🔧 Starting translation process...');
     setIsTranslating(true);
     setError(null);
     
