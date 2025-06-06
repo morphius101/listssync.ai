@@ -538,6 +538,156 @@ export class DatabaseStorage implements IStorage {
       return undefined;
     }
   }
+
+  // User management methods for subscription tiers
+  async getUser(id: string): Promise<User | undefined> {
+    try {
+      const [user] = await db.select().from(users).where(eq(users.id, id));
+      return user || undefined;
+    } catch (error) {
+      console.error('Error getting user:', error);
+      return undefined;
+    }
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    try {
+      const [user] = await db
+        .insert(users)
+        .values(userData)
+        .onConflictDoUpdate({
+          target: users.id,
+          set: {
+            ...userData,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+      return user;
+    } catch (error) {
+      console.error('Error upserting user:', error);
+      throw error;
+    }
+  }
+
+  async updateUserSubscription(userId: string, tier: SubscriptionTier, stripeData?: {
+    customerId?: string;
+    subscriptionId?: string;
+    status?: string;
+    endsAt?: Date;
+  }): Promise<User | undefined> {
+    try {
+      const updateData: any = {
+        subscriptionTier: tier,
+        updatedAt: new Date(),
+      };
+
+      if (stripeData) {
+        if (stripeData.customerId) updateData.stripeCustomerId = stripeData.customerId;
+        if (stripeData.subscriptionId) updateData.stripeSubscriptionId = stripeData.subscriptionId;
+        if (stripeData.status) updateData.subscriptionStatus = stripeData.status;
+        if (stripeData.endsAt) updateData.subscriptionEndsAt = stripeData.endsAt;
+      }
+
+      // Set allowed languages based on tier
+      if (tier === 'free') {
+        updateData.allowedLanguages = ['en', 'es'];
+      } else if (tier === 'pro') {
+        updateData.allowedLanguages = ['en', 'es', 'fr', 'de', 'it'];
+      } else if (tier === 'enterprise') {
+        updateData.allowedLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'ko', 'zh', 'ar'];
+      }
+
+      const [user] = await db
+        .update(users)
+        .set(updateData)
+        .where(eq(users.id, userId))
+        .returning();
+      
+      return user || undefined;
+    } catch (error) {
+      console.error('Error updating user subscription:', error);
+      return undefined;
+    }
+  }
+
+  async incrementUserUsage(userId: string, type: 'sync' | 'language'): Promise<boolean> {
+    try {
+      const user = await this.getUser(userId);
+      if (!user) return false;
+
+      if (type === 'sync') {
+        await db
+          .update(users)
+          .set({ 
+            listSyncCount: (user.listSyncCount || 0) + 1,
+            lastSyncAt: new Date()
+          })
+          .where(eq(users.id, userId));
+      } else if (type === 'language') {
+        await db
+          .update(users)
+          .set({ 
+            languageUseCount: (user.languageUseCount || 0) + 1
+          })
+          .where(eq(users.id, userId));
+      }
+      return true;
+    } catch (error) {
+      console.error('Error incrementing user usage:', error);
+      return false;
+    }
+  }
+
+  async checkUserLimits(userId: string, action: 'create_list' | 'translate' | 'sync'): Promise<{
+    allowed: boolean;
+    limit?: number;
+    current?: number;
+    tier: SubscriptionTier;
+  }> {
+    try {
+      const user = await this.getUser(userId);
+      if (!user) {
+        return { allowed: false, tier: 'free' };
+      }
+
+      const tier = user.subscriptionTier as SubscriptionTier;
+      const limits = TIER_LIMITS[tier];
+
+      switch (action) {
+        case 'create_list':
+          const currentLists = await this.getAllChecklists(userId);
+          const listCount = currentLists.length;
+          return {
+            allowed: listCount < limits.maxLists,
+            limit: limits.maxLists === Infinity ? undefined : limits.maxLists,
+            current: listCount,
+            tier
+          };
+
+        case 'translate':
+          const allowedLanguages = user.allowedLanguages as string[] || ['en', 'es'];
+          return {
+            allowed: true,
+            limit: limits.maxLanguages === Infinity ? undefined : limits.maxLanguages,
+            current: allowedLanguages.length,
+            tier
+          };
+
+        case 'sync':
+          return {
+            allowed: true,
+            tier
+          };
+
+        default:
+          return { allowed: false, tier };
+      }
+    } catch (error) {
+      console.error('Error checking user limits:', error);
+      return { allowed: false, tier: 'free' };
+    }
+  }
 }
 
 export const storage = new DatabaseStorage();

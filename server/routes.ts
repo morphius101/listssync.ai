@@ -20,7 +20,16 @@ import {
   sendVerificationSMS,
   sendVerificationEmail
 } from "./services/verificationService";
-import { ChecklistDTO } from "../shared/schema";
+import { ChecklistDTO, TIER_LIMITS, SubscriptionTier } from "../shared/schema";
+import Stripe from "stripe";
+
+// Initialize Stripe (conditional on API key availability)
+let stripe: Stripe | null = null;
+if (process.env.STRIPE_SECRET_KEY) {
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
+    apiVersion: "2024-06-20",
+  });
+}
 
 // Site configuration for URLs - use custom domain in production
 const SITE_CONFIG = {
