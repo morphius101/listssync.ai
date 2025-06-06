@@ -44,6 +44,36 @@ function Router() {
       {/* Publicly shared checklist with verification */}
       <Route path="/shared/:token" component={SharedChecklist} />
       
+      {/* Pricing page */}
+      <Route path="/pricing">
+        {() => <Pricing />}
+      </Route>
+      
+      {/* Subscription success/cancel pages */}
+      <Route path="/subscription/success">
+        {() => (
+          <div className="min-h-screen flex items-center justify-center bg-green-50">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-green-800 mb-4">Subscription Successful!</h1>
+              <p className="text-green-600 mb-4">Welcome to listssync.ai Pro. Your subscription is now active.</p>
+              <a href="/dashboard" className="text-blue-600 hover:underline">Go to Dashboard</a>
+            </div>
+          </div>
+        )}
+      </Route>
+      
+      <Route path="/subscription/cancel">
+        {() => (
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <h1 className="text-2xl font-bold text-gray-800 mb-4">Subscription Cancelled</h1>
+              <p className="text-gray-600 mb-4">Your subscription was not processed.</p>
+              <a href="/pricing" className="text-blue-600 hover:underline">View Pricing Plans</a>
+            </div>
+          </div>
+        )}
+      </Route>
+      
       {/* 404 page */}
       <Route component={NotFound} />
     </Switch>
