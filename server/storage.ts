@@ -4,10 +4,16 @@ import {
   ChecklistSummaryDTO, 
   VerificationDTO,
   MailingListSubscriptionDTO,
+  UserDTO,
+  User,
+  UpsertUser,
+  SubscriptionTier,
+  TIER_LIMITS,
   checklists, 
   tasks,
   verifications,
-  mailingListSubscriptions
+  mailingListSubscriptions,
+  users
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -32,6 +38,23 @@ export interface IStorage {
   subscribeToMailingList(subscription: MailingListSubscriptionDTO): Promise<MailingListSubscriptionDTO>;
   confirmMailingListSubscription(token: string): Promise<boolean>;
   getMailingListSubscription(email: string): Promise<MailingListSubscriptionDTO | undefined>;
+  
+  // User management methods for subscription tiers
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
+  updateUserSubscription(userId: string, tier: SubscriptionTier, stripeData?: {
+    customerId?: string;
+    subscriptionId?: string;
+    status?: string;
+    endsAt?: Date;
+  }): Promise<User | undefined>;
+  incrementUserUsage(userId: string, type: 'sync' | 'language'): Promise<boolean>;
+  checkUserLimits(userId: string, action: 'create_list' | 'translate' | 'sync'): Promise<{
+    allowed: boolean;
+    limit?: number;
+    current?: number;
+    tier: SubscriptionTier;
+  }>;
 }
 
 export class DatabaseStorage implements IStorage {

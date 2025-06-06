@@ -2,6 +2,44 @@ import { pgTable, index, text, serial, integer, boolean, timestamp, jsonb, varch
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
+// User Management Schema for tiered pricing
+export const users = pgTable("users", {
+  id: varchar("id").primaryKey().notNull(), // Firebase UID
+  email: varchar("email").unique(),
+  firstName: varchar("first_name"),
+  lastName: varchar("last_name"),
+  profileImageUrl: varchar("profile_image_url"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  // Subscription fields
+  subscriptionTier: varchar("subscription_tier").notNull().default("free"), // free, pro, enterprise
+  stripeCustomerId: varchar("stripe_customer_id"),
+  stripeSubscriptionId: varchar("stripe_subscription_id"),
+  subscriptionStatus: varchar("subscription_status").default("inactive"), // active, inactive, past_due, canceled
+  subscriptionEndsAt: timestamp("subscription_ends_at"),
+  // Usage tracking
+  listSyncCount: integer("list_sync_count").notNull().default(0),
+  languageUseCount: integer("language_use_count").notNull().default(0),
+  lastSyncAt: timestamp("last_sync_at"),
+  // Feature flags
+  allowedLanguages: jsonb("allowed_languages").default(['en', 'es']), // JSON array of language codes
+}, (table) => [
+  index("users_stripe_customer_idx").on(table.stripeCustomerId),
+  index("users_subscription_tier_idx").on(table.subscriptionTier),
+  index("users_email_idx").on(table.email),
+]);
+
+// Sessions table for user authentication
+export const sessions = pgTable(
+  "sessions",
+  {
+    sid: varchar("sid").primaryKey(),
+    sess: jsonb("sess").notNull(),
+    expire: timestamp("expire").notNull(),
+  },
+  (table) => [index("IDX_session_expire").on(table.expire)],
+);
+
 // Task Schema
 export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
@@ -175,3 +213,52 @@ export interface MailingListSubscriptionDTO {
   userAgent?: string;
   ipAddress?: string;
 }
+
+// User management types
+export const insertUserSchema = createInsertSchema(users).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export type InsertUser = z.infer<typeof insertUserSchema>;
+export type User = typeof users.$inferSelect;
+export type UpsertUser = typeof users.$inferInsert;
+
+export interface UserDTO {
+  id: string;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  profileImageUrl?: string;
+  subscriptionTier: 'free' | 'pro' | 'enterprise';
+  subscriptionStatus?: string;
+  subscriptionEndsAt?: Date;
+  listSyncCount: number;
+  languageUseCount: number;
+  allowedLanguages: string[];
+}
+
+// Subscription tier limits
+export const TIER_LIMITS = {
+  free: {
+    maxLists: 2,
+    syncFrequency: '6hours',
+    allowedLanguages: ['en', 'es'],
+    maxLanguages: 2,
+    features: ['manual_sync', 'basic_translation']
+  },
+  pro: {
+    maxLists: 10,
+    syncFrequency: 'realtime',
+    maxLanguages: 5,
+    features: ['realtime_sync', 'custom_fields', 'conflict_resolution', 'integrations']
+  },
+  enterprise: {
+    maxLists: Infinity,
+    syncFrequency: 'realtime',
+    maxLanguages: Infinity,
+    features: ['unlimited', 'admin_dashboard', 'custom_integrations', 'sla_support']
+  }
+} as const;
+
+export type SubscriptionTier = keyof typeof TIER_LIMITS;

@@ -1,0 +1,93 @@
+Sure! Here's a clean and structured set of **requirements to refactor ListSync.ai** around a tiered pricing model (Good–Better–Best), supporting both **mobile and web platforms**:
+
+---
+
+## 📋 **Feature & Pricing Tier Refactor Requirements – ListSync.ai**
+
+### 🧱 General Architecture
+
+* Implement tiered user access with 3 pricing levels: `Free`, `Pro`, and `Enterprise`
+* Add tier management middleware to gate access based on feature limits
+* Store tier and usage data per user (e.g., sync count, language use, API calls)
+* Enable support for both **mobile** and **web** usage
+
+---
+
+### 🔓 Free Plan (GOOD)
+
+* Price: `$0`
+* Limits:
+
+  * Sync up to **2 lists**
+  * Sync frequency: every **6 hours** (no real-time)
+  * Allow **manual sync**
+  * Allow **only English and Spanish translation** via OpenAI API
+* Show upsell prompts when:
+
+  * User attempts to sync a 3rd list
+  * User selects a language other than English/Spanish
+* Access to:
+
+  * Community support
+  * Mobile and web access
+
+---
+
+### 💼 Pro Plan (BETTER)
+
+* Price: `$12/month` or `$99/year` *(adjustable range \$9–\$15/month)*
+* Limits:
+
+  * Sync up to **10 lists**
+  * Sync frequency: **hourly or real-time**
+  * Enable **custom field mapping**
+  * Enable **automated conflict resolution**
+  * Allow up to **5 languages** (user-selectable)
+* Features:
+
+  * Airtable, Trello, Notion, Google Sheets integrations
+  * Priority email support
+  * Trial: 7-day free trial or prorated first month
+* Platform support:
+
+  * Full feature parity across web & mobile
+  * Push upgrade offers when limits are approached (in-app)
+
+---
+
+### 🏢 Enterprise Plan (BEST)
+
+* Price: **Custom pricing (\$49–\$199+/mo)**
+* Limits: None (fully unlocked)
+* Features:
+
+  * **Unlimited list syncs**
+  * Advanced sync rules (triggers, filters, schedule)
+  * Unlimited **language translation access** (all OpenAI-supported)
+  * Custom platform integrations (e.g., Salesforce, HubSpot)
+  * Admin dashboard for usage stats
+  * Early access to beta features
+  * Dedicated onboarding and SLA-based support
+
+---
+
+### 💸 Payments & Billing
+
+* Use Stripe (or Recurly/Paddle) to manage tier billing, trials, and upgrades
+* Ensure web checkout with Stripe links
+* Optional: mobile in-app purchases (iOS/Android) with platform-specific pricing and revenue share logic
+
+---
+
+### 🔒 Access Control & Metering
+
+* Add API middleware to enforce:
+
+  * Translation language caps
+  * List sync quotas
+  * Sync frequency throttling
+* Log usage data per user for upgrades and admin analytics
+
+---
+
+Let me know if you'd like this turned into a `requirements.md` for your repo or want UI wireframes to match this.
