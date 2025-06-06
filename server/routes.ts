@@ -1200,9 +1200,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   app.get(`${API_BASE}/verification/status/:token`, async (req, res) => {
     try {
-      const { token } = req.params;
+      const rawToken = req.params.token;
       
-      console.log(`Checking verification status for token: ${token}`);
+      // Clean the token to remove any URL-encoded query parameters
+      const token = decodeURIComponent(rawToken).split('?')[0];
+      
+      console.log(`Checking verification status for token: ${token} (original: ${rawToken})`);
       
       // CRITICAL FIX: First check if there's a verification record with this token
       // that already has a mapped checklist ID
