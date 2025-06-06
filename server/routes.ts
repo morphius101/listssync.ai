@@ -1359,30 +1359,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         // Check if it's expired and extend if needed
         isExpired = verification.expiresAt < new Date();
         
-        // If expired, extend the expiration time
+        // If expired, simply allow access for shared checklists
         if (isExpired) {
-          console.log(`⏰ Token expired, extending expiration time for token: ${token}`);
-          try {
-            await storage.createVerification({
-              ...verification,
-              expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // Extend by 24 hours
-            });
-            
-            // Get the updated verification
-            const updatedVerification = await getVerification(token);
-            if (updatedVerification) {
-              verification = updatedVerification;
-              isExpired = false;
-            }
-            console.log(`⏰ Successfully extended expiration for token: ${token}`);
-          } catch (error) {
-            console.error(`❌ Failed to extend expiration:`, error);
-          }
+          console.log(`⏰ Token expired but allowing access for shared checklist: ${token}`);
+          isExpired = false; // Override expiration for shared access
         }
-        
-        // Refresh verification status
-        verified = await isVerified(token);
       }
+      
+      // Refresh verification status
+      verified = await isVerified(token);
       
       // Always provide a valid result object with fallbacks for all fields
       const result = { 
