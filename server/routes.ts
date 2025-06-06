@@ -26,9 +26,7 @@ import Stripe from "stripe";
 // Initialize Stripe (conditional on API key availability)
 let stripe: Stripe | null = null;
 if (process.env.STRIPE_SECRET_KEY) {
-  stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-    apiVersion: "2024-06-20",
-  });
+  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 }
 
 // Site configuration for URLs - use custom domain in production
@@ -43,6 +41,161 @@ export async function registerRoutes(app: Express): Promise<Server> {
   
   // Setup API response compression for performance
   app.use(compression());
+
+  // ===============================
+  // USER SUBSCRIPTION ROUTES
+  // ===============================
+
+  // Get user subscription status
+  app.get(`${API_BASE}/user/:userId/subscription`, async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const user = await storage.getUser(userId);
+      
+      if (!user) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+
+      const limits = TIER_LIMITS[user.subscriptionTier as SubscriptionTier];
+      
+      res.json({
+        tier: user.subscriptionTier,
+        status: user.subscriptionStatus,
+        endsAt: user.subscriptionEndsAt,
+        usage: {
+          listSyncCount: user.listSyncCount,
+          languageUseCount: user.languageUseCount,
+          lastSyncAt: user.lastSyncAt
+        },
+        limits,
+        allowedLanguages: user.allowedLanguages
+      });
+    } catch (error) {
+      console.error('Error getting user subscription:', error);
+      res.status(500).json({ error: 'Failed to get subscription' });
+    }
+  });
+
+  // Create Stripe checkout session for subscriptions
+  app.post(`${API_BASE}/create-subscription`, async (req, res) => {
+    try {
+      if (!stripe) {
+        return res.status(400).json({ error: 'Payment processing not available. Please configure Stripe API keys.' });
+      }
+
+      const { userId, tier, email } = req.body;
+      
+      if (!userId || !tier || !email) {
+        return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      // Create or get Stripe customer
+      let customer;
+      const user = await storage.getUser(userId);
+      
+      if (user?.stripeCustomerId) {
+        customer = await stripe.customers.retrieve(user.stripeCustomerId);
+      } else {
+        customer = await stripe.customers.create({
+          email,
+          metadata: { userId }
+        });
+        
+        await storage.updateUserSubscription(userId, user?.subscriptionTier as SubscriptionTier || 'free', {
+          customerId: customer.id
+        });
+      }
+
+      // Define price IDs for each tier (configured in Stripe dashboard)
+      const priceIds = {
+        pro: process.env.STRIPE_PRO_PRICE_ID || 'price_pro_monthly', // $12/month
+        enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID || 'price_enterprise_monthly'
+      };
+
+      const session = await stripe.checkout.sessions.create({
+        customer: customer.id,
+        payment_method_types: ['card'],
+        line_items: [
+          {
+            price: priceIds[tier as keyof typeof priceIds],
+            quantity: 1,
+          },
+        ],
+        mode: 'subscription',
+        success_url: `${req.protocol}://${req.get('host')}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${req.protocol}://${req.get('host')}/subscription/cancel`,
+        metadata: {
+          userId,
+          tier
+        }
+      });
+
+      res.json({ sessionId: session.id, url: session.url });
+    } catch (error) {
+      console.error('Error creating subscription:', error);
+      res.status(500).json({ error: 'Failed to create subscription' });
+    }
+  });
+
+  // Stripe webhook for subscription events
+  app.post(`${API_BASE}/stripe/webhook`, async (req, res) => {
+    try {
+      if (!stripe) {
+        return res.status(400).json({ error: 'Stripe not configured' });
+      }
+
+      const sig = req.headers['stripe-signature'] as string;
+      const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+      let event;
+      try {
+        event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret || '');
+      } catch (err: any) {
+        console.log(`Webhook signature verification failed.`, err.message);
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+      }
+
+      // Handle subscription events
+      switch (event.type) {
+        case 'checkout.session.completed':
+          const session = event.data.object as Stripe.Checkout.Session;
+          const { userId, tier } = session.metadata || {};
+          
+          if (userId && tier) {
+            await storage.updateUserSubscription(userId, tier as SubscriptionTier, {
+              customerId: session.customer as string,
+              subscriptionId: session.subscription as string,
+              status: 'active'
+            });
+          }
+          break;
+
+        case 'customer.subscription.updated':
+        case 'customer.subscription.deleted':
+          const subscription = event.data.object as Stripe.Subscription;
+          const customer = await stripe.customers.retrieve(subscription.customer as string);
+          
+          if (customer && !customer.deleted && customer.metadata?.userId) {
+            const status = subscription.status === 'active' ? 'active' : 'inactive';
+            const tier = status === 'active' ? 'pro' : 'free';
+            
+            await storage.updateUserSubscription(customer.metadata.userId, tier, {
+              subscriptionId: subscription.id,
+              status
+            });
+          }
+          break;
+
+        default:
+          console.log(`Unhandled event type ${event.type}`);
+      }
+
+      res.json({ received: true });
+    } catch (error) {
+      console.error('Webhook error:', error);
+      res.status(500).json({ error: 'Webhook failed' });
+    }
+  });
 
   // Task schema for validation
   const taskSchema = z.object({
@@ -244,10 +397,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create new checklist
+  // Create new checklist with tier limits enforcement
   app.post(`${API_BASE}/checklists`, async (req, res) => {
     try {
       const validatedData = checklistSchema.parse(req.body);
+      
+      // Check user limits if userId is provided
+      if (validatedData.userId) {
+        const limits = await storage.checkUserLimits(validatedData.userId, 'create_list');
+        if (!limits.allowed) {
+          return res.status(403).json({ 
+            error: 'Subscription limit reached',
+            message: `You've reached the limit of ${limits.limit} lists for your ${limits.tier} plan. Please upgrade to create more lists.`,
+            tier: limits.tier,
+            limit: limits.limit,
+            current: limits.current,
+            upgradeRequired: true
+          });
+        }
+      }
       
       // Add createdAt and updatedAt timestamps since they're required by ChecklistDTO
       const checklistData = {
@@ -258,6 +426,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       const newChecklist = await storage.createChecklist(checklistData);
+      
+      // Increment user usage count
+      if (validatedData.userId) {
+        await storage.incrementUserUsage(validatedData.userId, 'sync');
+      }
+      
       res.status(201).json(newChecklist);
     } catch (error: any) {
       if (error.name === "ZodError") {
