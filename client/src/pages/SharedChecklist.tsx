@@ -253,9 +253,17 @@ export default function SharedChecklist() {
         <div className="container mx-auto px-4 py-8">
           {token && (
             <VerificationModal
+              isOpen={true}
+              onClose={() => setShowVerification(false)}
+              onVerified={(recipientId, checklistId) => {
+                setIsVerified(true);
+                setRecipientId(recipientId);
+                if (checklistId) {
+                  loadChecklist(checklistId);
+                }
+              }}
               token={token}
-              onVerificationComplete={handleVerificationComplete}
-              targetLanguage={targetLanguage}
+              showCloseButton={false}
             />
           )}
         </div>
