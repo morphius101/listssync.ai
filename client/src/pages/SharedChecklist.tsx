@@ -117,7 +117,11 @@ export default function SharedChecklist() {
       }
       
       // Use server-side endpoint to get checklist data without Firebase authentication
-      const response = await fetch(`/api/shared/checklist/${id}`);
+      const url = new URL(`/api/shared/checklist/${id}`, window.location.origin);
+      if (targetLanguage !== 'en') {
+        url.searchParams.set('lang', targetLanguage);
+      }
+      const response = await fetch(url.toString());
       const result = await response.json();
       
       if (!result.success || !result.checklist) {

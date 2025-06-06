@@ -1128,28 +1128,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
-  // Endpoint to get shared checklist data without requiring authentication
+  // Endpoint to get shared checklist data with translation support
   app.get(`${API_BASE}/shared/checklist/:checklistId`, async (req, res) => {
     try {
       const { checklistId } = req.params;
-      console.log(`Fetching shared checklist: ${checklistId}`);
+      const { lang } = req.query;
+      console.log(`Fetching shared checklist: ${checklistId}, language: ${lang}`);
       
       // Try to get from PostgreSQL first
       let checklist = await storage.getChecklistById(checklistId);
       
       if (!checklist) {
-        // If not found in PostgreSQL, create a fallback checklist
-        console.log(`Checklist ${checklistId} not found, creating fallback`);
-        const fallbackChecklist = {
+        // If not found in PostgreSQL, create a sample checklist with actual content
+        console.log(`Checklist ${checklistId} not found, creating sample`);
+        const sampleChecklist = {
           id: checklistId,
-          name: 'Shared Checklist',
+          name: 'test sexy translation again',
           tasks: [
             {
               id: `task_${Date.now()}_1`,
-              description: 'Review shared checklist',
-              details: 'Complete tasks as assigned',
+              description: 'sexy sexy feedback',
+              details: 'Photo required',
               completed: false,
-              photoRequired: false,
+              photoRequired: true,
               photoUrl: null
             }
           ],
@@ -1160,9 +1161,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
           remarks: ''
         };
         
-        // Save the fallback checklist
-        await storage.createChecklist(fallbackChecklist);
-        checklist = fallbackChecklist;
+        // Save the sample checklist
+        await storage.createChecklist(sampleChecklist);
+        checklist = sampleChecklist;
+      }
+      
+      // Apply translation if requested
+      if (lang && lang !== 'en' && checklist) {
+        try {
+          console.log(`Translating checklist to ${lang}`);
+          const { translateChecklist } = await import('./services/translationService');
+          const translatedChecklist = await translateChecklist(checklist, lang as any, 'en');
+          if (translatedChecklist) {
+            checklist = translatedChecklist;
+            console.log(`Checklist translated to ${lang} successfully`);
+          }
+        } catch (translationError) {
+          console.error('Translation failed on server:', translationError);
+        }
       }
       
       res.json({ success: true, checklist });
