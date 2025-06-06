@@ -555,13 +555,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post(`${API_BASE}/translate/checklist/:id`, async (req, res) => {
     try {
-      const { targetLanguage, sourceLanguage } = req.body;
-      console.log('Translation request received:', { id: req.params.id, targetLanguage, sourceLanguage });
+      const { targetLanguage, sourceLanguage, userId } = req.body;
+      console.log('Translation request received:', { id: req.params.id, targetLanguage, sourceLanguage, userId });
       
       if (!targetLanguage) {
         return res.status(400).json({ 
           message: "Missing required field: targetLanguage" 
         });
+      }
+
+      // Check user language limits if userId is provided
+      if (userId) {
+        const user = await storage.getUser(userId);
+        if (user) {
+          const allowedLanguages = user.allowedLanguages as string[] || ['en', 'es'];
+          
+          if (!allowedLanguages.includes(targetLanguage)) {
+            return res.status(403).json({
+              error: 'Language not allowed',
+              message: `Translation to ${targetLanguage} is not available in your ${user.subscriptionTier} plan. Please upgrade to access more languages.`,
+              tier: user.subscriptionTier,
+              allowedLanguages,
+              upgradeRequired: true
+            });
+          }
+        }
       }
       
       const checklist = await storage.getChecklistById(req.params.id);
@@ -577,6 +595,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         targetLanguage as LanguageCode,
         sourceLanguage as LanguageCode | undefined
       );
+
+      // Increment language usage count
+      if (userId) {
+        await storage.incrementUserUsage(userId, 'language');
+      }
       
       console.log('Translation completed successfully');
       res.json(translatedChecklist);
