@@ -189,7 +189,7 @@ export default function SharedChecklist() {
       ...checklist,
       tasks: updatedTasks,
       progress,
-      status,
+      status: status as 'completed' | 'in-progress' | 'not-started',
       updatedAt: new Date()
     };
     
