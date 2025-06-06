@@ -23,13 +23,16 @@ import {
 export default function SharedChecklist() {
   const [match, params] = useRoute("/shared/:token");
   const [, navigate] = useLocation();
-  const token = params?.token;
-
+  
+  // Clean the token to remove any query parameters that might be included
+  const rawToken = params?.token;
+  const token = rawToken?.split('?')[0]; // Remove query parameters from token
+  
   // Extract language from URL query parameters
   const urlParams = new URLSearchParams(window.location.search);
   const langFromUrl = urlParams.get('lang') || 'en';
   
-  console.log(`🌐 SharedChecklist initialized with language: ${langFromUrl}`);
+  console.log(`🌐 SharedChecklist initialized with token: ${token}, language: ${langFromUrl}`);
 
   const [checklist, setChecklist] = useState<Checklist | null>(null);
   const [remarks, setRemarks] = useState("");
