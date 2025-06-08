@@ -43,6 +43,7 @@ function Router() {
       
       {/* Publicly shared checklist with verification */}
       <Route path="/shared/:token" component={SharedChecklist} />
+      <Route path="/shared/checklist/:token" component={SharedChecklist} />
       
       {/* Pricing page */}
       <Route path="/pricing">

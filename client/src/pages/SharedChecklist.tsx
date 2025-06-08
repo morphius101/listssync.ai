@@ -21,8 +21,13 @@ import {
 } from 'lucide-react';
 
 export default function SharedChecklist() {
-  const [match, params] = useRoute("/shared/:token");
+  const [match1, params1] = useRoute("/shared/:token");
+  const [match2, params2] = useRoute("/shared/checklist/:token");
   const [, navigate] = useLocation();
+  
+  // Use whichever route matched
+  const match = match1 || match2;
+  const params = params1 || params2;
   
   // Clean the token to remove any query parameters that might be included
   const rawToken = params?.token;
@@ -337,7 +342,7 @@ export default function SharedChecklist() {
             <p className="text-green-800 font-medium">Verified Access</p>
             <p className="text-green-600 text-sm">
               You have verified access to this shared checklist
-              {maskedContact && ` via ${maskedContact}`}
+              {maskedContact && typeof maskedContact === 'string' && ` via ${maskedContact}`}
             </p>
           </div>
         </div>
