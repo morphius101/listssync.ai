@@ -599,7 +599,7 @@ export class DatabaseStorage implements IStorage {
       // Set allowed languages based on tier
       if (tier === 'free') {
         updateData.allowedLanguages = ['en', 'es'];
-      } else if (tier === 'pro') {
+      } else if (tier === 'professional') {
         updateData.allowedLanguages = ['en', 'es', 'fr', 'de', 'it'];
       } else if (tier === 'enterprise') {
         updateData.allowedLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'ko', 'zh', 'ar'];

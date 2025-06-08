@@ -253,11 +253,11 @@ export default function SharedChecklist() {
     };
     
     setChecklist(updatedChecklist);
-    sendChecklistUpdate(updatedChecklist);
+    sendChecklistUpdate(updatedChecklist, recipientId);
     
     try {
       if (checklist.id) {
-        await updateTaskStatus(checklist.id, taskId, !checklist.tasks.find(t => t.id === taskId)?.completed);
+        await updateTaskStatus(checklist.id, taskId, { completed: !checklist.tasks.find(t => t.id === taskId)?.completed });
       }
     } catch (error) {
       console.error('Error updating task:', error);
@@ -278,7 +278,7 @@ export default function SharedChecklist() {
       
       await updateChecklist(updatedChecklist);
       setChecklist(updatedChecklist);
-      sendChecklistUpdate({ ...updatedChecklist, remarks, recipientId });
+      sendChecklistUpdate({ ...updatedChecklist, remarks }, recipientId);
       
       toast({
         title: 'Success',
@@ -387,26 +387,20 @@ export default function SharedChecklist() {
         {/* Checklist Header */}
         <ChecklistHeader 
           checklist={checklist}
-          onEditName={() => {}} // Read-only for shared checklists
         />
 
         {/* Tasks List */}
         <TasksList 
           tasks={checklist.tasks}
-          onTaskToggle={handleTaskToggle}
-          onTaskEdit={() => {}} // Read-only for shared checklists
-          onAddTask={() => {}} // Read-only for shared checklists
-          onDeleteTask={() => {}} // Read-only for shared checklists
-          onPhotoUpload={() => {}} // Read-only for shared checklists
-          readOnly={true}
+          onTaskUpdate={handleTaskToggle}
+          disabled={false}
         />
 
         {/* Remarks Section */}
         <RemarksSection
-          remarks={remarks}
-          onRemarksChange={setRemarks}
-          onSubmit={handleRemarksSubmit}
-          isSubmitting={isSubmitting}
+          value={remarks}
+          onChange={setRemarks}
+          disabled={isSubmitting}
         />
       </div>
     </div>

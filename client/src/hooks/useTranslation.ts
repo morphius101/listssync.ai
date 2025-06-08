@@ -37,3 +37,12 @@ export function getLanguageName(code: LanguageCode): string {
   const language = LANGUAGES.find(lang => lang.code === code);
   return language?.name || 'Unknown';
 }
+
+// Translation hook - returns language utilities
+export function useTranslation() {
+  return {
+    languages: LANGUAGES,
+    getLanguageName,
+    t: (key: string) => key, // Simple passthrough since client-side translation is disabled
+  };
+}
