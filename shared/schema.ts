@@ -59,7 +59,7 @@ export const tasks = pgTable("tasks", {
 
 // Checklist Schema
 export const checklists = pgTable("checklists", {
-  id: serial("id").primaryKey(),
+  id: text("id").primaryKey(), // Changed to text to support Firebase IDs
   name: text("name").notNull(),
   status: text("status").notNull().default("not-started"),
   progress: integer("progress").notNull().default(0),
