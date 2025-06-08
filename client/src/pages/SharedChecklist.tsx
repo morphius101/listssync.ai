@@ -29,13 +29,27 @@ export default function SharedChecklist() {
   const match = match1 || match2;
   const params = params1 || params2;
   
+  // Extract language from URL query parameters with multiple fallback methods
+  const urlParams = new URLSearchParams(window.location.search);
+  let langFromUrl = urlParams.get('lang') || 'en';
+  
+  // Alternative: check if lang is in the hash or URL
+  if (langFromUrl === 'en' && window.location.href.includes('lang=')) {
+    const langMatch = window.location.href.match(/lang=([a-z]{2})/);
+    if (langMatch) {
+      langFromUrl = langMatch[1];
+    }
+  }
+  
   // Clean the token to remove any query parameters that might be included
   const rawToken = params?.token;
-  const token = rawToken?.split('?')[0]; // Remove query parameters from token
+  const token = rawToken?.includes('?') ? rawToken.split('?')[0] : rawToken;
   
-  // Extract language from URL query parameters
-  const urlParams = new URLSearchParams(window.location.search);
-  const langFromUrl = urlParams.get('lang') || 'en';
+  console.log(`🌐 Full URL:`, window.location.href);
+  console.log(`🌐 URL search params:`, window.location.search);
+  console.log(`🌐 Raw token:`, rawToken);
+  console.log(`🌐 Cleaned token:`, token);
+  console.log(`🌐 Final detected language:`, langFromUrl);
   
   console.log(`SharedChecklist initialized with token: ${token}, language: ${langFromUrl}`);
 
