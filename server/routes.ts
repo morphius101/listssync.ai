@@ -1400,8 +1400,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(`${API_BASE}/shared/checklist/:checklistId`, async (req, res) => {
     try {
       const { checklistId } = req.params;
-      const { lang } = req.query;
-      console.log(`Fetching shared checklist: ${checklistId}, language: ${lang}`);
+      const { token } = req.query;
+      console.log(`Fetching shared checklist: ${checklistId}, token: ${token ? 'provided' : 'none'}`);
       
       // Try to get from PostgreSQL
       let checklist = await storage.getChecklistById(checklistId);
@@ -1414,22 +1414,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
       
-      // Apply translation if requested
-      if (lang && lang !== 'en' && checklist) {
+      // Determine target language from verification record if token is provided
+      let targetLanguage = 'en';
+      if (token && typeof token === 'string') {
         try {
-          console.log(`Translating checklist to ${lang}`);
+          const verification = await storage.getVerificationByToken(token);
+          if (verification && verification.targetLanguage) {
+            targetLanguage = verification.targetLanguage;
+            console.log(`Using target language from verification: ${targetLanguage}`);
+          }
+        } catch (verificationError) {
+          console.error('Error getting verification for language:', verificationError);
+        }
+      }
+      
+      // Apply translation if needed
+      if (targetLanguage && targetLanguage !== 'en' && checklist) {
+        try {
+          console.log(`Translating checklist to ${targetLanguage}`);
           const { translateChecklist } = await import('./services/translationService');
-          const translatedChecklist = await translateChecklist(checklist, lang as any, 'en');
+          const translatedChecklist = await translateChecklist(checklist, targetLanguage as any, 'en');
           if (translatedChecklist) {
             checklist = translatedChecklist;
-            console.log(`Checklist translated to ${lang} successfully`);
+            console.log(`Checklist translated to ${targetLanguage} successfully`);
           }
         } catch (translationError) {
           console.error('Translation failed on server:', translationError);
         }
       }
       
-      res.json({ success: true, checklist });
+      res.json({ success: true, checklist, targetLanguage });
     } catch (error) {
       console.error('Error fetching shared checklist:', error);
       res.status(500).json({ success: false, message: 'Failed to fetch checklist' });

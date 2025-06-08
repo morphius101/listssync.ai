@@ -357,6 +357,7 @@ export class DatabaseStorage implements IStorage {
           recipientEmail: verification.recipientEmail,
           recipientPhone: verification.recipientPhone,
           checklistId: verification.checklistId,
+          targetLanguage: verification.targetLanguage || 'en',
         })
         .returning();
       
@@ -370,6 +371,7 @@ export class DatabaseStorage implements IStorage {
         recipientEmail: insertedVerification.recipientEmail || undefined,
         recipientPhone: insertedVerification.recipientPhone || undefined,
         checklistId: insertedVerification.checklistId || undefined,
+        targetLanguage: insertedVerification.targetLanguage || 'en',
       };
     } catch (error) {
       console.error('Error creating verification:', error);
@@ -396,6 +398,7 @@ export class DatabaseStorage implements IStorage {
         recipientEmail: foundVerification.recipientEmail || undefined,
         recipientPhone: foundVerification.recipientPhone || undefined,
         checklistId: foundVerification.checklistId || undefined,
+        targetLanguage: foundVerification.targetLanguage || 'en',
       };
     } catch (error) {
       console.error('Error retrieving verification:', error);

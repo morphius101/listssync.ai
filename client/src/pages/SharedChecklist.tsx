@@ -157,8 +157,8 @@ export default function SharedChecklist() {
       
       // Use server-side endpoint to get checklist data without Firebase authentication
       const url = new URL(`/api/shared/checklist/${id}`, window.location.origin);
-      if (targetLanguage !== 'en') {
-        url.searchParams.set('lang', targetLanguage);
+      if (token) {
+        url.searchParams.set('token', token);
       }
       const response = await fetch(url.toString());
       const result = await response.json();
@@ -394,55 +394,18 @@ export default function SharedChecklist() {
           </div>
         </div>
 
-        {/* Language Controls */}
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Globe className="w-5 h-5 text-blue-600" />
-              <div>
-                <p className="text-blue-800 font-medium">Language</p>
-                <p className="text-blue-600 text-sm">
-                  {targetLanguage === 'es' ? 'This checklist is displayed in Spanish' : 'This checklist is displayed in English'}
-                </p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button
-                onClick={async () => {
-                  if (checklist && targetLanguage !== 'en') {
-                    // Reset to English
-                    window.location.href = window.location.href.replace('?lang=es', '').replace('&lang=es', '');
-                  }
-                }}
-                variant={targetLanguage === 'en' ? 'default' : 'outline'}
-                size="sm"
-              >
-                English
-              </Button>
-              <Button
-                onClick={async () => {
-                  if (checklist) {
-                    console.log('🔄 Manual Spanish translation triggered');
-                    try {
-                      const translatedData = await translateChecklist(checklist, 'es', 'en');
-                      if (translatedData) {
-                        setChecklist(translatedData);
-                        setTargetLanguage('es');
-                        console.log('✅ Manual translation completed');
-                      }
-                    } catch (error) {
-                      console.error('❌ Manual translation failed:', error);
-                    }
-                  }
-                }}
-                variant={targetLanguage === 'es' ? 'default' : 'outline'}
-                size="sm"
-              >
-                Español
-              </Button>
+        {/* Language Indicator */}
+        {targetLanguage !== 'en' && (
+          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
+            <Globe className="w-5 h-5 text-blue-600" />
+            <div>
+              <p className="text-blue-800 font-medium">Auto-Translated</p>
+              <p className="text-blue-600 text-sm">
+                This checklist has been automatically translated to {targetLanguage === 'es' ? 'Spanish' : targetLanguage}
+              </p>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Checklist Header */}
         <ChecklistHeader 
