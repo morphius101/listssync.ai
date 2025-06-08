@@ -281,25 +281,16 @@ export default function SharedChecklist() {
             <VerificationModal
               isOpen={true}
               onClose={() => setShowVerification(false)}
-              onVerified={async (recipientId, checklistId) => {
+              onVerified={(recipientId, checklistId) => {
                 console.log(`🎯 Verification callback: recipientId=${recipientId}, checklistId=${checklistId}`);
                 setIsVerified(true);
                 setRecipientId(recipientId);
                 setChecklistId(checklistId || null);
+                setShowVerification(false);
                 
+                // Force reload the checklist data
                 if (checklistId) {
-                  try {
-                    console.log(`📋 Loading checklist after verification: ${checklistId}`);
-                    const loadedChecklist = await loadChecklist(checklistId);
-                    if (loadedChecklist) {
-                      setShowVerification(false);
-                    }
-                  } catch (error) {
-                    console.error('Failed to load checklist after verification:', error);
-                    setShowVerification(false);
-                  }
-                } else {
-                  setShowVerification(false);
+                  loadChecklist(checklistId);
                 }
               }}
               token={token}
