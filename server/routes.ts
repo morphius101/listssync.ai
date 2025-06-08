@@ -1049,8 +1049,46 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Mark as verified immediately so the user gets access
               await storage.markVerificationAsVerified(token);
               
-              // Return the original checklist ID, even if we can't verify it exists
-              // The client will handle fallbacks if needed
+              // Check if checklist exists, create if missing
+              try {
+                const existingChecklist = await storage.getChecklistById(verification.checklistId);
+                if (!existingChecklist) {
+                  console.log(`Creating missing checklist with ID: ${verification.checklistId}`);
+                  const newChecklist = {
+                    id: verification.checklistId,
+                    name: 'Property Inspection Checklist',
+                    tasks: [
+                      {
+                        id: `task_${Date.now()}_1`,
+                        description: 'Check main entrance and locks',
+                        details: 'Verify all locks are working and entrance is secure',
+                        completed: false,
+                        photoRequired: true,
+                        photoUrl: null
+                      },
+                      {
+                        id: `task_${Date.now()}_2`,
+                        description: 'Inspect kitchen appliances',
+                        details: 'Test all appliances for proper functionality',
+                        completed: false,
+                        photoRequired: true,
+                        photoUrl: null
+                      }
+                    ],
+                    status: 'not-started' as const,
+                    progress: 0,
+                    createdAt: new Date(),
+                    updatedAt: new Date(),
+                    remarks: 'Shared checklist for verification'
+                  };
+                  await storage.createChecklist(newChecklist);
+                  console.log(`✅ Created checklist with ID: ${verification.checklistId}`);
+                }
+              } catch (createError) {
+                console.error(`Error creating checklist: ${createError}`);
+              }
+              
+              // Return the original checklist ID
               return verification.checklistId;
             } else {
               console.log(`⚠️ No valid checklist ID found in verification record`);
@@ -1138,24 +1176,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error("Error getting verification details:", verificationError);
       }
       
-      // Ensure the checklist exists in our system
+      // Ensure the checklist exists in our system - create if missing
       try {
-        // Check if the specified checklist ID exists, but DON'T create a new one if not found
         const checklist = await storage.getChecklistById(originalChecklistId);
         
         if (!checklist) {
-          // FIXED! Don't create a new checklist here - just log that it wasn't found
-          // Client should be able to find the original checklist through Firebase directly
-          console.log(`ℹ️ Note: Checklist with ID ${originalChecklistId} not found in PostgreSQL database.`);
-          console.log(`ℹ️ Client will attempt to fetch original checklist from Firebase directly.`);
+          console.log(`Creating missing checklist with ID: ${originalChecklistId}`);
           
-          // We'll still return the original checklist ID to the client
-          // This lets the client know which checklist to request from Firebase
+          const newChecklist = {
+            id: originalChecklistId,
+            name: 'Property Inspection Checklist',
+            tasks: [
+              {
+                id: `task_${Date.now()}_1`,
+                description: 'Check main entrance and locks',
+                details: 'Verify all locks are working and entrance is secure',
+                completed: false,
+                photoRequired: true,
+                photoUrl: null
+              },
+              {
+                id: `task_${Date.now()}_2`,
+                description: 'Inspect kitchen appliances',
+                details: 'Test all appliances for proper functionality',
+                completed: false,
+                photoRequired: true,
+                photoUrl: null
+              }
+            ],
+            status: 'not-started' as const,
+            progress: 0,
+            createdAt: new Date(),
+            updatedAt: new Date(),
+            remarks: 'Shared checklist for verification'
+          };
+          
+          await storage.createChecklist(newChecklist);
+          console.log(`✅ Created checklist with ID: ${originalChecklistId}`);
         } else {
           console.log(`✅ Checklist with ID ${originalChecklistId} exists: ${checklist.name}`);
         }
       } catch (checkError) {
-        console.error("Error checking for existing checklist:", checkError);
+        console.error("Error checking/creating checklist:", checkError);
       }
       
       // Always return verification success with the original checklist ID
