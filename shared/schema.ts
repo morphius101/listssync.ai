@@ -249,29 +249,13 @@ export const TIER_LIMITS = {
     storageGB: 1,
     features: ['manual_sync', 'basic_translation', 'mobile_access']
   },
-  starter: {
-    maxLists: 25,
-    maxUsers: 3,
-    syncFrequency: 'hourly',
-    maxLanguages: 8,
-    storageGB: 10,
-    features: ['automated_sync', 'team_collaboration', 'priority_support', 'custom_fields']
-  },
   professional: {
     maxLists: 100,
     maxUsers: 10,
     syncFrequency: 'realtime',
     maxLanguages: 15,
     storageGB: 50,
-    features: ['realtime_sync', 'advanced_analytics', 'integrations', 'workflow_automation', 'api_access']
-  },
-  business: {
-    maxLists: 500,
-    maxUsers: 50,
-    syncFrequency: 'realtime',
-    maxLanguages: 25,
-    storageGB: 200,
-    features: ['advanced_permissions', 'custom_branding', 'sso', 'audit_logs', 'dedicated_support']
+    features: ['realtime_sync', 'advanced_analytics', 'integrations', 'workflow_automation', 'api_access', 'team_collaboration', 'priority_support']
   },
   enterprise: {
     maxLists: Infinity,
@@ -283,4 +267,4 @@ export const TIER_LIMITS = {
   }
 } as const;
 
-export type SubscriptionTier = keyof typeof TIER_LIMITS;
+export type SubscriptionTier = 'free' | 'professional' | 'enterprise';
