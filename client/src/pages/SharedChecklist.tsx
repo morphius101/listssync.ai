@@ -10,7 +10,7 @@ import TasksList from '@/components/checklist/TasksList';
 import RemarksSection from '@/components/checklist/RemarksSection';
 import { useToast } from '@/hooks/use-toast';
 import { useWebSocket } from '@/hooks/useWebSocket';
-import { useTranslation } from '@/hooks/useTranslation';
+import { getLanguageName } from '@/hooks/useTranslation';
 import { 
   Loader2, 
   ShieldCheck, 
@@ -88,7 +88,7 @@ export default function SharedChecklist() {
   const { toast } = useToast();
   const { checkVerificationStatus, token: verificationToken, maskedContact } = useVerification();
   const { subscribeToChecklist, sendChecklistUpdate } = useWebSocket();
-  const { translateChecklist } = useTranslation();
+
 
   // Check verification status - only runs once when token is available
   useEffect(() => {
@@ -378,7 +378,7 @@ export default function SharedChecklist() {
             <div>
               <p className="text-blue-800 font-medium">Auto-Translated</p>
               <p className="text-blue-600 text-sm">
-                This checklist has been automatically translated to {targetLanguage === 'es' ? 'Spanish' : targetLanguage}
+                This checklist has been automatically translated to {getLanguageName(targetLanguage as any)}
               </p>
             </div>
           </div>
