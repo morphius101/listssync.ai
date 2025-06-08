@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { apiRequest } from '@/lib/queryClient';
+// Translation types and constants - client-side translation is disabled
+// Translation is controlled by the sender and happens server-side only
 
 export type LanguageCode = 
   | 'en' // English
@@ -16,7 +16,7 @@ export type LanguageCode =
 interface LanguageOption {
   code: LanguageCode;
   name: string;
-  flag?: string; // Optional flag emoji
+  flag?: string;
 }
 
 export const LANGUAGES: LanguageOption[] = [
@@ -32,25 +32,11 @@ export const LANGUAGES: LanguageOption[] = [
   { code: 'hi', name: 'Hindi', flag: '🇮🇳' }
 ];
 
-export interface TranslationHook {
-  isTranslating: boolean;
-  error: string | null;
-  translateText: (
-    text: string, 
-    targetLanguage: LanguageCode, 
-    sourceLanguage?: LanguageCode
-  ) => Promise<string>;
-  translateChecklist: (
-    checklist: any, 
-    targetLanguage: LanguageCode, 
-    sourceLanguage?: LanguageCode
-  ) => Promise<any>;
-  languages: LanguageOption[];
+// Helper function to get language display name
+export function getLanguageName(code: LanguageCode): string {
+  const language = LANGUAGES.find(lang => lang.code === code);
+  return language?.name || 'Unknown';
 }
-
-export function useTranslation(): TranslationHook {
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const translateText = async (
     text: string, 
