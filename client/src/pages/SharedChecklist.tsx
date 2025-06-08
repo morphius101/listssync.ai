@@ -273,7 +273,7 @@ export default function SharedChecklist() {
     );
   }
 
-  if (showVerification || !isVerified || !checklist) {
+  if (showVerification) {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="container mx-auto px-4 py-8">
@@ -285,22 +285,52 @@ export default function SharedChecklist() {
                 console.log(`🎯 Verification callback: recipientId=${recipientId}, checklistId=${checklistId}`);
                 setIsVerified(true);
                 setRecipientId(recipientId);
-                setShowVerification(false);
+                setChecklistId(checklistId || null);
                 
                 if (checklistId) {
-                  setChecklistId(checklistId);
                   try {
                     console.log(`📋 Loading checklist after verification: ${checklistId}`);
-                    await loadChecklist(checklistId);
+                    const loadedChecklist = await loadChecklist(checklistId);
+                    if (loadedChecklist) {
+                      setShowVerification(false);
+                    }
                   } catch (error) {
                     console.error('Failed to load checklist after verification:', error);
+                    setShowVerification(false);
                   }
+                } else {
+                  setShowVerification(false);
                 }
               }}
               token={token}
               showCloseButton={false}
             />
           )}
+        </div>
+      </div>
+    );
+  }
+
+  // Show loading state if verified but no checklist yet
+  if (isVerified && !checklist) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
+          <p>Loading your shared checklist...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // If not verified and no checklist, show verification
+  if (!isVerified || !checklist) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-4 py-8">
+          <div className="text-center">
+            <p>Unable to load shared checklist. Please try refreshing the page.</p>
+          </div>
         </div>
       </div>
     );
