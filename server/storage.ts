@@ -126,7 +126,7 @@ export class DatabaseStorage implements IStorage {
           const tasksData = tokenChecklist.tasksData as TaskDTO[] || [];
           
           return {
-            id: tokenChecklist.id.toString(),
+            id: id, // Use the share token as the ID for consistency
             name: tokenChecklist.name,
             tasks: tasksData,
             status: tokenChecklist.status as 'not-started' | 'in-progress' | 'completed',
@@ -212,6 +212,9 @@ export class DatabaseStorage implements IStorage {
       task.id ? task : { ...task, id: uuidv4() }
     );
     
+    // Handle string IDs by storing them as shareToken
+    const isStringId = isNaN(parseInt(checklist.id)) || !checklist.id.match(/^\d+$/);
+    
     // Insert the checklist
     const [insertedChecklist] = await db.insert(checklists).values({
       name: checklist.name,
@@ -219,12 +222,13 @@ export class DatabaseStorage implements IStorage {
       progress: checklist.progress,
       remarks: checklist.remarks || "",
       tasksData: tasksWithIds,
-      userId: checklist.userId
+      userId: checklist.userId,
+      shareToken: isStringId ? checklist.id : null
     }).returning();
     
-    // Return the checklist summary
+    // Return the checklist summary with the appropriate ID
     return {
-      id: insertedChecklist.id.toString(),
+      id: isStringId ? checklist.id : insertedChecklist.id.toString(),
       name: insertedChecklist.name,
       status: insertedChecklist.status as 'not-started' | 'in-progress' | 'completed',
       progress: insertedChecklist.progress,
