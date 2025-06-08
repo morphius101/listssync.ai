@@ -7,7 +7,7 @@ import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
 interface PricingTier {
-  id: 'free' | 'starter' | 'professional' | 'business' | 'enterprise';
+  id: 'free' | 'professional' | 'enterprise';
   name: string;
   price: string;
   description: string;
@@ -36,26 +36,7 @@ const pricingTiers: PricingTier[] = [
       'Mobile and web access'
     ]
   },
-  {
-    id: 'starter',
-    name: 'Starter',
-    price: '$19',
-    description: 'Great for small teams',
-    icon: Zap,
-    buttonText: 'Start Free Trial',
-    yearlyDiscount: 'Save 20% yearly',
-    features: [
-      'Up to 25 checklists',
-      '3 team members',
-      'Hourly sync',
-      '8 language translations',
-      '10GB storage',
-      'Team collaboration',
-      'Priority support',
-      'Custom fields',
-      '14-day free trial'
-    ]
-  },
+
   {
     id: 'professional',
     name: 'Professional',
@@ -78,35 +59,15 @@ const pricingTiers: PricingTier[] = [
       '14-day free trial'
     ]
   },
-  {
-    id: 'business',
-    name: 'Business',
-    price: '$99',
-    description: 'For larger organizations',
-    icon: Building,
-    buttonText: 'Start Free Trial',
-    yearlyDiscount: 'Save 25% yearly',
-    features: [
-      'Up to 500 checklists',
-      '50 team members',
-      'Real-time sync',
-      '25 language translations',
-      '200GB storage',
-      'Advanced permissions',
-      'Custom branding',
-      'SSO integration',
-      'Audit logs',
-      'Dedicated support',
-      '30-day free trial'
-    ]
-  },
+
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: 'Custom',
+    price: '$299',
     description: 'For enterprise needs',
     icon: Building,
-    buttonText: 'Contact Sales',
+    buttonText: 'Start Free Trial',
+    yearlyDiscount: 'Save 20% yearly',
     features: [
       'Unlimited checklists',
       'Unlimited users',
@@ -117,7 +78,7 @@ const pricingTiers: PricingTier[] = [
       'Enterprise SLA',
       'Custom integrations',
       'Dedicated onboarding',
-      'Custom contracts'
+      '30-day free trial'
     ]
   }
 ];
