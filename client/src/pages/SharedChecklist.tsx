@@ -162,17 +162,23 @@ export default function SharedChecklist() {
       let finalChecklist = result.checklist;
       
       // Check if we need to translate this checklist
+      console.log(`🔍 Translation check: token=${token}, targetLanguage=${targetLanguage}, needsTranslation=${targetLanguage !== 'en'}`);
       if (token && targetLanguage !== 'en') {
         try {
-          console.log(`Translating checklist to ${targetLanguage}`);
+          console.log(`🔄 Starting translation to ${targetLanguage} for checklist: ${finalChecklist.name}`);
           const translatedData = await translateChecklist(finalChecklist, targetLanguage as any, 'en');
           if (translatedData) {
             finalChecklist = translatedData;
-            console.log(`Checklist translated successfully`);
+            console.log(`✅ Checklist translated successfully to ${targetLanguage}`);
+            console.log(`📝 Translated checklist name: ${finalChecklist.name}`);
+          } else {
+            console.log(`⚠️ Translation returned empty data`);
           }
         } catch (translationError) {
-          console.error('Translation failed, using original:', translationError);
+          console.error('❌ Translation failed, using original:', translationError);
         }
+      } else {
+        console.log(`ℹ️ Skipping translation - language is ${targetLanguage}`);
       }
       
       setChecklist(finalChecklist);
