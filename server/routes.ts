@@ -1492,20 +1492,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Apply translation if needed
-      if (targetLanguage && targetLanguage !== 'en' && checklist) {
-        try {
-          console.log(`Translating checklist to ${targetLanguage}`);
-          const { translateChecklist } = await import('./services/translationService');
-          const translatedChecklist = await translateChecklist(checklist, targetLanguage as any, 'en');
-          if (translatedChecklist) {
-            checklist = translatedChecklist;
-            console.log(`Checklist translated to ${targetLanguage} successfully`);
-          }
-        } catch (translationError) {
-          console.error('Translation failed on server:', translationError);
-        }
-      }
+      // Translation disabled - serving pre-translated content from database
+      console.log(`Serving checklist in target language: ${targetLanguage}`);
       
       res.json({ success: true, checklist, targetLanguage });
     } catch (error) {

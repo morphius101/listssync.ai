@@ -89,31 +89,29 @@ export class DatabaseStorage implements IStorage {
     console.log(`🔍 Attempting to fetch checklist with ID: ${id}`);
     
     try {
-      // First attempt: Try fetching by ID if it's a valid integer
-      if (!isNaN(parseInt(id)) && id.match(/^\d+$/)) {
-        try {
-          console.log(`Trying to fetch checklist with numeric ID: ${id}`);
-          const [dbChecklist] = await db.select().from(checklists).where(eq(checklists.id, parseInt(id)));
+      // First attempt: Try fetching by exact string ID match (supports both numeric and Firebase IDs)
+      try {
+        console.log(`Trying to fetch checklist with exact ID: ${id}`);
+        const [dbChecklist] = await db.select().from(checklists).where(eq(checklists.id, id));
+        
+        if (dbChecklist) {
+          console.log(`✅ Found checklist by exact ID: ${id}`);
+          const tasksData = dbChecklist.tasksData as TaskDTO[] || [];
           
-          if (dbChecklist) {
-            console.log(`✅ Found checklist by numeric ID: ${id}`);
-            const tasksData = dbChecklist.tasksData as TaskDTO[] || [];
-            
-            return {
-              id: dbChecklist.id.toString(),
-              name: dbChecklist.name,
-              tasks: tasksData,
-              status: dbChecklist.status as 'not-started' | 'in-progress' | 'completed',
-              progress: dbChecklist.progress,
-              createdAt: dbChecklist.createdAt,
-              updatedAt: dbChecklist.updatedAt,
-              remarks: dbChecklist.remarks || "",
-              userId: dbChecklist.userId || undefined
-            };
-          }
-        } catch (intError: any) {
-          console.log(`❌ Error finding checklist by numeric ID: ${intError.message}`);
+          return {
+            id: dbChecklist.id,
+            name: dbChecklist.name,
+            tasks: tasksData,
+            status: dbChecklist.status as 'not-started' | 'in-progress' | 'completed',
+            progress: dbChecklist.progress,
+            createdAt: dbChecklist.createdAt,
+            updatedAt: dbChecklist.updatedAt,
+            remarks: dbChecklist.remarks || "",
+            userId: dbChecklist.userId || undefined
+          };
         }
+      } catch (directError: any) {
+        console.log(`❌ Error finding checklist by exact ID: ${directError.message}`);
       }
       
       // Second attempt: Try fetching by share token
