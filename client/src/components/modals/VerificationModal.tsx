@@ -77,7 +77,11 @@ export function VerificationModal({
           // Use the original checklist ID that was shared
           if (result.checklistId) {
             console.log(`📋 Using original shared checklist ID: ${result.checklistId}`);
-            onVerified(result.recipientId || '', result.checklistId);
+            
+            // Close modal and trigger callback
+            setTimeout(() => {
+              onVerified(result.recipientId || '', result.checklistId);
+            }, 1000);
             return;
           }
         }
