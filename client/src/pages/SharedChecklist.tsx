@@ -193,37 +193,14 @@ export default function SharedChecklist() {
         throw new Error('No checklist available');
       }
       
-      let finalChecklist = result.checklist;
-      
-      // Check if we need to translate this checklist
-      // Force Spanish translation if URL contains lang=es
-      const forceSpanish = window.location.href.includes('lang=es');
-      const shouldTranslate = (targetLanguage !== 'en') || forceSpanish;
-      
-      console.log(`🔍 Translation check: token=${token}, targetLanguage=${targetLanguage}, forceSpanish=${forceSpanish}, shouldTranslate=${shouldTranslate}`);
-      if (token && shouldTranslate) {
-        try {
-          const translationLang = forceSpanish ? 'es' : targetLanguage;
-          console.log(`🔄 Starting translation to ${translationLang} for checklist: ${finalChecklist.name}`);
-          const translatedData = await translateChecklist(finalChecklist, translationLang as any, 'en');
-          if (translatedData) {
-            finalChecklist = translatedData;
-            console.log(`✅ Checklist translated successfully to ${translationLang}`);
-            console.log(`📝 Translated checklist name: ${finalChecklist.name}`);
-            // Update the target language state to reflect the actual translation
-            setTargetLanguage(translationLang);
-          } else {
-            console.log(`⚠️ Translation returned empty data`);
-          }
-        } catch (translationError) {
-          console.error('❌ Translation failed, using original:', translationError);
-        }
-      } else {
-        console.log(`ℹ️ Skipping translation - language is ${targetLanguage}`);
+      // Server automatically handles translation based on verification record
+      // Use the target language returned by the server
+      if (result.targetLanguage) {
+        setTargetLanguage(result.targetLanguage);
       }
       
-      setChecklist(finalChecklist);
-      setRemarks(finalChecklist.remarks || "");
+      setChecklist(result.checklist);
+      setRemarks(result.checklist.remarks || "");
       
       // Subscribe to realtime updates
       subscribeToChecklist(id);
@@ -233,7 +210,7 @@ export default function SharedChecklist() {
         description: 'Your shared checklist has been loaded successfully.',
       });
       
-      return finalChecklist;
+      return result.checklist;
     } catch (error) {
       console.error('Error loading shared checklist:', error);
       toast({
