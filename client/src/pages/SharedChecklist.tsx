@@ -233,11 +233,11 @@ export default function SharedChecklist() {
   };
 
   // Handle task completion toggle
-  const handleTaskToggle = async (taskId: string) => {
+  const handleTaskToggle = async (taskId: string, updates: Partial<Task>) => {
     if (!checklist) return;
     
     const updatedTasks = checklist.tasks.map(task =>
-      task.id === taskId ? { ...task, completed: !task.completed } : task
+      task.id === taskId ? { ...task, ...updates } : task
     );
     
     const completedCount = updatedTasks.filter(task => task.completed).length;
@@ -253,11 +253,16 @@ export default function SharedChecklist() {
     };
     
     setChecklist(updatedChecklist);
-    sendChecklistUpdate(updatedChecklist, recipientId);
+    if (checklist.id) {
+      sendChecklistUpdate(checklist.id, { checklist: updatedChecklist, recipientId });
+    }
     
     try {
       if (checklist.id) {
-        await updateTaskStatus(checklist.id, taskId, { completed: !checklist.tasks.find(t => t.id === taskId)?.completed });
+        const task = checklist.tasks.find(t => t.id === taskId);
+        if (task) {
+          await updateTaskStatus(checklist.id, taskId, { completed: !task.completed });
+        }
       }
     } catch (error) {
       console.error('Error updating task:', error);
@@ -278,7 +283,9 @@ export default function SharedChecklist() {
       
       await updateChecklist(updatedChecklist);
       setChecklist(updatedChecklist);
-      sendChecklistUpdate({ ...updatedChecklist, remarks }, recipientId);
+      if (checklist.id) {
+        sendChecklistUpdate(checklist.id, { checklist: updatedChecklist, recipientId });
+      }
       
       toast({
         title: 'Success',
