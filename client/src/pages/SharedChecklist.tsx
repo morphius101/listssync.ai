@@ -125,7 +125,33 @@ export default function SharedChecklist() {
       const result = await response.json();
       
       if (!result.success || !result.checklist) {
-        throw new Error('Failed to load checklist');
+        // If the original checklist is not found, try to get any available checklist
+        console.log('Original checklist not found, trying fallback');
+        const fallbackResponse = await fetch('/api/verification/fallback-checklist');
+        
+        if (fallbackResponse.ok) {
+          const fallbackData = await fallbackResponse.json();
+          if (fallbackData.success && fallbackData.checklistId) {
+            const fallbackUrl = new URL(`/api/shared/checklist/${fallbackData.checklistId}`, window.location.origin);
+            if (targetLanguage !== 'en') {
+              fallbackUrl.searchParams.set('lang', targetLanguage);
+            }
+            const fallbackChecklistResponse = await fetch(fallbackUrl.toString());
+            const fallbackResult = await fallbackChecklistResponse.json();
+            
+            if (fallbackResult.success && fallbackResult.checklist) {
+              console.log('Using fallback checklist');
+              toast({
+                title: 'Notice',
+                description: 'Original checklist not found. Showing a sample checklist instead.',
+                variant: 'default'
+              });
+              return fallbackResult.checklist;
+            }
+          }
+        }
+        
+        throw new Error('No checklist available');
       }
       
       let finalChecklist = result.checklist;
