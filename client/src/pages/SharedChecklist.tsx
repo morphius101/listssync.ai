@@ -64,6 +64,26 @@ export default function SharedChecklist() {
   const [isExpired, setIsExpired] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [targetLanguage, setTargetLanguage] = useState<string>(langFromUrl);
+  
+  // Force language update if URL changes
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    let currentLang = urlParams.get('lang') || 'en';
+    
+    // Alternative: check if lang is in the URL string directly
+    if (currentLang === 'en' && window.location.href.includes('lang=')) {
+      const langMatch = window.location.href.match(/lang=([a-z]{2})/);
+      if (langMatch) {
+        currentLang = langMatch[1];
+      }
+    }
+    
+    console.log(`🔄 Language detection update: ${currentLang} (from ${window.location.href})`);
+    if (currentLang !== targetLanguage) {
+      setTargetLanguage(currentLang);
+      console.log(`🔄 Updated target language to: ${currentLang}`);
+    }
+  }, [window.location.search, targetLanguage]);
 
   const { toast } = useToast();
   const { checkVerificationStatus, token: verificationToken, maskedContact } = useVerification();
@@ -176,15 +196,22 @@ export default function SharedChecklist() {
       let finalChecklist = result.checklist;
       
       // Check if we need to translate this checklist
-      console.log(`🔍 Translation check: token=${token}, targetLanguage=${targetLanguage}, needsTranslation=${targetLanguage !== 'en'}`);
-      if (token && targetLanguage !== 'en') {
+      // Force Spanish translation if URL contains lang=es
+      const forceSpanish = window.location.href.includes('lang=es');
+      const shouldTranslate = (targetLanguage !== 'en') || forceSpanish;
+      
+      console.log(`🔍 Translation check: token=${token}, targetLanguage=${targetLanguage}, forceSpanish=${forceSpanish}, shouldTranslate=${shouldTranslate}`);
+      if (token && shouldTranslate) {
         try {
-          console.log(`🔄 Starting translation to ${targetLanguage} for checklist: ${finalChecklist.name}`);
-          const translatedData = await translateChecklist(finalChecklist, targetLanguage as any, 'en');
+          const translationLang = forceSpanish ? 'es' : targetLanguage;
+          console.log(`🔄 Starting translation to ${translationLang} for checklist: ${finalChecklist.name}`);
+          const translatedData = await translateChecklist(finalChecklist, translationLang as any, 'en');
           if (translatedData) {
             finalChecklist = translatedData;
-            console.log(`✅ Checklist translated successfully to ${targetLanguage}`);
+            console.log(`✅ Checklist translated successfully to ${translationLang}`);
             console.log(`📝 Translated checklist name: ${finalChecklist.name}`);
+            // Update the target language state to reflect the actual translation
+            setTargetLanguage(translationLang);
           } else {
             console.log(`⚠️ Translation returned empty data`);
           }
@@ -367,18 +394,55 @@ export default function SharedChecklist() {
           </div>
         </div>
 
-        {/* Language Indicator */}
-        {targetLanguage !== 'en' && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
-            <Globe className="w-5 h-5 text-blue-600" />
-            <div>
-              <p className="text-blue-800 font-medium">Auto-Translated</p>
-              <p className="text-blue-600 text-sm">
-                This checklist has been automatically translated to {targetLanguage === 'es' ? 'Spanish' : targetLanguage}
-              </p>
+        {/* Language Controls */}
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Globe className="w-5 h-5 text-blue-600" />
+              <div>
+                <p className="text-blue-800 font-medium">Language</p>
+                <p className="text-blue-600 text-sm">
+                  {targetLanguage === 'es' ? 'This checklist is displayed in Spanish' : 'This checklist is displayed in English'}
+                </p>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                onClick={async () => {
+                  if (checklist && targetLanguage !== 'en') {
+                    // Reset to English
+                    window.location.href = window.location.href.replace('?lang=es', '').replace('&lang=es', '');
+                  }
+                }}
+                variant={targetLanguage === 'en' ? 'default' : 'outline'}
+                size="sm"
+              >
+                English
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (checklist) {
+                    console.log('🔄 Manual Spanish translation triggered');
+                    try {
+                      const translatedData = await translateChecklist(checklist, 'es', 'en');
+                      if (translatedData) {
+                        setChecklist(translatedData);
+                        setTargetLanguage('es');
+                        console.log('✅ Manual translation completed');
+                      }
+                    } catch (error) {
+                      console.error('❌ Manual translation failed:', error);
+                    }
+                  }
+                }}
+                variant={targetLanguage === 'es' ? 'default' : 'outline'}
+                size="sm"
+              >
+                Español
+              </Button>
             </div>
           </div>
-        )}
+        </div>
 
         {/* Checklist Header */}
         <ChecklistHeader 
