@@ -33,6 +33,7 @@ export function initializeFirebase() {
           hasProjectId: !!firebaseConfig.projectId,
           hasAppId: !!firebaseConfig.appId
         });
+        throw new Error("Firebase configuration is incomplete");
       }
       
       // Connect to Firebase with persistence settings for better cross-domain support

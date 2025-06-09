@@ -16,8 +16,12 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { initializeFirebase } from "./lib/firebase";
 
-// Initialize Firebase
-initializeFirebase();
+// Initialize Firebase with error handling
+try {
+  initializeFirebase();
+} catch (error) {
+  console.error("Firebase initialization failed, continuing with limited functionality:", error);
+}
 
 // Component to provide authenticated user data to pricing page
 function PricingWithAuth() {
