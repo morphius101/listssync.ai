@@ -44,7 +44,27 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleCreateNew = () => {
+  const handleCreateNew = async () => {
+    if (!user) return;
+
+    // Check usage limits before creating new checklist
+    try {
+      const response = await fetch(`/api/user/${user.uid}/subscription`);
+      const subscription = await response.json();
+      
+      if (subscription.limits.maxLists !== Infinity && checklists.length >= subscription.limits.maxLists) {
+        toast({
+          title: "Checklist Limit Reached",
+          description: `You've reached your plan's limit of ${subscription.limits.maxLists} checklists. Please upgrade to create more.`,
+          variant: "destructive",
+        });
+        setLocation('/pricing');
+        return;
+      }
+    } catch (error) {
+      console.error('Error checking subscription limits:', error);
+    }
+
     setCurrentChecklist(null);
     setIsEditing(true);
   };
@@ -185,12 +205,23 @@ const AdminDashboard = () => {
     };
   };
 
+  const handleUpgrade = () => {
+    setLocation('/pricing');
+  };
+
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
       <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
       
       {/* Development Banner */}
       <DevelopmentBanner />
+      
+      {/* Subscription Status */}
+      {user && (
+        <div className="mb-6">
+          <SubscriptionStatus userId={user.uid} onUpgrade={handleUpgrade} />
+        </div>
+      )}
       
       {isEditing ? (
         <ChecklistEditor

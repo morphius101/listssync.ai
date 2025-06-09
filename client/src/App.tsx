@@ -12,11 +12,42 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import LandingPage from "@/components/LandingPage";
 import ProtectedRoute from "@/components/ProtectedRoute";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/useAuth";
 import { initializeFirebase } from "./lib/firebase";
 
 // Initialize Firebase
 initializeFirebase();
+
+// Component to provide authenticated user data to pricing page
+function PricingWithAuth() {
+  const { user } = useAuth();
+  const [currentTier, setCurrentTier] = useState<string>('free');
+
+  useEffect(() => {
+    const fetchUserTier = async () => {
+      if (user) {
+        try {
+          const response = await fetch(`/api/user/${user.uid}/subscription`);
+          const subscription = await response.json();
+          setCurrentTier(subscription.tier || 'free');
+        } catch (error) {
+          console.error('Error fetching user subscription:', error);
+        }
+      }
+    };
+
+    fetchUserTier();
+  }, [user]);
+
+  return (
+    <Pricing 
+      userId={user?.uid} 
+      userEmail={user?.email || undefined}
+      currentTier={currentTier}
+    />
+  );
+}
 
 function Router() {
   return (
@@ -47,7 +78,11 @@ function Router() {
       
       {/* Pricing page */}
       <Route path="/pricing">
-        {() => <Pricing />}
+        {() => (
+          <ProtectedRoute>
+            <PricingWithAuth />
+          </ProtectedRoute>
+        )}
       </Route>
       
       {/* Subscription success/cancel pages */}
