@@ -25,7 +25,7 @@ const pricingTiers: PricingTier[] = [
     price: '$0',
     description: 'Perfect for individuals',
     icon: Check,
-    buttonText: 'Get Started',
+    buttonText: 'Sign Up Free',
     features: [
       'Up to 5 checklists',
       '1 user',
@@ -104,10 +104,8 @@ export default function Pricing({ userId, userEmail, currentTier = 'free' }: Pri
     }
 
     if (tier.id === 'free') {
-      toast({
-        title: 'Already on Free Plan',
-        description: 'You are already using the free plan.',
-      });
+      // Redirect to dashboard for free plan - user registration will create free account
+      window.location.href = '/dashboard';
       return;
     }
 

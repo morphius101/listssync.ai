@@ -76,6 +76,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Create or update user with automatic free tier enrollment
+  app.post(`${API_BASE}/user/register`, async (req, res) => {
+    try {
+      const { userId, email, firstName, lastName, profileImageUrl } = req.body;
+      
+      if (!userId || !email) {
+        return res.status(400).json({ error: 'Missing required fields: userId and email' });
+      }
+
+      // Create or update user with free tier by default
+      const user = await storage.upsertUser({
+        id: userId,
+        email,
+        firstName,
+        lastName,
+        profileImageUrl,
+        subscriptionTier: 'free',
+        subscriptionStatus: 'active',
+        allowedLanguages: TIER_LIMITS.free.allowedLanguages
+      });
+
+      res.json({
+        success: true,
+        user: {
+          id: user.id,
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          subscriptionTier: user.subscriptionTier,
+          subscriptionStatus: user.subscriptionStatus,
+          allowedLanguages: user.allowedLanguages
+        }
+      });
+    } catch (error) {
+      console.error('Error registering user:', error);
+      res.status(500).json({ error: 'Failed to register user' });
+    }
+  });
+
   // Create Stripe checkout session for subscriptions
   app.post(`${API_BASE}/create-subscription`, async (req, res) => {
     try {

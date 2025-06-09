@@ -4,9 +4,11 @@ import DashboardStats from "@/components/dashboard/DashboardStats";
 import ChecklistsManager from "@/components/dashboard/ChecklistsManager";
 import ChecklistEditor from "@/components/dashboard/ChecklistEditor";
 import ShareLinkModal from "@/components/modals/ShareLinkModal";
+import SubscriptionStatus from "@/components/SubscriptionStatus";
 import { DevelopmentBanner } from "@/components/DevelopmentBanner";
 import { Checklist, ChecklistSummary } from "@/types";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { getChecklists, getChecklistById, createChecklist, updateChecklist, deleteChecklist, generateShareLink } from "@/services/checklistService";
 
@@ -18,6 +20,7 @@ const AdminDashboard = () => {
   const [checklistToDelete, setChecklistToDelete] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
   const [location, setLocation] = useLocation();
 
   useEffect(() => {

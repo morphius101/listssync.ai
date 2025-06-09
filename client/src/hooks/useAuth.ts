@@ -5,10 +5,36 @@ export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
+  const registerUserInDatabase = async (firebaseUser: User) => {
+    try {
+      await fetch('/api/user/register', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: firebaseUser.uid,
+          email: firebaseUser.email,
+          firstName: firebaseUser.displayName?.split(' ')[0] || '',
+          lastName: firebaseUser.displayName?.split(' ').slice(1).join(' ') || '',
+          profileImageUrl: firebaseUser.photoURL,
+        }),
+      });
+    } catch (error) {
+      console.error('Failed to register user in database:', error);
+    }
+  };
+
   useEffect(() => {
     const auth = getAuth();
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
+      
+      // Automatically register new users in the free tier
+      if (currentUser) {
+        await registerUserInDatabase(currentUser);
+      }
+      
       setIsLoading(false);
     });
 
