@@ -189,7 +189,12 @@ export default function Pricing({ userId, userEmail, currentTier = 'free' }: Pri
                   
                   <div className="mt-4">
                     <span className="text-4xl font-bold text-gray-900">{tier.price}</span>
-                    {tier.id === 'professional' && <span className="text-gray-600">/month</span>}
+                    {tier.id !== 'free' && <span className="text-gray-600">/month</span>}
+                    {tier.yearlyDiscount && (
+                      <div className="mt-2">
+                        <span className="text-sm text-green-600 font-medium">{tier.yearlyDiscount}</span>
+                      </div>
+                    )}
                   </div>
                 </CardHeader>
 

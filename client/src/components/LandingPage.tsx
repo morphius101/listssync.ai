@@ -94,6 +94,40 @@ const LandingPage = () => {
 
   return (
     <div className="min-h-screen bg-white">
+      {/* Navigation Header */}
+      <header className="bg-white border-b border-gray-200">
+        <div className="container mx-auto px-4 py-4 flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Logo size="sm" />
+            <span className="font-bold text-lg text-primary">ListsSync.ai</span>
+          </div>
+          
+          <nav className="hidden md:flex items-center space-x-6">
+            <a href="#features" className="text-gray-600 hover:text-primary transition-colors">Features</a>
+            <a href="#how-it-works" className="text-gray-600 hover:text-primary transition-colors">How It Works</a>
+            <a href="/pricing" className="text-gray-600 hover:text-primary transition-colors">Pricing</a>
+            <Button 
+              onClick={handleGetStarted}
+              disabled={isLoggingIn || isLoading}
+              size="sm"
+              variant="outline"
+            >
+              {isAuthenticated ? 'Dashboard' : 'Sign In'}
+            </Button>
+          </nav>
+          
+          <div className="md:hidden">
+            <Button 
+              onClick={handleGetStarted}
+              disabled={isLoggingIn || isLoading}
+              size="sm"
+            >
+              {isAuthenticated ? 'Dashboard' : 'Sign In'}
+            </Button>
+          </div>
+        </div>
+      </header>
+
       {/* Hero Section */}
       <div className="bg-gradient-to-b from-indigo-50 to-white">
         <div className="container mx-auto px-4 pt-16 pb-24 flex flex-col items-center text-center">
@@ -122,7 +156,7 @@ const LandingPage = () => {
       </div>
       
       {/* Features Section */}
-      <div className="py-16 bg-white">
+      <div id="features" className="py-16 bg-white">
         <div className="container mx-auto px-4">
           <h2 className="text-3xl font-bold text-center mb-12 text-gray-900">
             Designed for professionals who need accountability

@@ -34,6 +34,12 @@ const Header = () => {
                 </Button>
               </Link>
               
+              <Link href="/pricing">
+                <Button variant="ghost" size="sm" className="flex items-center space-x-1">
+                  <span>Pricing</span>
+                </Button>
+              </Link>
+              
               <div className="flex items-center space-x-2">
                 <div className="hidden md:flex flex-col items-end">
                   <span className="text-sm font-medium text-gray-900">
