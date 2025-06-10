@@ -1,5 +1,6 @@
 import { createRoot } from "react-dom/client";
-import App from "./App";
+import TestApp from "./TestApp";
+// import App from "./App";
 import "./index.css";
 
 // Add debugging to see what's happening
@@ -22,8 +23,8 @@ if (!rootElement) {
     console.log("Creating React root...");
     const root = createRoot(rootElement);
     
-    console.log("Rendering App component...");
-    root.render(<App />);
+    console.log("Rendering TestApp component...");
+    root.render(<TestApp />);
     
     console.log("React application started successfully");
   } catch (error) {
