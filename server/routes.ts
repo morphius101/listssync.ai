@@ -1531,10 +1531,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
-      // Translation disabled - serving pre-translated content from database
+      // Apply translation if target language is not English
+      let finalChecklist = checklist;
+      if (targetLanguage && targetLanguage !== 'en') {
+        console.log(`Translating checklist to: ${targetLanguage}`);
+        try {
+          const { translateChecklist } = await import('./services/translationService');
+          finalChecklist = await translateChecklist(checklist, targetLanguage, 'en');
+          console.log(`Successfully translated checklist to ${targetLanguage}`);
+        } catch (translationError) {
+          console.error('Translation failed, serving original checklist:', translationError);
+          finalChecklist = checklist;
+        }
+      }
+      
       console.log(`Serving checklist in target language: ${targetLanguage}`);
       
-      res.json({ success: true, checklist, targetLanguage });
+      res.json({ success: true, checklist: finalChecklist, targetLanguage });
     } catch (error) {
       console.error('Error fetching shared checklist:', error);
       res.status(500).json({ success: false, message: 'Failed to fetch checklist' });
