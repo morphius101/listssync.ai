@@ -1,9 +1,4 @@
+// This file is no longer needed as the main app is working
 export default function TestApp() {
-  return (
-    <div style={{ padding: '20px', textAlign: 'center' }}>
-      <h1>Test App Loading</h1>
-      <p>If you can see this, React is working properly.</p>
-      <button onClick={() => alert('Button clicked!')}>Test Button</button>
-    </div>
-  );
+  return null;
 }
