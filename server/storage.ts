@@ -9,11 +9,13 @@ import {
   UpsertUser,
   SubscriptionTier,
   TIER_LIMITS,
+  SmsConsentDTO,
   checklists, 
   tasks,
   verifications,
   mailingListSubscriptions,
-  users
+  users,
+  smsConsents
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -55,6 +57,11 @@ export interface IStorage {
     current?: number;
     tier: SubscriptionTier;
   }>;
+  
+  // SMS consent methods for Twilio compliance
+  recordSmsConsent(consent: SmsConsentDTO): Promise<SmsConsentDTO>;
+  getSmsConsent(phoneNumber: string): Promise<SmsConsentDTO | undefined>;
+  revokeSmsConsent(phoneNumber: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -691,6 +698,82 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error checking user limits:', error);
       return { allowed: false, tier: 'free' };
+    }
+  }
+
+  async recordSmsConsent(consent: SmsConsentDTO): Promise<SmsConsentDTO> {
+    try {
+      const [insertedConsent] = await db
+        .insert(smsConsents)
+        .values({
+          phoneNumber: consent.phoneNumber,
+          firstName: consent.firstName,
+          lastName: consent.lastName,
+          consentedAt: consent.consentedAt,
+          ipAddress: consent.ipAddress,
+          userAgent: consent.userAgent,
+          isActive: consent.isActive ?? true
+        })
+        .returning();
+
+      return {
+        id: insertedConsent.id,
+        phoneNumber: insertedConsent.phoneNumber,
+        firstName: insertedConsent.firstName,
+        lastName: insertedConsent.lastName,
+        consentedAt: insertedConsent.consentedAt,
+        ipAddress: insertedConsent.ipAddress || undefined,
+        userAgent: insertedConsent.userAgent || undefined,
+        isActive: insertedConsent.isActive || true
+      };
+    } catch (error) {
+      console.error('Error recording SMS consent:', error);
+      throw error;
+    }
+  }
+
+  async getSmsConsent(phoneNumber: string): Promise<SmsConsentDTO | undefined> {
+    try {
+      const [consent] = await db
+        .select()
+        .from(smsConsents)
+        .where(and(
+          eq(smsConsents.phoneNumber, phoneNumber),
+          eq(smsConsents.isActive, true)
+        ))
+        .orderBy(desc(smsConsents.createdAt))
+        .limit(1);
+
+      if (!consent) return undefined;
+
+      return {
+        id: consent.id,
+        phoneNumber: consent.phoneNumber,
+        firstName: consent.firstName,
+        lastName: consent.lastName,
+        consentedAt: consent.consentedAt,
+        ipAddress: consent.ipAddress || undefined,
+        userAgent: consent.userAgent || undefined,
+        isActive: consent.isActive || true
+      };
+    } catch (error) {
+      console.error('Error retrieving SMS consent:', error);
+      return undefined;
+    }
+  }
+
+  async revokeSmsConsent(phoneNumber: string): Promise<boolean> {
+    try {
+      const [updatedConsent] = await db
+        .update(smsConsents)
+        .set({ isActive: false })
+        .where(eq(smsConsents.phoneNumber, phoneNumber))
+        .returning();
+
+      return !!updatedConsent;
+    } catch (error) {
+      console.error('Error revoking SMS consent:', error);
+      return false;
     }
   }
 }

@@ -1828,6 +1828,118 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // SMS consent endpoint for Twilio compliance
+  app.post(`${API_BASE}/sms-consent`, async (req, res) => {
+    try {
+      const { phoneNumber, firstName, lastName, consentedAt, ipAddress, userAgent } = req.body;
+      
+      if (!phoneNumber || !firstName || !lastName) {
+        return res.status(400).json({ message: "Phone number, first name, and last name are required" });
+      }
+
+      // Clean and validate phone number
+      const cleanPhone = phoneNumber.replace(/\D/g, '');
+      if (cleanPhone.length < 10) {
+        return res.status(400).json({ message: "Invalid phone number format" });
+      }
+
+      console.log(`📱 Recording SMS consent for: ${phoneNumber}`);
+      
+      // Check if consent already exists for this phone number
+      const existing = await storage.getSmsConsent(phoneNumber);
+      if (existing && existing.isActive) {
+        return res.json({
+          success: true,
+          message: "SMS consent already recorded for this phone number",
+          consent: existing
+        });
+      }
+
+      // Record the consent
+      const consentData = {
+        phoneNumber,
+        firstName: firstName.trim(),
+        lastName: lastName.trim(),
+        consentedAt: consentedAt ? new Date(consentedAt) : new Date(),
+        ipAddress: ipAddress || req.ip,
+        userAgent: userAgent || req.get('User-Agent'),
+        isActive: true
+      };
+
+      const savedConsent = await storage.recordSmsConsent(consentData);
+      
+      console.log(`✅ SMS consent recorded for ${phoneNumber}`);
+      
+      res.json({
+        success: true,
+        message: "SMS consent recorded successfully",
+        consent: savedConsent
+      });
+    } catch (error: any) {
+      console.error('Error recording SMS consent:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to record SMS consent" 
+      });
+    }
+  });
+
+  // Get SMS consent status
+  app.get(`${API_BASE}/sms-consent/:phoneNumber`, async (req, res) => {
+    try {
+      const { phoneNumber } = req.params;
+      
+      const consent = await storage.getSmsConsent(phoneNumber);
+      
+      if (!consent) {
+        return res.status(404).json({ 
+          success: false,
+          message: "No SMS consent found for this phone number" 
+        });
+      }
+      
+      res.json({
+        success: true,
+        consent
+      });
+    } catch (error: any) {
+      console.error('Error retrieving SMS consent:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to retrieve SMS consent" 
+      });
+    }
+  });
+
+  // Revoke SMS consent
+  app.delete(`${API_BASE}/sms-consent/:phoneNumber`, async (req, res) => {
+    try {
+      const { phoneNumber } = req.params;
+      
+      const success = await storage.revokeSmsConsent(phoneNumber);
+      
+      if (!success) {
+        return res.status(404).json({ 
+          success: false,
+          message: "No SMS consent found to revoke" 
+        });
+      }
+      
+      console.log(`🚫 SMS consent revoked for ${phoneNumber}`);
+      
+      res.json({
+        success: true,
+        message: "SMS consent revoked successfully"
+      });
+    } catch (error: any) {
+      console.error('Error revoking SMS consent:', error);
+      res.status(500).json({ 
+        success: false,
+        message: "Failed to revoke SMS consent" 
+      });
+    }
+  });
+
   // Mailing list subscription endpoint
   app.post(`${API_BASE}/mailing-list/subscribe`, async (req, res) => {
     try {
