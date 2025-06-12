@@ -1,17 +1,16 @@
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { MessageSquare, Shield, Phone } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { useToast } from '@/hooks/use-toast';
+import { Smartphone, Shield, MessageCircle } from 'lucide-react';
 
 export default function SmsConsent() {
-  const [phoneNumber, setPhoneNumber] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [hasConsented, setHasConsented] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -20,10 +19,19 @@ export default function SmsConsent() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    if (!firstName.trim() || !lastName.trim() || !phoneNumber.trim()) {
+      toast({
+        title: "Missing Information",
+        description: "Please fill in all required fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     if (!hasConsented) {
       toast({
         title: "Consent Required",
-        description: "Please check the consent box to receive SMS messages.",
+        description: "Please check the consent box to proceed.",
         variant: "destructive"
       });
       return;
@@ -32,7 +40,6 @@ export default function SmsConsent() {
     setIsSubmitting(true);
     
     try {
-      // Store the consent in your database
       const response = await fetch('/api/sms-consent', {
         method: 'POST',
         headers: {
@@ -43,7 +50,7 @@ export default function SmsConsent() {
           firstName,
           lastName,
           consentedAt: new Date().toISOString(),
-          ipAddress: 'user-provided', // Would normally capture actual IP
+          ipAddress: 'user-provided',
           userAgent: navigator.userAgent
         }),
       });
@@ -76,17 +83,23 @@ export default function SmsConsent() {
             <div className="mx-auto w-12 h-12 bg-green-100 rounded-full flex items-center justify-center mb-4">
               <Shield className="w-6 h-6 text-green-600" />
             </div>
-            <CardTitle className="text-green-700">Consent Recorded</CardTitle>
+            <CardTitle className="text-2xl text-green-600">Consent Recorded</CardTitle>
             <CardDescription>
-              Thank you for opting in to receive SMS notifications from ListsSync.ai.
+              Thank you for opting in to SMS notifications from ListsSync.ai
             </CardDescription>
           </CardHeader>
-          <CardContent className="text-center">
-            <p className="text-sm text-muted-foreground mb-4">
-              You will now receive important updates about your shared checklists via SMS.
+          <CardContent className="text-center space-y-4">
+            <p className="text-sm text-gray-600">
+              You will now receive SMS notifications for shared checklists and important updates.
             </p>
-            <Button onClick={() => window.location.href = '/'} className="w-full">
-              Return to ListsSync.ai
+            <p className="text-xs text-gray-500">
+              You can opt out at any time by replying STOP to any message.
+            </p>
+            <Button 
+              onClick={() => window.location.href = '/'}
+              className="w-full"
+            >
+              Continue to ListsSync.ai
             </Button>
           </CardContent>
         </Card>
@@ -97,102 +110,96 @@ export default function SmsConsent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-lg">
-        <CardHeader className="text-center">
-          <div className="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
-            <MessageSquare className="w-6 h-6 text-blue-600" />
+        <CardHeader>
+          <div className="flex items-center space-x-2 mb-4">
+            <Smartphone className="w-8 h-8 text-blue-600" />
+            <div>
+              <CardTitle className="text-2xl">SMS Consent</CardTitle>
+              <CardDescription>
+                Opt in to receive SMS notifications from ListsSync.ai
+              </CardDescription>
+            </div>
           </div>
-          <CardTitle>SMS Notifications Consent</CardTitle>
-          <CardDescription>
-            Opt in to receive important checklist notifications via SMS
-          </CardDescription>
         </CardHeader>
-        
         <CardContent>
-          <Alert className="mb-6">
-            <Phone className="h-4 w-4" />
-            <AlertDescription>
-              <strong>What you're consenting to:</strong> By providing your phone number and checking the consent box below, 
-              you agree to receive SMS text messages from ListsSync.ai about your shared checklists, verification codes, 
-              and important updates. Message and data rates may apply.
-            </AlertDescription>
-          </Alert>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-6">
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName">First Name *</Label>
                 <Input
                   id="firstName"
                   value={firstName}
                   onChange={(e) => setFirstName(e.target.value)}
+                  placeholder="Enter your first name"
                   required
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="lastName">Last Name</Label>
+                <Label htmlFor="lastName">Last Name *</Label>
                 <Input
                   id="lastName"
                   value={lastName}
                   onChange={(e) => setLastName(e.target.value)}
+                  placeholder="Enter your last name"
                   required
                 />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="phone">Phone Number</Label>
+              <Label htmlFor="phoneNumber">Phone Number *</Label>
               <Input
-                id="phone"
+                id="phoneNumber"
                 type="tel"
-                placeholder="+1 (555) 123-4567"
                 value={phoneNumber}
                 onChange={(e) => setPhoneNumber(e.target.value)}
+                placeholder="Enter your phone number"
                 required
               />
             </div>
 
-            <div className="space-y-4">
-              <div className="flex items-start space-x-3">
-                <Checkbox
-                  id="consent"
-                  checked={hasConsented}
-                  onCheckedChange={(checked) => setHasConsented(checked as boolean)}
-                />
-                <div className="space-y-1">
-                  <Label htmlFor="consent" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                    I consent to receive SMS messages
-                  </Label>
-                  <p className="text-xs text-muted-foreground">
-                    I agree to receive SMS text messages from ListsSync.ai at the phone number provided above. 
-                    I understand that I can opt out at any time by replying STOP. Message frequency varies. 
-                    Message and data rates may apply.
-                  </p>
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <div className="flex items-start space-x-2">
+                <MessageCircle className="w-5 h-5 text-blue-600 mt-0.5" />
+                <div className="text-sm text-blue-800">
+                  <p className="font-medium mb-2">What you're consenting to:</p>
+                  <ul className="space-y-1 text-xs">
+                    <li>• Receive SMS notifications when checklists are shared with you</li>
+                    <li>• Get verification codes for accessing shared content</li>
+                    <li>• Receive important updates about your shared checklists</li>
+                    <li>• Message and data rates may apply</li>
+                  </ul>
                 </div>
               </div>
             </div>
 
-            <div className="bg-gray-50 p-4 rounded-lg text-xs text-gray-600 space-y-2">
-              <p><strong>Frequency:</strong> You may receive up to 5 messages per month, depending on your checklist activity.</p>
-              <p><strong>Opt-out:</strong> Reply STOP to any message to unsubscribe immediately.</p>
-              <p><strong>Help:</strong> Reply HELP for assistance or contact support@listssync.ai</p>
-              <p><strong>Carriers:</strong> Message and data rates may apply. Supported carriers include major US networks.</p>
+            <div className="flex items-start space-x-2">
+              <Checkbox
+                id="consent"
+                checked={hasConsented}
+                onCheckedChange={(checked) => setHasConsented(checked as boolean)}
+              />
+              <Label htmlFor="consent" className="text-sm leading-relaxed">
+                I consent to receive SMS messages from ListsSync.ai at the phone number provided above. 
+                I understand that I can opt out at any time by replying STOP to any message.
+              </Label>
             </div>
 
             <Button 
               type="submit" 
               className="w-full" 
-              disabled={!hasConsented || isSubmitting}
+              disabled={isSubmitting || !hasConsented}
             >
-              {isSubmitting ? 'Recording Consent...' : 'Opt In to SMS Notifications'}
+              {isSubmitting ? 'Recording Consent...' : 'Give SMS Consent'}
             </Button>
-          </form>
 
-          <div className="mt-6 text-center">
-            <p className="text-xs text-muted-foreground">
-              By submitting this form, you provide explicit consent to receive SMS messages from ListsSync.ai. 
-              Your phone number will be used only for the purposes described and will not be shared with third parties.
-            </p>
-          </div>
+            <div className="text-center">
+              <p className="text-xs text-gray-500">
+                By providing consent, you agree to our SMS terms and conditions. 
+                Standard message and data rates apply.
+              </p>
+            </div>
+          </form>
         </CardContent>
       </Card>
     </div>
