@@ -267,4 +267,37 @@ export const TIER_LIMITS = {
   }
 } as const;
 
+export const smsConsents = pgTable("sms_consents", {
+  id: serial("id").primaryKey(),
+  phoneNumber: text("phone_number").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  consentedAt: timestamp("consented_at").notNull(),
+  ipAddress: text("ip_address"),
+  userAgent: text("user_agent"),
+  isActive: boolean("is_active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow()
+});
+
+export const insertSmsConsentSchema = createInsertSchema(smsConsents).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true
+});
+
+export type InsertSmsConsent = z.infer<typeof insertSmsConsentSchema>;
+export type SmsConsent = typeof smsConsents.$inferSelect;
+
+export interface SmsConsentDTO {
+  id?: number;
+  phoneNumber: string;
+  firstName: string;
+  lastName: string;
+  consentedAt: Date;
+  ipAddress?: string;
+  userAgent?: string;
+  isActive?: boolean;
+}
+
 export type SubscriptionTier = 'free' | 'professional' | 'enterprise';

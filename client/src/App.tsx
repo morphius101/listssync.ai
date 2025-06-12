@@ -8,6 +8,7 @@ import AdminDashboard from "@/pages/AdminDashboard";
 import ChecklistView from "@/pages/ChecklistView";
 import SharedChecklist from "@/pages/SharedChecklist";
 import Pricing from "@/pages/Pricing";
+import SmsConsent from "@/pages/SmsConsent";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import LandingPage from "@/components/LandingPage";
@@ -79,6 +80,9 @@ function Router() {
       {/* Publicly shared checklist with verification */}
       <Route path="/shared/:token" component={SharedChecklist} />
       <Route path="/shared/checklist/:token" component={SharedChecklist} />
+      
+      {/* SMS Consent page - public access required for compliance */}
+      <Route path="/sms-consent" component={SmsConsent} />
       
       {/* Pricing page */}
       <Route path="/pricing">
