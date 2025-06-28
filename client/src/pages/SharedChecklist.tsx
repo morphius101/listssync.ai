@@ -164,29 +164,42 @@ export default function SharedChecklist() {
       const result = await response.json();
       
       if (!result.success || !result.checklist) {
-        // If the original checklist is not found, try to get any available checklist
-        console.log('Original checklist not found, trying fallback');
-        const fallbackResponse = await fetch('/api/verification/fallback-checklist');
-        
-        if (fallbackResponse.ok) {
-          const fallbackData = await fallbackResponse.json();
-          if (fallbackData.success && fallbackData.checklistId) {
-            const fallbackUrl = new URL(`/api/shared/checklist/${fallbackData.checklistId}`, window.location.origin);
-            if (targetLanguage !== 'en') {
-              fallbackUrl.searchParams.set('lang', targetLanguage);
-            }
-            const fallbackChecklistResponse = await fetch(fallbackUrl.toString());
-            const fallbackResult = await fallbackChecklistResponse.json();
+        // If server indicates we need to fetch from Firebase, try that
+        if (result.needsClientFetch) {
+          console.log('Server indicates Firebase checklist, trying Firebase fetch');
+          try {
+            const { getChecklistById } = await import('@/services/checklistService');
+            const firebaseChecklist = await getChecklistById(id);
             
-            if (fallbackResult.success && fallbackResult.checklist) {
-              console.log('Using fallback checklist');
-              toast({
-                title: 'Notice',
-                description: 'Original checklist not found. Showing a sample checklist instead.',
-                variant: 'default'
-              });
-              return fallbackResult.checklist;
+            if (firebaseChecklist) {
+              console.log('Successfully retrieved original checklist from Firebase');
+              
+              // If we need translation, handle it here
+              if (targetLanguage !== 'en') {
+                console.log(`Requesting translation to ${targetLanguage}`);
+                try {
+                  const translationResponse = await fetch(`/api/checklists/${id}/translate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ targetLanguage })
+                  });
+                  
+                  if (translationResponse.ok) {
+                    const translatedData = await translationResponse.json();
+                    if (translatedData.checklist) {
+                      console.log('Successfully translated checklist');
+                      return translatedData.checklist;
+                    }
+                  }
+                } catch (translationError) {
+                  console.error('Translation failed:', translationError);
+                }
+              }
+              
+              return firebaseChecklist;
             }
+          } catch (firebaseError) {
+            console.error('Failed to fetch from Firebase:', firebaseError);
           }
         }
         

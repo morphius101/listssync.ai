@@ -1464,39 +1464,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
             const existingChecklist = await storage.getChecklistById(checklistId);
             
             if (!existingChecklist) {
-              // Create a mapped version in PostgreSQL using the Firebase ID as the string ID
-              console.log(`Creating mapped checklist for Firebase ID: ${checklistId}`);
-              
-              const mappedChecklist = {
-                id: checklistId,
-                name: "Shared Property Checklist",
-                tasks: [
-                  {
-                    id: "1",
-                    description: "Check main entrance and locks",
-                    details: "Verify all locks are working and entrance is secure",
-                    completed: false,
-                    photoRequired: true,
-                    photoUrl: null
-                  },
-                  {
-                    id: "2", 
-                    description: "Inspect kitchen appliances",
-                    details: "Test all appliances for proper functionality",
-                    completed: false,
-                    photoRequired: true,
-                    photoUrl: null
-                  }
-                ],
-                status: 'not-started' as const,
-                progress: 0,
-                createdAt: new Date(),
-                updatedAt: new Date(),
-                remarks: 'Shared checklist for verification'
-              };
-              
-              await storage.createChecklist(mappedChecklist);
-              checklist = mappedChecklist;
+              // For Firebase checklists, we need to fetch the original data from Firebase
+              // Instead of creating placeholder content, return error so client handles it properly
+              console.log(`Firebase checklist ${checklistId} not found in PostgreSQL, returning error to let client handle`);
+              return res.status(404).json({ 
+                success: false, 
+                message: 'Original checklist not found. Please verify the sharing link is correct.',
+                checklistId,
+                needsClientFetch: true // Signal to client to try Firebase fetch
+              });
             } else {
               checklist = existingChecklist;
             }
@@ -1536,8 +1512,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (targetLanguage && targetLanguage !== 'en') {
         console.log(`Translating checklist to: ${targetLanguage}`);
         try {
-          const { translateChecklist } = await import('./services/translationService');
-          finalChecklist = await translateChecklist(checklist, targetLanguage, 'en');
+          const { translateChecklist, AVAILABLE_LANGUAGES } = await import('./services/translationService');
+          const validTargetLang = targetLanguage as keyof typeof AVAILABLE_LANGUAGES;
+          finalChecklist = await translateChecklist(checklist, validTargetLang, 'en');
           console.log(`Successfully translated checklist to ${targetLanguage}`);
         } catch (translationError) {
           console.error('Translation failed, serving original checklist:', translationError);
