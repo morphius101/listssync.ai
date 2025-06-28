@@ -68,6 +68,20 @@ export function DevelopmentBanner({ onDismiss }: DevelopmentBannerProps) {
                 Join our mailing list to be notified when these features are fully available.
               </p>
               
+              <div className="bg-blue-100 border border-blue-300 rounded-lg p-3 mb-3">
+                <div className="flex items-center space-x-2">
+                  <div className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">
+                    OPT IN
+                  </div>
+                  <span className="text-blue-800 text-sm font-medium">
+                    Email Updates Consent
+                  </span>
+                </div>
+                <p className="text-blue-700 text-xs mt-1">
+                  By submitting your email below, you consent to receive updates from ListsSync.ai
+                </p>
+              </div>
+              
               {!isSubmitted ? (
                 <form onSubmit={handleEmailSubmit} className="flex items-center space-x-2 max-w-md">
                   <Mail className="h-4 w-4 text-blue-600" />

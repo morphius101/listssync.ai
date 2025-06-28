@@ -111,6 +111,19 @@ export default function SmsConsent() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-lg">
         <CardHeader>
+          <div className="bg-green-100 border border-green-200 rounded-lg p-3 mb-4">
+            <div className="flex items-center space-x-2">
+              <div className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
+                OPT IN
+              </div>
+              <span className="text-green-800 text-sm font-medium">
+                SMS Messaging Consent Required
+              </span>
+            </div>
+            <p className="text-green-700 text-xs mt-1">
+              By providing your information below, you explicitly consent to receive SMS messages from ListsSync.ai
+            </p>
+          </div>
           <div className="flex items-center space-x-2 mb-4">
             <Smartphone className="w-8 h-8 text-blue-600" />
             <div>
