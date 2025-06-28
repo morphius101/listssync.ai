@@ -1512,9 +1512,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (targetLanguage && targetLanguage !== 'en') {
         console.log(`Translating checklist to: ${targetLanguage}`);
         try {
-          const { translateChecklist, AVAILABLE_LANGUAGES } = await import('./services/translationService');
-          const validTargetLang = targetLanguage as keyof typeof AVAILABLE_LANGUAGES;
-          finalChecklist = await translateChecklist(checklist, validTargetLang, 'en');
+          const { translateChecklist, LanguageCode } = await import('./services/translationService');
+          const validTargetLang = targetLanguage as LanguageCode;
+          if (['en', 'es', 'fr', 'de', 'pt', 'zh', 'ru', 'ja', 'ar', 'hi'].includes(validTargetLang)) {
+            finalChecklist = await translateChecklist(checklist, validTargetLang, 'en');
+          } else {
+            finalChecklist = checklist;
+          }
           console.log(`Successfully translated checklist to ${targetLanguage}`);
         } catch (translationError) {
           console.error('Translation failed, serving original checklist:', translationError);
