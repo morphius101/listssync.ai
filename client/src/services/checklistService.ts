@@ -165,43 +165,9 @@ export const getChecklistById = async (id: string): Promise<Checklist | null> =>
             console.error(`Error fetching from API: ${apiError}`);
           }
           
-          // Only create a new checklist as absolute last resort when we can't find the original
-          console.log(`⚠️ Original checklist not found anywhere. Creating new one as last resort: ${data.checklistId}`);
-            
-          // Create a copy of the original checklist with the correct ID
-          const defaultChecklist = {
-            id: data.checklistId,
-            name: "Shared Checklist",
-            tasks: [
-              {
-                id: "1",
-                description: "This is a shared checklist",
-                details: "The original shared checklist couldn't be found. Contact support if you believe this is an error.",
-                completed: false,
-                photoRequired: false,
-                photoUrl: null
-              }
-            ],
-            status: 'not-started' as const,
-            progress: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            remarks: "This is a placeholder for a shared checklist that couldn't be found. Please contact greyson@listssync.ai with the checklist ID for assistance."
-          };
-          
-          // Save the checklist to Firebase as a last resort
-          try {
-            await setDoc(verifiedDocRef, {
-              ...defaultChecklist,
-              createdAt: Timestamp.fromDate(defaultChecklist.createdAt),
-              updatedAt: Timestamp.fromDate(defaultChecklist.updatedAt)
-            });
-            
-            console.log(`✅ Created placeholder checklist with ID: ${data.checklistId}`);
-            return defaultChecklist;
-          } catch (createError) {
-            console.error(`Error creating placeholder checklist: ${createError}`);
-          }
+          // Don't create placeholder content - this corrupts shared checklists
+          console.log(`❌ Original checklist not found for ID: ${data.checklistId}`);
+          throw new Error(`Shared checklist not found: ${data.checklistId}`);
         }
       }
     } catch (verificationError) {

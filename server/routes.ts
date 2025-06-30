@@ -1088,44 +1088,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
               // Mark as verified immediately so the user gets access
               await storage.markVerificationAsVerified(token);
               
-              // Check if checklist exists, create if missing
-              try {
-                const existingChecklist = await storage.getChecklistById(verification.checklistId);
-                if (!existingChecklist) {
-                  console.log(`Creating missing checklist with ID: ${verification.checklistId}`);
-                  const newChecklist = {
-                    id: verification.checklistId,
-                    name: 'Property Inspection Checklist',
-                    tasks: [
-                      {
-                        id: `task_${Date.now()}_1`,
-                        description: 'Check main entrance and locks',
-                        details: 'Verify all locks are working and entrance is secure',
-                        completed: false,
-                        photoRequired: true,
-                        photoUrl: null
-                      },
-                      {
-                        id: `task_${Date.now()}_2`,
-                        description: 'Inspect kitchen appliances',
-                        details: 'Test all appliances for proper functionality',
-                        completed: false,
-                        photoRequired: true,
-                        photoUrl: null
-                      }
-                    ],
-                    status: 'not-started' as const,
-                    progress: 0,
-                    createdAt: new Date(),
-                    updatedAt: new Date(),
-                    remarks: 'Shared checklist for verification'
-                  };
-                  await storage.createChecklist(newChecklist);
-                  console.log(`✅ Created checklist with ID: ${verification.checklistId}`);
-                }
-              } catch (createError) {
-                console.error(`Error creating checklist: ${createError}`);
-              }
+              // Don't create placeholder checklists - this corrupts shared content
+              // The original checklist should already exist or be fetchable from Firebase
+              console.log(`Using original checklist ID: ${verification.checklistId}`);
               
               // Return the original checklist ID
               return verification.checklistId;
@@ -1512,10 +1477,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (targetLanguage && targetLanguage !== 'en') {
         console.log(`Translating checklist to: ${targetLanguage}`);
         try {
-          const { translateChecklist, LanguageCode } = await import('./services/translationService');
-          const validTargetLang = targetLanguage as LanguageCode;
-          if (['en', 'es', 'fr', 'de', 'pt', 'zh', 'ru', 'ja', 'ar', 'hi'].includes(validTargetLang)) {
-            finalChecklist = await translateChecklist(checklist, validTargetLang, 'en');
+          const { translateChecklist } = await import('./services/translationService');
+          const validLanguages = ['en', 'es', 'fr', 'de', 'pt', 'zh', 'ru', 'ja', 'ar', 'hi'];
+          if (validLanguages.includes(targetLanguage)) {
+            finalChecklist = await translateChecklist(checklist, targetLanguage as any, 'en');
           } else {
             finalChecklist = checklist;
           }

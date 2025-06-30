@@ -164,46 +164,51 @@ export default function SharedChecklist() {
       const result = await response.json();
       
       if (!result.success || !result.checklist) {
-        // If server indicates we need to fetch from Firebase, try that
-        if (result.needsClientFetch) {
-          console.log('Server indicates Firebase checklist, trying Firebase fetch');
-          try {
-            const { getChecklistById } = await import('@/services/checklistService');
-            const firebaseChecklist = await getChecklistById(id);
+        // Try to fetch the original checklist directly from Firebase
+        console.log('Server endpoint failed, trying Firebase fetch directly');
+        try {
+          const { getChecklistById } = await import('@/services/checklistService');
+          const firebaseChecklist = await getChecklistById(id);
+          
+          if (firebaseChecklist) {
+            console.log('Successfully retrieved original checklist from Firebase');
             
-            if (firebaseChecklist) {
-              console.log('Successfully retrieved original checklist from Firebase');
-              
-              // If we need translation, handle it here
-              if (targetLanguage !== 'en') {
-                console.log(`Requesting translation to ${targetLanguage}`);
-                try {
-                  const translationResponse = await fetch(`/api/checklists/${id}/translate`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ targetLanguage })
-                  });
-                  
-                  if (translationResponse.ok) {
-                    const translatedData = await translationResponse.json();
-                    if (translatedData.checklist) {
-                      console.log('Successfully translated checklist');
-                      return translatedData.checklist;
-                    }
+            // If we need translation and it's not English, try server translation
+            if (targetLanguage !== 'en') {
+              console.log(`Requesting translation to ${targetLanguage}`);
+              try {
+                const translationResponse = await fetch(`/api/translate/checklist/${id}`, {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify({ targetLanguage, sourceLanguage: 'en' })
+                });
+                
+                if (translationResponse.ok) {
+                  const translatedData = await translationResponse.json();
+                  if (translatedData.checklist) {
+                    console.log('Successfully translated original checklist');
+                    setChecklist(translatedData.checklist);
+                    setRemarks(translatedData.checklist.remarks || "");
+                    subscribeToChecklist(id);
+                    return translatedData.checklist;
                   }
-                } catch (translationError) {
-                  console.error('Translation failed:', translationError);
                 }
+              } catch (translationError) {
+                console.error('Translation failed, using original:', translationError);
               }
-              
-              return firebaseChecklist;
             }
-          } catch (firebaseError) {
-            console.error('Failed to fetch from Firebase:', firebaseError);
+            
+            // Use original checklist (English or translation failed)
+            setChecklist(firebaseChecklist);
+            setRemarks(firebaseChecklist.remarks || "");
+            subscribeToChecklist(id);
+            return firebaseChecklist;
           }
+        } catch (firebaseError) {
+          console.error('Failed to fetch from Firebase:', firebaseError);
         }
         
-        throw new Error('No checklist available');
+        throw new Error('Original checklist not found');
       }
       
       // Server automatically handles translation based on verification record
