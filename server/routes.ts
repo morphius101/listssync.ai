@@ -1373,7 +1373,70 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
-  // Endpoint to get shared checklist data with translation support
+  // Endpoint to get shared checklist data with translation support (token-based)
+  app.get(`${API_BASE}/shared/checklist`, async (req, res) => {
+    try {
+      const { token } = req.query;
+      console.log(`Fetching shared checklist with token: ${token ? 'provided' : 'none'}`);
+      
+      if (!token) {
+        return res.status(400).json({ 
+          success: false, 
+          message: 'Token is required' 
+        });
+      }
+      
+      // Get verification record to find the checklist ID and target language
+      const verification = await storage.getVerificationByToken(token as string);
+      if (!verification) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Invalid or expired token' 
+        });
+      }
+      
+      console.log(`Found verification record for token: ${token}, checklist: ${verification.checklistId}, language: ${verification.targetLanguage}`);
+      
+      // Get the checklist
+      let checklist = await storage.getChecklistById(verification.checklistId);
+      if (!checklist) {
+        return res.status(404).json({ 
+          success: false, 
+          message: 'Checklist not found' 
+        });
+      }
+      
+      let finalChecklist = checklist;
+      const targetLanguage = verification.targetLanguage || 'en';
+      
+      // Apply translation if needed
+      if (targetLanguage && targetLanguage !== 'en') {
+        console.log(`Translating checklist to: ${targetLanguage}`);
+        try {
+          const { translateChecklist } = await import('./services/geminiTranslationService');
+          const validLanguages = ['en', 'es', 'fr', 'de', 'pt', 'zh', 'ru', 'ja', 'ar', 'hi'];
+          if (validLanguages.includes(targetLanguage)) {
+            finalChecklist = await translateChecklist(checklist, targetLanguage as any, 'en');
+          } else {
+            finalChecklist = checklist;
+          }
+          console.log(`Successfully translated checklist to ${targetLanguage}`);
+        } catch (translationError) {
+          console.error('Translation failed, serving original checklist:', translationError);
+          finalChecklist = checklist;
+        }
+      }
+      
+      console.log(`Serving checklist in target language: ${targetLanguage}`);
+      
+      res.json({ success: true, checklist: finalChecklist, targetLanguage });
+    } catch (error) {
+      console.error('Error fetching shared checklist:', error);
+      res.status(500).json({ success: false, message: 'Failed to fetch checklist' });
+    }
+  });
+
+  // Endpoint to get shared checklist data with translation support (ID-based)
   app.get(`${API_BASE}/shared/checklist/:checklistId`, async (req, res) => {
     try {
       const { checklistId } = req.params;
