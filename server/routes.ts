@@ -9,7 +9,7 @@ import {
   translateText, 
   AVAILABLE_LANGUAGES,
   type LanguageCode 
-} from "./services/translationService";
+} from "./services/geminiTranslationService";
 import {
   createVerification,
   verifyCode,
@@ -1477,7 +1477,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (targetLanguage && targetLanguage !== 'en') {
         console.log(`Translating checklist to: ${targetLanguage}`);
         try {
-          const { translateChecklist } = await import('./services/translationService');
+          const { translateChecklist } = await import('./services/geminiTranslationService');
           const validLanguages = ['en', 'es', 'fr', 'de', 'pt', 'zh', 'ru', 'ja', 'ar', 'hi'];
           if (validLanguages.includes(targetLanguage)) {
             finalChecklist = await translateChecklist(checklist, targetLanguage as any, 'en');
