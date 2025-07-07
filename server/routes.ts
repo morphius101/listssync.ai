@@ -1185,38 +1185,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const checklist = await storage.getChecklistById(originalChecklistId);
         
         if (!checklist) {
-          console.log(`Creating missing checklist with ID: ${originalChecklistId}`);
-          
-          const newChecklist = {
-            id: originalChecklistId,
-            name: 'Property Inspection Checklist',
-            tasks: [
-              {
-                id: `task_${Date.now()}_1`,
-                description: 'Check main entrance and locks',
-                details: 'Verify all locks are working and entrance is secure',
-                completed: false,
-                photoRequired: true,
-                photoUrl: null
-              },
-              {
-                id: `task_${Date.now()}_2`,
-                description: 'Inspect kitchen appliances',
-                details: 'Test all appliances for proper functionality',
-                completed: false,
-                photoRequired: true,
-                photoUrl: null
-              }
-            ],
-            status: 'not-started' as const,
-            progress: 0,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            remarks: 'Shared checklist for verification'
-          };
-          
-          await storage.createChecklist(newChecklist);
-          console.log(`✅ Created checklist with ID: ${originalChecklistId}`);
+          console.log(`❌ Checklist ${originalChecklistId} not found in database`);
+          return res.status(404).json({ 
+            success: false, 
+            message: 'The requested checklist was not found. Please check the link and try again.' 
+          });
         } else {
           console.log(`✅ Checklist with ID ${originalChecklistId} exists: ${checklist.name}`);
         }

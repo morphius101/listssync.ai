@@ -101,6 +101,11 @@ Changelog:
   - Built SMS consent page with opt-in banners and compliance messaging
   - Added API endpoints for recording, retrieving, and revoking SMS consent
   - Integrated opt-in banners for both SMS and email consent areas
+- July 7, 2025. Fixed critical production deployment issues and translation service
+  - Fixed CSS build errors preventing app from loading (invalid border-border classes)
+  - Switched translation service from OpenAI to Gemini for better multilingual support
+  - Removed hardcoded "Property Inspection Checklist" creation that was causing wrong lists to be shared
+  - Fixed shared checklist logic to use actual user-created checklists instead of fallback content
 ```
 
 ## User Preferences
