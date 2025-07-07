@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import * as React from 'react';
 import {
   Dialog,
   DialogContent,
@@ -50,6 +51,36 @@ export default function ShareLinkModal({
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>('en');
   const [response, setResponse] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+
+  // Reset state when modal opens
+  useEffect(() => {
+    if (isOpen) {
+      // Clear all form fields and states when modal opens
+      setShareLink(null);
+      setIsCopied(false);
+      setRecipientEmail('');
+      setRecipientPhone('');
+      setRecipientName('');
+      setSelectedLanguage('en');
+      setResponse(null);
+      setError(null);
+      setActiveTab('email');
+    }
+  }, [isOpen]);
+  React.useEffect(() => {
+    if (isOpen) {
+      // Clear all form fields and states when modal opens
+      setShareLink(null);
+      setIsCopied(false);
+      setRecipientEmail('');
+      setRecipientPhone('');
+      setRecipientName('');
+      setSelectedLanguage('en');
+      setResponse(null);
+      setError(null);
+      setActiveTab('email');
+    }
+  }, [isOpen]);
   
   const { isLoading, shareChecklist } = useVerification();
   const { languages, isTranslating, translateChecklist } = useTranslation();
