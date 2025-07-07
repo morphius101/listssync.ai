@@ -106,6 +106,9 @@ Changelog:
   - Switched translation service from OpenAI to Gemini for better multilingual support
   - Removed hardcoded "Property Inspection Checklist" creation that was causing wrong lists to be shared
   - Fixed shared checklist logic to use actual user-created checklists instead of fallback content
+  - RESOLVED: Gemini translation working perfectly - test checklist translates to Spanish successfully
+  - RESOLVED: Database verification records now point to existing checklists instead of missing Firebase IDs
+  - IDENTIFIED: New user checklists aren't being created with proper user IDs in PostgreSQL database
 ```
 
 ## User Preferences
