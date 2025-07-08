@@ -53,10 +53,18 @@ const AdminDashboard = () => {
 
     // Check usage limits before creating new checklist
     try {
-      const response = await fetch(`/api/user/${user.uid}/subscription`);
+      const response = await fetch(`/api/user/${user.uid}/subscription`, {
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      });
       const subscription = await response.json();
       
-      if (subscription.limits.maxLists !== Infinity && checklists.length >= subscription.limits.maxLists) {
+      console.log('Current subscription:', subscription);
+      
+      if (subscription.limits.maxLists !== null && subscription.limits.maxLists !== Infinity && checklists.length >= subscription.limits.maxLists) {
         trackUserAction('create_checklist_limit_reached', subscription.tier);
         toast({
           title: "Checklist Limit Reached",

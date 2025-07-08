@@ -63,7 +63,13 @@ export default function SubscriptionStatus({ userId, onUpgrade }: SubscriptionSt
 
   const fetchSubscriptionData = async () => {
     try {
-      const data = await fetch(`/api/user/${userId}/subscription`).then(res => res.json());
+      const data = await fetch(`/api/user/${userId}/subscription`, {
+        cache: 'no-cache',
+        headers: {
+          'Cache-Control': 'no-cache',
+          'Pragma': 'no-cache'
+        }
+      }).then(res => res.json());
       setSubscription(data);
     } catch (error: any) {
       console.error('Error fetching subscription:', error);
