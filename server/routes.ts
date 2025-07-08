@@ -147,8 +147,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Define price IDs for each tier (configured in Stripe dashboard)
       const priceIds = {
-        professional: process.env.STRIPE_PROFESSIONAL_PRICE_ID || 'price_1RikGbQjqQKNfQAY5yauzvSg', // $49/month
-        enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID || 'price_1RikGcQjqQKNfQAYzHuVaOVC' // $299/month
+        professional: process.env.STRIPE_PROFESSIONAL_PRICE_ID || 'price_1RikHtARacWLsYzMi1CWbouU', // $49/month
+        enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID || 'price_1RikInARacWLsYzMLMt2mL4x' // $299/month
       };
 
       const session = await stripe.checkout.sessions.create({
