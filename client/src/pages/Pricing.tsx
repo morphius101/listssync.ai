@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Check, Crown, Zap, Building } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { trackStripeEvent, trackUserAction } from '@/lib/analytics';
 
 interface PricingTier {
   id: 'free' | 'professional' | 'enterprise';
@@ -103,13 +104,18 @@ export default function Pricing({ userId, userEmail, currentTier = 'free' }: Pri
       return;
     }
 
+    // Track subscription attempt
+    trackUserAction('subscription_attempt', tier.id);
+
     if (tier.id === 'free') {
       // Redirect to dashboard for free plan - user registration will create free account
+      trackUserAction('free_plan_selected');
       window.location.href = '/dashboard';
       return;
     }
 
     if (tier.id === 'enterprise') {
+      trackUserAction('enterprise_contact_requested');
       toast({
         title: 'Contact Sales',
         description: 'Please contact our sales team for enterprise pricing.',
@@ -131,11 +137,16 @@ export default function Pricing({ userId, userEmail, currentTier = 'free' }: Pri
       }).then(res => res.json());
 
       if (response.url) {
+        // Track Stripe checkout redirect
+        trackStripeEvent('checkout_redirect', undefined, tier.id);
+        trackUserAction('stripe_checkout_redirect', tier.id);
+        
         // Redirect to Stripe checkout
         window.location.href = response.url;
       }
     } catch (error: any) {
       console.error('Subscription error:', error);
+      trackUserAction('subscription_error', tier.id);
       toast({
         title: 'Subscription Error',
         description: error.message || 'Failed to create subscription. Please try again.',

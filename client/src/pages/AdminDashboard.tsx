@@ -4,13 +4,14 @@ import DashboardStats from "@/components/dashboard/DashboardStats";
 import ChecklistsManager from "@/components/dashboard/ChecklistsManager";
 import ChecklistEditor from "@/components/dashboard/ChecklistEditor";
 import ShareLinkModal from "@/components/modals/ShareLinkModal";
-import SubscriptionStatus from "@/components/SubscriptionStatus";
+import MinimalistSubscriptionStatus from "@/components/MinimalistSubscriptionStatus";
 import { DevelopmentBanner } from "@/components/DevelopmentBanner";
 import { Checklist, ChecklistSummary } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { getChecklists, getChecklistById, createChecklist, updateChecklist, deleteChecklist, generateShareLink } from "@/services/checklistService";
+import { trackUserAction } from "@/lib/analytics";
 
 const AdminDashboard = () => {
   const [checklists, setChecklists] = useState<ChecklistSummary[]>([]);
@@ -47,12 +48,16 @@ const AdminDashboard = () => {
   const handleCreateNew = async () => {
     if (!user) return;
 
+    // Track user action
+    trackUserAction('create_checklist_started');
+
     // Check usage limits before creating new checklist
     try {
       const response = await fetch(`/api/user/${user.uid}/subscription`);
       const subscription = await response.json();
       
       if (subscription.limits.maxLists !== Infinity && checklists.length >= subscription.limits.maxLists) {
+        trackUserAction('create_checklist_limit_reached', subscription.tier);
         toast({
           title: "Checklist Limit Reached",
           description: `You've reached your plan's limit of ${subscription.limits.maxLists} checklists. Please upgrade to create more.`,
@@ -126,6 +131,7 @@ const AdminDashboard = () => {
         setCurrentChecklist(fullChecklist);
         console.log("Set current checklist:", fullChecklist.id);
         setIsShareModalOpen(true);
+        trackUserAction('share_checklist_opened', fullChecklist.id);
       } else {
         console.error("Could not fetch checklist with ID:", id);
         toast({
@@ -154,10 +160,12 @@ const AdminDashboard = () => {
         // Update existing checklist
         await updateChecklist(checklist);
         setChecklists(checklists.map(c => c.id === checklist.id ? {...c, ...checklist} : c));
+        trackUserAction('checklist_updated', checklist.id);
       } else {
         // Create new checklist
         const newChecklist = await createChecklist(checklist);
         setChecklists([...checklists, newChecklist]);
+        trackUserAction('checklist_created', newChecklist.id);
       }
       setIsEditing(false);
       return Promise.resolve();
@@ -206,21 +214,23 @@ const AdminDashboard = () => {
   };
 
   const handleUpgrade = () => {
+    trackUserAction('upgrade_from_dashboard');
     setLocation('/pricing');
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-      <h1 className="text-2xl font-bold text-gray-900 mb-6">Dashboard</h1>
+    <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+      <div className="mb-8">
+        <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
+        <p className="text-gray-600 mt-1">Manage your checklists and track progress</p>
+      </div>
       
       {/* Development Banner */}
       <DevelopmentBanner />
       
-      {/* Subscription Status */}
+      {/* Minimalist Subscription Status */}
       {user && (
-        <div className="mb-6">
-          <SubscriptionStatus userId={user.uid} onUpgrade={handleUpgrade} />
-        </div>
+        <MinimalistSubscriptionStatus userId={user.uid} onUpgrade={handleUpgrade} />
       )}
       
       {isEditing ? (
