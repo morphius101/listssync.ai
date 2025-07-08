@@ -383,33 +383,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.error(`❌ Error fetching specific checklist ${req.params.id}:`, specificError);
       }
       
-      console.log(`❓ Checklist not found with ID: ${req.params.id}, trying fallback...`);
+      console.log(`❓ Checklist not found with ID: ${req.params.id}`);
       
-      // Try to get a default checklist with ID "1"
-      try {
-        const defaultChecklist = await storage.getChecklistById('1');
-        if (defaultChecklist) {
-          console.log(`✅ Found default checklist: ${defaultChecklist.name}`);
-          return res.json(defaultChecklist);
-        }
-      } catch (defaultError) {
-        console.error('❌ Error fetching default checklist:', defaultError);
-      }
-      
-      // Create an in-memory checklist with the requested ID
-      console.log(`⚠️ No existing checklists found, creating in-memory checklist`);
-      const inMemoryChecklist = createDefaultChecklist(req.params.id);
-      
-      // Try to save this checklist to the database for future use
-      try {
-        await storage.createChecklist(inMemoryChecklist);
-        console.log(`✅ Created new default checklist with ID: ${req.params.id}`);
-      } catch (saveError) {
-        console.error('❌ Error saving default checklist:', saveError);
-      }
-      
-      // Always return a valid response
-      return res.json(inMemoryChecklist);
+      // PRODUCTION FIX: Don't create fallback checklists for sharing
+      // Return 404 error instead of creating generic content
+      return res.status(404).json({
+        error: 'Checklist not found',
+        message: `Checklist with ID ${req.params.id} does not exist. Please ensure you have the correct link.`,
+        checklistId: req.params.id
+      });
     } catch (error: any) {
       console.error('💥 Unexpected error in checklist endpoint:', error);
       
@@ -1085,11 +1067,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
             if (verification.checklistId && verification.checklistId !== 'null' && verification.checklistId !== 'undefined') {
               console.log(`📋 Found specific checklist ID in verification: ${verification.checklistId}`);
               
+              // PRODUCTION FIX: Validate that the checklist actually exists before proceeding
+              try {
+                const checklistExists = await storage.getChecklistById(verification.checklistId);
+                if (!checklistExists) {
+                  console.error(`❌ Checklist ${verification.checklistId} not found in database`);
+                  throw new Error(`Checklist ${verification.checklistId} no longer exists`);
+                }
+              } catch (error) {
+                console.error(`❌ Error validating checklist existence:`, error);
+                throw new Error(`Shared checklist is no longer available`);
+              }
+              
               // Mark as verified immediately so the user gets access
               await storage.markVerificationAsVerified(token);
               
-              // Don't create placeholder checklists - this corrupts shared content
-              // The original checklist should already exist or be fetchable from Firebase
               console.log(`Using original checklist ID: ${verification.checklistId}`);
               
               // Return the original checklist ID

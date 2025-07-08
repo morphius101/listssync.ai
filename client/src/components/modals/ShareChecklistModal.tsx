@@ -33,6 +33,7 @@ export function ShareChecklistModal({
   // Use custom domain in production, otherwise use current origin
   const isProduction = import.meta.env.MODE === 'production';
   const baseUrl = isProduction ? 'https://www.listssync.ai' : window.location.origin;
+  // IMPORTANT: Always use the actual checklist ID from the database
   const shareUrl = baseUrl + '/shared/' + checklist.id;
   const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(shareUrl)}`;
   
