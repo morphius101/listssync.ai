@@ -43,7 +43,7 @@ export async function translateText(
       return text;
     }
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+    const model = genAI.models.generateContent;
     
     const targetLangName = AVAILABLE_LANGUAGES[targetLanguage];
     const sourceLangName = sourceLanguage ? AVAILABLE_LANGUAGES[sourceLanguage] : "the source language";
@@ -53,9 +53,11 @@ export async function translateText(
     
     Text to translate: "${text}"`;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const translatedText = response.text();
+    const result = await genAI.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+    const translatedText = result.text || text;
 
     console.log(`🌍 Gemini Translation: ${sourceLanguage || 'auto'} → ${targetLanguage}`);
     console.log(`📝 Original: ${text.substring(0, 50)}...`);
