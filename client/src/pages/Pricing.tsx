@@ -115,12 +115,8 @@ export default function Pricing({ userId, userEmail, currentTier = 'free' }: Pri
     }
 
     if (tier.id === 'enterprise') {
-      trackUserAction('enterprise_contact_requested');
-      toast({
-        title: 'Contact Sales',
-        description: 'Please contact our sales team for enterprise pricing.',
-      });
-      return;
+      trackUserAction('enterprise_subscription_attempt');
+      // Continue with normal subscription flow for Enterprise
     }
 
     setLoading(tier.id);
