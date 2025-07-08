@@ -43,8 +43,6 @@ export async function translateText(
       return text;
     }
 
-    const model = genAI.models.generateContent;
-    
     const targetLangName = AVAILABLE_LANGUAGES[targetLanguage];
     const sourceLangName = sourceLanguage ? AVAILABLE_LANGUAGES[sourceLanguage] : "the source language";
     
