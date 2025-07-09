@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
 import { 
   Select,
   SelectContent,
@@ -23,7 +24,7 @@ import {
 import { useVerification, SendVerificationParams } from '@/hooks/useVerification';
 import { useTranslation, LanguageCode } from '@/hooks/useTranslation';
 import { Checklist } from '@/types';
-import { AlertTriangle, Loader2, ClipboardCopy, Mail, Phone, Languages, Smartphone, Globe } from 'lucide-react';
+import { AlertTriangle, Loader2, ClipboardCopy, Mail, Phone, Languages, Smartphone, Globe, Shield, MessageSquare } from 'lucide-react';
 
 interface ShareLinkModalProps {
   isOpen: boolean;
@@ -51,6 +52,8 @@ export default function ShareLinkModal({
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>('en');
   const [response, setResponse] = useState<any>(null);
   const [error, setError] = useState<string | null>(null);
+  const [smsConsent, setSmsConsent] = useState(false);
+  const [emailConsent, setEmailConsent] = useState(false);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -65,20 +68,8 @@ export default function ShareLinkModal({
       setResponse(null);
       setError(null);
       setActiveTab('email');
-    }
-  }, [isOpen]);
-  React.useEffect(() => {
-    if (isOpen) {
-      // Clear all form fields and states when modal opens
-      setShareLink(null);
-      setIsCopied(false);
-      setRecipientEmail('');
-      setRecipientPhone('');
-      setRecipientName('');
-      setSelectedLanguage('en');
-      setResponse(null);
-      setError(null);
-      setActiveTab('email');
+      setSmsConsent(false);
+      setEmailConsent(false);
     }
   }, [isOpen]);
   
@@ -112,6 +103,17 @@ export default function ShareLinkModal({
     if (activeTab === 'phone' && !recipientPhone) {
       console.log('Phone validation failed: empty phone number');
       setError('Please enter a valid phone number.');
+      return;
+    }
+    
+    // Validate consent requirements
+    if (activeTab === 'email' && !emailConsent) {
+      setError('Please confirm that the recipient consents to receive emails.');
+      return;
+    }
+    
+    if (activeTab === 'phone' && !smsConsent) {
+      setError('Please confirm that the recipient consents to receive text messages.');
       return;
     }
     
@@ -326,6 +328,29 @@ export default function ShareLinkModal({
                   onChange={(e) => setRecipientEmail(e.target.value)}
                   placeholder="recipient@example.com"
                 />
+                
+                {/* Email consent banner */}
+                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <div className="flex items-start space-x-2">
+                    <Shield className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-blue-800">
+                      <p className="font-medium mb-1">Email Communication Consent</p>
+                      <p className="text-xs">
+                        By sharing this checklist via email, you confirm that the recipient has agreed to receive communications from ListsSync.ai, including verification codes and checklist updates.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 mt-3">
+                    <Checkbox
+                      id="email-consent"
+                      checked={emailConsent}
+                      onCheckedChange={(checked) => setEmailConsent(checked as boolean)}
+                    />
+                    <Label htmlFor="email-consent" className="text-xs text-blue-800">
+                      I confirm the recipient consents to receive emails from ListsSync.ai
+                    </Label>
+                  </div>
+                </div>
               </TabsContent>
               
               <TabsContent value="phone" className="space-y-2">
@@ -337,6 +362,32 @@ export default function ShareLinkModal({
                   onChange={(e) => setRecipientPhone(e.target.value)}
                   placeholder="+1 (555) 123-4567"
                 />
+                
+                {/* SMS consent banner */}
+                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <div className="flex items-start space-x-2">
+                    <MessageSquare className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
+                    <div className="text-sm text-amber-800">
+                      <p className="font-medium mb-1">SMS Communication Consent</p>
+                      <p className="text-xs mb-2">
+                        By sharing this checklist via SMS, you confirm that the recipient has agreed to receive text messages from ListsSync.ai, including verification codes and checklist updates.
+                      </p>
+                      <p className="text-xs text-amber-700">
+                        <strong>Important:</strong> Message and data rates may apply. The recipient can reply STOP to opt out at any time.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2 mt-3">
+                    <Checkbox
+                      id="sms-consent"
+                      checked={smsConsent}
+                      onCheckedChange={(checked) => setSmsConsent(checked as boolean)}
+                    />
+                    <Label htmlFor="sms-consent" className="text-xs text-amber-800">
+                      I confirm the recipient consents to receive SMS messages from ListsSync.ai
+                    </Label>
+                  </div>
+                </div>
               </TabsContent>
             </Tabs>
             
@@ -358,8 +409,8 @@ export default function ShareLinkModal({
             <Button 
               type="submit"
               disabled={isLoading || isTranslating || 
-                (activeTab === 'email' && !recipientEmail) || 
-                (activeTab === 'phone' && !recipientPhone)
+                (activeTab === 'email' && (!recipientEmail || !emailConsent)) || 
+                (activeTab === 'phone' && (!recipientPhone || !smsConsent))
               }
               className="w-full"
             >
