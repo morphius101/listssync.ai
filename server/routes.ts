@@ -26,6 +26,16 @@ import Stripe from "stripe";
 // Initialize Stripe (conditional on API key availability)
 let stripe: Stripe | null = null;
 if (process.env.STRIPE_SECRET_KEY) {
+  // Check if we're using test keys and log appropriate message
+  const isTestMode = process.env.STRIPE_SECRET_KEY.startsWith('sk_test_');
+  const isLiveMode = process.env.STRIPE_SECRET_KEY.startsWith('sk_live_');
+  
+  console.log(`🔑 Stripe initialization: ${isLiveMode ? 'LIVE MODE' : isTestMode ? 'TEST MODE' : 'UNKNOWN MODE'}`);
+  
+  if (process.env.NODE_ENV === 'production' && isTestMode) {
+    console.warn('⚠️  WARNING: Using Stripe test keys in production environment!');
+  }
+  
   stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 }
 
