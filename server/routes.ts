@@ -25,6 +25,7 @@ import Stripe from "stripe";
 
 // Initialize Stripe (conditional on API key availability)
 let stripe: Stripe | null = null;
+
 if (process.env.STRIPE_SECRET_KEY) {
   // Check if we're using test keys and log appropriate message
   const isTestMode = process.env.STRIPE_SECRET_KEY.startsWith('sk_test_');
