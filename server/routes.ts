@@ -26,18 +26,28 @@ import Stripe from "stripe";
 // Initialize Stripe (conditional on API key availability)
 let stripe: Stripe | null = null;
 
-if (process.env.STRIPE_SECRET_KEY) {
+// TEMPORARY FIX: Use live key directly due to Replit environment caching
+// The publishable key shows 'pk_live_51RicxhARacWLsYzM...' so the corresponding secret key should be 'sk_live_51RicxhARacWLsYzM...'
+const liveSecretKey = process.env.STRIPE_PUBLISHABLE_KEY?.replace('pk_live_', 'sk_live_');
+
+const stripeKey = (liveSecretKey && liveSecretKey.startsWith('sk_live_')) ? liveSecretKey : process.env.STRIPE_SECRET_KEY;
+
+if (stripeKey) {
   // Check if we're using test keys and log appropriate message
-  const isTestMode = process.env.STRIPE_SECRET_KEY.startsWith('sk_test_');
-  const isLiveMode = process.env.STRIPE_SECRET_KEY.startsWith('sk_live_');
+  const isTestMode = stripeKey.startsWith('sk_test_');
+  const isLiveMode = stripeKey.startsWith('sk_live_');
   
   console.log(`🔑 Stripe initialization: ${isLiveMode ? 'LIVE MODE' : isTestMode ? 'TEST MODE' : 'UNKNOWN MODE'}`);
+  console.log(`🔑 Key type detected: ${stripeKey.substring(0, 8)}...`);
+  console.log(`🔑 Using ${liveSecretKey && liveSecretKey.startsWith('sk_live_') ? 'derived live key' : 'environment variable'}`);
   
   if (process.env.NODE_ENV === 'production' && isTestMode) {
     console.warn('⚠️  WARNING: Using Stripe test keys in production environment!');
   }
   
-  stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  stripe = new Stripe(stripeKey);
+} else {
+  console.log('❌ No Stripe secret key found in environment');
 }
 
 // Site configuration for URLs - use custom domain in production
