@@ -167,10 +167,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Define price IDs for each tier (configured in Stripe dashboard)
+      // Using live price IDs to ensure checkout is in live mode
       const priceIds = {
-        professional: process.env.STRIPE_PROFESSIONAL_PRICE_ID || 'price_1RikHtARacWLsYzMi1CWbouU', // $49/month
-        enterprise: process.env.STRIPE_ENTERPRISE_PRICE_ID || 'price_1RikInARacWLsYzMLMt2mL4x' // $299/month
+        professional: 'price_1RikHtARacWLsYzMi1CWbouU', // $49/month - Live price ID
+        enterprise: 'price_1RikInARacWLsYzMLMt2mL4x' // $299/month - Live price ID
       };
+      
+      console.log(`🔑 Using price IDs: Professional=${priceIds.professional}, Enterprise=${priceIds.enterprise}`);
+      console.log(`🔑 Stripe key type: ${stripeKey.substring(0, 8)}...`);
 
       const session = await stripe.checkout.sessions.create({
         customer: customer.id,
