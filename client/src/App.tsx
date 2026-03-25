@@ -16,7 +16,7 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
 import { initializeFirebase } from "./lib/firebase";
-import { initGA } from "@/lib/analytics";
+import { initGA, trackStripeEvent, trackUserAction } from "@/lib/analytics";
 import { useAnalytics } from "@/hooks/use-analytics";
 
 // Initialize Firebase with error handling
