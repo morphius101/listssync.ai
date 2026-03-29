@@ -17,17 +17,22 @@ const LandingPage = () => {
   const handleGetStarted = async () => {
     if (isAuthenticated) {
       navigate('/dashboard');
-    } else {
-      setIsLoggingIn(true);
-      try {
-        await signInWithGoogle();
-        navigate('/dashboard');
-      } catch (error) {
-        console.error('Login failed:', error);
-      } finally {
-        setIsLoggingIn(false);
-      }
+      return;
     }
+    setIsLoggingIn(true);
+    try {
+      const result = await signInWithGoogle();
+      // On mobile, signInWithRedirect returns undefined and navigates away — no result here
+      // On desktop, signInWithPopup returns a UserCredential
+      if (result) {
+        navigate('/dashboard');
+      }
+      // Mobile: navigation will happen after redirect returns and onAuthStateChanged fires
+    } catch (error: any) {
+      console.error('Login failed:', error);
+      setIsLoggingIn(false);
+    }
+    // Note: don't set isLoggingIn=false on mobile redirect path — page will reload
   };
 
   const features = [

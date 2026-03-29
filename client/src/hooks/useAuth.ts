@@ -32,6 +32,10 @@ export function useAuth() {
     getRedirectResult(auth).then(async (result) => {
       if (result?.user) {
         await registerUserInDatabase(result.user);
+        // Redirect to dashboard after successful mobile sign-in
+        if (window.location.pathname === '/') {
+          window.location.href = '/dashboard';
+        }
       }
     }).catch((error) => {
       console.error('Redirect sign-in error:', error);
