@@ -4,3 +4,15 @@ dist
 server/public
 vite.config.ts.*
 *.tar.gz
+
+# Replit-specific (never commit these)
+.local/
+.replit
+replit.md
+attached_assets/
+generated-icon.png
+*.png
+*.jpg
+*.jpeg
+# Allow SVG icons in public
+!client/public/*.svg
