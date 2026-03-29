@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 
 // Create Gemini client
-const genAI = new GoogleGenAI(process.env.GEMINI_API_KEY || "");
+const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
 
 // Available languages for translation
 export const AVAILABLE_LANGUAGES = {
@@ -77,7 +77,8 @@ export async function translateText(
  */
 export async function translateChecklist(
   checklist: any,
-  targetLanguage: LanguageCode
+  targetLanguage: LanguageCode,
+  _sourceLanguage?: LanguageCode | string
 ): Promise<any> {
   try {
     console.log(`🔄 Starting checklist translation to ${targetLanguage}`);

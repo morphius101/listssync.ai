@@ -157,19 +157,17 @@ export class DatabaseStorage implements IStorage {
         if (verification && verification.checklistId) {
           console.log(`✅ Found verification with checklist ID: ${verification.checklistId}`);
           
-          // First try to determine if verification.checklistId is numeric
-          if (!isNaN(parseInt(verification.checklistId)) && verification.checklistId.match(/^\d+$/)) {
-            try {
+          try {
               const [linkedChecklist] = await db.select()
                 .from(checklists)
-                .where(eq(checklists.id, parseInt(verification.checklistId)));
+                .where(eq(checklists.id, verification.checklistId));
                 
               if (linkedChecklist) {
                 console.log(`✅ Found checklist via verification link: ${verification.checklistId}`);
                 const tasksData = linkedChecklist.tasksData as TaskDTO[] || [];
                 
                 return {
-                  id: linkedChecklist.id.toString(),
+                  id: linkedChecklist.id,
                   name: linkedChecklist.name,
                   tasks: tasksData,
                   status: linkedChecklist.status as 'not-started' | 'in-progress' | 'completed',
@@ -183,21 +181,6 @@ export class DatabaseStorage implements IStorage {
             } catch (linkedError: any) {
               console.log(`❌ Error finding linked checklist by ID: ${linkedError.message}`);
             }
-          } else {
-            // If it's not numeric, it might be a Firebase ID or token
-            console.log(`⚠️ Non-numeric checklist ID in verification: ${verification.checklistId}`);
-            return {
-              id: verification.checklistId,
-              name: "Shared Checklist",
-              tasks: [],
-              status: 'not-started' as 'not-started',
-              progress: 0,
-              createdAt: new Date(),
-              updatedAt: new Date(),
-              remarks: "This checklist was shared with you. The data will be loaded from Firebase.",
-              userId: undefined
-            };
-          }
         }
       } catch (verificationError: any) {
         console.log(`❌ Error checking verification: ${verificationError.message}`);
@@ -212,28 +195,22 @@ export class DatabaseStorage implements IStorage {
   }
 
   async createChecklist(checklist: ChecklistDTO): Promise<ChecklistSummaryDTO> {
-    // Format tasks for storage as JSON
     const tasksWithIds = checklist.tasks.map(task => 
       task.id ? task : { ...task, id: uuidv4() }
     );
-    
-    // Handle string IDs by storing them as shareToken
-    const isStringId = isNaN(parseInt(checklist.id)) || !checklist.id.match(/^\d+$/);
-    
-    // Insert the checklist
+
     const [insertedChecklist] = await db.insert(checklists).values({
+      id: checklist.id,
       name: checklist.name,
       status: checklist.status,
       progress: checklist.progress,
       remarks: checklist.remarks || "",
       tasksData: tasksWithIds,
       userId: checklist.userId,
-      shareToken: isStringId ? checklist.id : null
     }).returning();
     
-    // Return the checklist summary with the appropriate ID
     return {
-      id: isStringId ? checklist.id : insertedChecklist.id.toString(),
+      id: insertedChecklist.id,
       name: insertedChecklist.name,
       status: insertedChecklist.status as 'not-started' | 'in-progress' | 'completed',
       progress: insertedChecklist.progress,
@@ -244,65 +221,43 @@ export class DatabaseStorage implements IStorage {
   }
 
   async updateChecklist(checklist: ChecklistDTO): Promise<ChecklistDTO | undefined> {
-    // Only proceed if this is a numeric ID
-    if (!isNaN(parseInt(checklist.id)) && checklist.id.match(/^\d+$/)) {
-      const checklistId = parseInt(checklist.id);
+    try {
+      const [updatedChecklist] = await db.update(checklists)
+        .set({
+          name: checklist.name,
+          status: checklist.status,
+          progress: checklist.progress,
+          remarks: checklist.remarks,
+          tasksData: checklist.tasks,
+          updatedAt: new Date()
+        })
+        .where(eq(checklists.id, checklist.id))
+        .returning();
       
-      // Check if checklist exists
-      try {
-        const [existingChecklist] = await db.select().from(checklists).where(eq(checklists.id, checklistId));
-        
-        if (!existingChecklist) {
-          return undefined;
-        }
-        
-        // Update the checklist
-        const [updatedChecklist] = await db.update(checklists)
-          .set({
-            name: checklist.name,
-            status: checklist.status,
-            progress: checklist.progress,
-            remarks: checklist.remarks,
-            tasksData: checklist.tasks,
-            updatedAt: new Date()
-          })
-          .where(eq(checklists.id, checklistId))
-          .returning();
-        
-        if (!updatedChecklist) {
-          return undefined;
-        }
-        
-        const tasksData = updatedChecklist.tasksData as TaskDTO[] || [];
-        
-        return {
-          id: updatedChecklist.id.toString(),
-          name: updatedChecklist.name,
-          status: updatedChecklist.status as 'not-started' | 'in-progress' | 'completed',
-          progress: updatedChecklist.progress,
-          tasks: tasksData,
-          remarks: updatedChecklist.remarks || "",
-          createdAt: updatedChecklist.createdAt,
-          updatedAt: updatedChecklist.updatedAt,
-          userId: updatedChecklist.userId || undefined
-        };
-      } catch (error) {
-        console.error("Error updating checklist:", error);
-        return undefined;
-      }
+      if (!updatedChecklist) return undefined;
+      
+      const tasksData = updatedChecklist.tasksData as TaskDTO[] || [];
+      return {
+        id: updatedChecklist.id,
+        name: updatedChecklist.name,
+        status: updatedChecklist.status as 'not-started' | 'in-progress' | 'completed',
+        progress: updatedChecklist.progress,
+        tasks: tasksData,
+        remarks: updatedChecklist.remarks || "",
+        createdAt: updatedChecklist.createdAt,
+        updatedAt: updatedChecklist.updatedAt,
+        userId: updatedChecklist.userId || undefined
+      };
+    } catch (error) {
+      console.error("Error updating checklist:", error);
+      return undefined;
     }
-    
-    // If we can't convert to a numeric ID, return undefined
-    return undefined;
   }
 
   async deleteChecklist(id: string): Promise<boolean> {
     try {
-      if (!isNaN(parseInt(id)) && id.match(/^\d+$/)) {
-        await db.delete(checklists).where(eq(checklists.id, parseInt(id)));
-        return true;
-      }
-      return false;
+      await db.delete(checklists).where(eq(checklists.id, id));
+      return true;
     } catch (error) {
       console.error("Error deleting checklist:", error);
       return false;

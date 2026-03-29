@@ -6,12 +6,40 @@ import ChecklistEditor from "@/components/dashboard/ChecklistEditor";
 import ShareLinkModal from "@/components/modals/ShareLinkModal";
 import MinimalistSubscriptionStatus from "@/components/MinimalistSubscriptionStatus";
 import { DevelopmentBanner } from "@/components/DevelopmentBanner";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Checklist, ChecklistSummary } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { getChecklists, getChecklistById, createChecklist, updateChecklist, deleteChecklist, generateShareLink } from "@/services/checklistService";
 import { trackUserAction } from "@/lib/analytics";
+
+function DashboardSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <div key={i} className="bg-white rounded-lg p-4 border">
+            <Skeleton className="h-4 w-24 mb-2" />
+            <Skeleton className="h-8 w-16" />
+          </div>
+        ))}
+      </div>
+      <div className="space-y-3">
+        {[...Array(3)].map((_, i) => (
+          <div key={i} className="bg-white rounded-lg p-4 border flex items-center gap-4">
+            <Skeleton className="h-10 w-10 rounded-full shrink-0" />
+            <div className="flex-1 space-y-2">
+              <Skeleton className="h-4 w-48" />
+              <Skeleton className="h-3 w-32" />
+            </div>
+            <Skeleton className="h-6 w-20 rounded-full" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
 const AdminDashboard = () => {
   const [checklists, setChecklists] = useState<ChecklistSummary[]>([]);
@@ -248,6 +276,8 @@ const AdminDashboard = () => {
           onCancel={() => setIsEditing(false)}
           onShare={() => setIsShareModalOpen(true)}
         />
+      ) : isLoading ? (
+        <DashboardSkeleton />
       ) : (
         <>
           <DashboardStats {...getStats()} />

@@ -16,3 +16,4 @@ generated-icon.png
 *.jpeg
 # Allow SVG icons in public
 !client/public/*.svg
+.env

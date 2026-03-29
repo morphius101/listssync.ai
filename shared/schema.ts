@@ -230,7 +230,7 @@ export interface UserDTO {
   firstName?: string;
   lastName?: string;
   profileImageUrl?: string;
-  subscriptionTier: 'free' | 'pro' | 'enterprise';
+  subscriptionTier: 'free' | 'professional' | 'enterprise';
   subscriptionStatus?: string;
   subscriptionEndsAt?: Date;
   listSyncCount: number;

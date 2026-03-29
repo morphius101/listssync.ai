@@ -1,6 +1,15 @@
 import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
+import { validateEnv } from "./validateEnv";
+import { initializeApp, getApps } from "firebase-admin/app";
+
+if (getApps().length === 0) {
+  // In production use a service account, in development use application default credentials
+  initializeApp();
+}
+
+validateEnv();
 
 // Server startup
 
