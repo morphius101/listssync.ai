@@ -69,6 +69,11 @@ const SITE_CONFIG = {
 export async function registerRoutes(app: Express): Promise<Server> {
   // API base path
   const API_BASE = "/api";
+
+  // Health check — used by Railway, load balancers, uptime monitors
+  app.get(`${API_BASE}/health`, (_req, res) => {
+    res.json({ status: "ok", timestamp: new Date().toISOString() });
+  });
   
   // Setup API response compression for performance
   app.use(compression());
@@ -183,7 +188,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       };
       
       console.log(`🔑 Using price IDs: Professional=${priceIds.professional}, Enterprise=${priceIds.enterprise}`);
-      console.log(`🔑 Stripe key type: ${stripeKey.substring(0, 8)}...`);
+      console.log(`🔑 Stripe key type: ${stripeKey?.substring(0, 8) ?? 'unknown'}...`);
 
       const session = await stripe.checkout.sessions.create({
         customer: customer.id,
@@ -1418,6 +1423,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`Found verification record for token: ${token}, checklist: ${verification.checklistId}, language: ${verification.targetLanguage}`);
       
       // Get the checklist
+      if (!verification.checklistId) {
+        return res.status(404).json({ success: false, message: 'No checklist linked to this token' });
+      }
       let checklist = await storage.getChecklistById(verification.checklistId);
       if (!checklist) {
         return res.status(404).json({ 

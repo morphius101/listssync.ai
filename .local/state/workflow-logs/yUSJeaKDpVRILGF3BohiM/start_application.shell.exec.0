@@ -1,0 +1,46 @@
+
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[1G[0K📝 Email Environment variables check:
+- NODE_ENV: development
+- SENDGRID_API_KEY exists: [33mtrue[39m
+- SENDGRID_API_KEY value is string type: [33mtrue[39m
+- SENDGRID_API_KEY length: [33m69[39m
+- First characters of key (if exists): SG....
+🔑 Setting up SendGrid with valid API key...
+✅ SendGrid mail service initialized successfully
+🔑 Stripe initialization: LIVE MODE
+🔑 Key type detected: sk_live_...
+🔑 Using derived live key
+=== ENVIRONMENT VARIABLES DEBUG ===
+NODE_ENV: development
+TWILIO_ACCOUNT_SID exists: [33mtrue[39m
+TWILIO_AUTH_TOKEN exists: [33mtrue[39m
+TWILIO_PHONE_NUMBER exists: [33mtrue[39m
+Twilio SID first chars: ACe02
+Twilio Auth first chars: b7b30
+Twilio Phone: +18663503513
+================================
+node:events:502
+      throw er; // Unhandled 'error' event
+      ^
+
+Error: listen EADDRINUSE: address already in use 0.0.0.0:5000
+[90m    at Server.setupListenHandle [as _listen2] (node:net:1908:16)[39m
+[90m    at listenInCluster (node:net:1965:12)[39m
+[90m    at doListen (node:net:2139:7)[39m
+[90m    at process.processTicksAndRejections (node:internal/process/task_queues:83:21)[39m
+Emitted 'error' event on WebSocketServer instance at:
+[90m    at Server.emit (node:events:524:28)[39m
+[90m    at emitErrorNT (node:net:1944:8)[39m
+[90m    at process.processTicksAndRejections (node:internal/process/task_queues:82:21)[39m {
+  code: [32m'EADDRINUSE'[39m,
+  errno: [33m-98[39m,
+  syscall: [32m'listen'[39m,
+  address: [32m'0.0.0.0'[39m,
+  port: [33m5000[39m
+}
+
+Node.js v20.20.0
+[1G[0K⠙[1G[0K
