@@ -1,6 +1,16 @@
 import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
+import { requireAuth } from "./middleware/auth";
+import rateLimit from "express-rate-limit";
+
+const verificationRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 3,
+  message: { error: "Too many verification attempts. Please wait 15 minutes before trying again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 import { WebSocketServer } from "ws";
 import { z } from "zod";
 import compression from "compression";
@@ -137,7 +147,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create Stripe checkout session for subscriptions
-  app.post(`${API_BASE}/create-subscription`, async (req, res) => {
+  app.post(`${API_BASE}/create-subscription`, requireAuth, async (req, res) => {
     try {
       if (!stripe) {
         return res.status(400).json({ error: 'Payment processing not available. Please configure Stripe API keys.' });
@@ -167,10 +177,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       // Define price IDs for each tier (configured in Stripe dashboard)
-      // Using live price IDs to ensure checkout is in live mode
       const priceIds = {
-        professional: 'price_1RikHtARacWLsYzMi1CWbouU', // $49/month - Live price ID
-        enterprise: 'price_1RikInARacWLsYzMLMt2mL4x' // $299/month - Live price ID
+        professional: process.env.STRIPE_PRICE_PROFESSIONAL || "price_1RikHtARacWLsYzMi1CWbouU",
+        enterprise: process.env.STRIPE_PRICE_ENTERPRISE || "price_1RikInARacWLsYzMLMt2mL4x"
       };
       
       console.log(`🔑 Using price IDs: Professional=${priceIds.professional}, Enterprise=${priceIds.enterprise}`);
@@ -444,7 +453,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new checklist with tier limits enforcement
-  app.post(`${API_BASE}/checklists`, async (req, res) => {
+  app.post(`${API_BASE}/checklists`, requireAuth, async (req, res) => {
     try {
       const validatedData = checklistSchema.parse(req.body);
       
@@ -488,7 +497,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update checklist
-  app.put(`${API_BASE}/checklists/:id`, async (req, res) => {
+  app.put(`${API_BASE}/checklists/:id`, requireAuth, async (req, res) => {
     try {
       // Check if checklist exists
       const existingChecklist = await storage.getChecklistById(req.params.id);
@@ -527,7 +536,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete checklist
-  app.delete(`${API_BASE}/checklists/:id`, async (req, res) => {
+  app.delete(`${API_BASE}/checklists/:id`, requireAuth, async (req, res) => {
     try {
       // Check if checklist exists
       const existingChecklist = await storage.getChecklistById(req.params.id);
@@ -656,7 +665,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Verification system routes
-  app.post(`${API_BASE}/verification/send`, async (req, res) => {
+  app.post(`${API_BASE}/verification/send`, verificationRateLimit, async (req, res) => {
     console.log('================================================');
     console.log('📨 VERIFICATION REQUEST RECEIVED');
     console.log('================================================');
@@ -798,15 +807,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
             sendSuccess = true;
           } else {
             console.error(`❌ Failed to send verification email to ${email}`);
-            // Add detailed logging
             console.error(`📧 Verification email failure details:`);
             console.error(`- Email: ${email.substring(0, 3)}...${email.substring(email.indexOf('@'))}`);
             console.error(`- Environment: ${process.env.NODE_ENV}`);
-            
-            // We'll continue instead of returning an error
-            // This allows the flow to work even if email delivery fails
-            console.log(`ℹ️ Continuing verification flow despite email failure`);
-            sendSuccess = true; // Treat as success for flow continuity
+
+            if (process.env.NODE_ENV === 'development') {
+              console.log(`ℹ️ Continuing verification flow despite email failure (development only)`);
+              sendSuccess = true;
+            } else {
+              return res.status(500).json({ message: "Failed to send verification email. Please try again or use phone verification." });
+            }
           }
         } catch (emailError: any) {
           console.error(`❌ Exception during verification email sending:`, emailError.message);
@@ -1230,14 +1240,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Unexpected error in verification endpoint:", error);
-      
-      // Even on error, return success with a default ID
-      return res.json({ 
-        verified: true, 
-        recipientId: `emergency_${Date.now()}`,
-        checklistId: "1",
-        message: "Verification processed (recovery mode)"
-      });
+      return res.status(500).json({ verified: false, message: "Internal server error" });
     }
   });
 
