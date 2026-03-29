@@ -80,26 +80,13 @@ export function getFirebase() {
 export function signInWithGoogle() {
   const auth = getAuth();
   const provider = new GoogleAuthProvider();
-  
-  // Add these settings to help with authentication across different environments
-  provider.setCustomParameters({
-    prompt: 'select_account',
-    // This helps with session storage issues in certain browsers and environments
-    auth_type: 'rerequest',
-  });
-  
-  // Add better error handling
-  return signInWithPopup(auth, provider)
-    .catch((error) => {
-      console.error("Login failed:", error);
-      
-      // Provide helpful error information
-      if (error.code === 'auth/popup-blocked') {
-        console.error("Unable to verify that the app domain is authorized");
-      }
-      
-      throw error; // Rethrow for upstream handling
-    });
+  provider.setCustomParameters({ prompt: 'select_account' });
+
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+  if (isMobile) {
+    return signInWithRedirect(auth, provider);
+  }
+  return signInWithPopup(auth, provider);
 }
 
 export function signOutUser() {

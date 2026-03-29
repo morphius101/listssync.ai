@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Separator } from '@/components/ui/separator';
-import { AlertCircle, Loader2, Mail, Apple } from 'lucide-react';
+import { AlertCircle, Loader2, Mail } from 'lucide-react';
 import { signInWithGoogle } from '@/lib/firebase';
 
 type Mode = 'signin' | 'signup' | 'reset';
@@ -105,10 +105,12 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
     setLoading(true);
     try {
       const result = await signInWithGoogle();
-      if (result) onSuccess(); // desktop popup — result available immediately
-      // mobile redirect — page will reload, onSuccess fires via useAuth
+      if (result) onSuccess();
     } catch (err: any) {
-      if (err.code !== 'auth/popup-closed-by-user') {
+      console.error('Google sign-in error:', err.code, err.message);
+      if (err.code === 'auth/popup-blocked') {
+        setError('Popup was blocked by your browser. Please allow popups for this site and try again.');
+      } else if (err.code !== 'auth/popup-closed-by-user') {
         setError(friendlyError(err.code));
       }
       setLoading(false);
@@ -182,7 +184,11 @@ export function AuthModal({ open, onClose, onSuccess }: AuthModalProps) {
               onClick={handleApple}
               disabled={loading}
             >
-              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Apple className="h-4 w-4" />}
+              {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : (
+                <svg className="h-4 w-4" viewBox="0 0 814 1000" fill="currentColor">
+                  <path d="M788.1 340.9c-5.8 4.5-108.2 62.2-108.2 190.5 0 148.4 130.3 200.9 134.2 202.2-.6 3.2-20.7 71.9-68.7 141.9-42.8 61.6-87.5 123.1-155.5 123.1s-85.5-39.5-164-39.5c-76 0-103.7 40.8-165.9 40.8s-105-57.8-155.5-127.4C46 425.2 26.1 193.7 26.1 138.8c0-19.9 1.3-40.5 3.9-60.5C43.6 36.7 96.2 0 156.7 0c59.2 0 103.1 38.5 134.2 38.5 30.4 0 79.6-40.8 147.7-40.8 23.1 0 108.2 1.9 169.7 82.4zm-85.4-193.1c31.1-36.9 53.1-88.1 53.1-139.3 0-7.1-.6-14.3-1.9-20.1-50.6 1.9-110.8 33.7-147.1 75.8-28.5 32.4-55.1 83.6-55.1 135.5 0 7.8 1.3 15.6 1.9 18.1 3.2.6 8.4 1.3 13.6 1.3 45.4 0 102.5-30.4 135.5-71.3z"/>
+                </svg>
+              )}
               Continue with Apple
             </Button>
 

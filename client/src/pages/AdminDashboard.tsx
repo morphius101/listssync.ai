@@ -190,6 +190,38 @@ const AdminDashboard = () => {
     setLocation(`/checklist/${id}`);
   };
 
+  const handleDuplicate = async (id: string) => {
+    try {
+      const original = await getChecklistById(id);
+      if (!original) throw new Error('Checklist not found');
+      
+      const duplicate: Checklist = {
+        ...original,
+        id: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+        name: `${original.name} (Copy)`,
+        status: 'not-started',
+        progress: 0,
+        tasks: original.tasks.map(t => ({
+          ...t,
+          id: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
+          completed: false,
+          photoUrl: null,
+        })),
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        userId: user?.uid,
+      };
+
+      await createChecklist(duplicate);
+      await loadChecklists();
+      trackUserAction('checklist_duplicated', id);
+      toast({ title: 'Duplicated', description: `"${original.name}" copied successfully.` });
+    } catch (error) {
+      console.error('Error duplicating checklist:', error);
+      toast({ title: 'Error', description: 'Failed to duplicate checklist.', variant: 'destructive' });
+    }
+  };
+
   const handleSaveChecklist = async (checklist: Checklist) => {
     try {
       if (checklist.id && checklists.some(c => c.id === checklist.id)) {
@@ -289,6 +321,7 @@ const AdminDashboard = () => {
             onDelete={handleDelete}
             onShare={handleShare}
             onView={handleView}
+            onDuplicate={handleDuplicate}
           />
         </>
       )}

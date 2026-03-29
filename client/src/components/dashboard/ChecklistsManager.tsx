@@ -16,6 +16,7 @@ interface ChecklistsManagerProps {
   onDelete: (id: string) => void;
   onShare: (id: string) => void;
   onView: (id: string) => void;
+  onDuplicate: (id: string) => void;
 }
 
 const ChecklistsManager = ({ 
@@ -24,7 +25,8 @@ const ChecklistsManager = ({
   onEdit, 
   onDelete,
   onShare,
-  onView
+  onView,
+  onDuplicate
 }: ChecklistsManagerProps) => {
   const [location, setLocation] = useLocation();
 
@@ -104,6 +106,9 @@ const ChecklistsManager = ({
                     <DropdownMenuContent>
                       <DropdownMenuItem onClick={() => onEdit(checklist.id)}>
                         Edit
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => onDuplicate(checklist.id)}>
+                        Duplicate
                       </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => onShare(checklist.id)}>
                         Share Link

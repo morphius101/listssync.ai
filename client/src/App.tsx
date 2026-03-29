@@ -12,6 +12,8 @@ import SmsConsent from "@/pages/SmsConsent";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import LandingPage from "@/components/LandingPage";
+import { OfflineIndicator } from "@/components/OfflineIndicator";
+import { PWAInstallPrompt } from "@/components/PWAInstallPrompt";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
@@ -175,6 +177,8 @@ function App() {
             <Router />
           </div>
           <Footer />
+          <OfflineIndicator />
+          <PWAInstallPrompt />
         </div>
       </TooltipProvider>
     </QueryClientProvider>
