@@ -4,6 +4,22 @@ import { getAuth } from "firebase/auth";
 // API base URL
 const API_BASE = '/api';
 
+// Get the current user's Firebase ID token for authenticated requests
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const auth = getAuth();
+  const user = auth.currentUser;
+  if (!user) return { 'Content-Type': 'application/json' };
+  try {
+    const token = await user.getIdToken();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    };
+  } catch {
+    return { 'Content-Type': 'application/json' };
+  }
+}
+
 // Get all checklists (optionally filtered by current user)
 export const getChecklists = async (): Promise<ChecklistSummary[]> => {
   const auth = getAuth();
@@ -90,9 +106,7 @@ export const createChecklist = async (checklist: Checklist): Promise<ChecklistSu
     // Use PostgreSQL API instead of Firebase
     const response = await fetch(`${API_BASE}/checklists`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: await getAuthHeaders(),
       body: JSON.stringify(checklistData),
     });
     
@@ -127,9 +141,7 @@ export const updateChecklist = async (checklist: Checklist): Promise<void> => {
     // Use PostgreSQL API instead of Firebase
     const response = await fetch(`${API_BASE}/checklists/${checklist.id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: await getAuthHeaders(),
       body: JSON.stringify(checklist),
     });
     
@@ -150,8 +162,10 @@ export const deleteChecklist = async (id: string): Promise<void> => {
   
   try {
     // Use PostgreSQL API instead of Firebase
+    const authHeaders = await getAuthHeaders();
     const response = await fetch(`${API_BASE}/checklists/${id}`, {
       method: 'DELETE',
+      headers: authHeaders,
     });
     
     if (!response.ok) {
