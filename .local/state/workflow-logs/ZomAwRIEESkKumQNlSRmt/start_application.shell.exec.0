@@ -1,0 +1,25 @@
+[1G[0K⠙[1G[0K
+> rest-express@1.0.0 dev
+> NODE_ENV=development tsx server/index.ts
+
+[1G[0K⠙[1G[0K📝 Email Environment variables check:
+- NODE_ENV: development
+- SENDGRID_API_KEY exists: [33mtrue[39m
+- SENDGRID_API_KEY value is string type: [33mtrue[39m
+- SENDGRID_API_KEY length: [33m69[39m
+- First characters of key (if exists): SG....
+🔑 Setting up SendGrid with valid API key...
+✅ SendGrid mail service initialized successfully
+🔑 Stripe initialization: LIVE MODE
+🔑 Key type detected: sk_live_...
+🔑 Using derived live key
+=== ENVIRONMENT VARIABLES DEBUG ===
+NODE_ENV: development
+TWILIO_ACCOUNT_SID exists: [33mtrue[39m
+TWILIO_AUTH_TOKEN exists: [33mtrue[39m
+TWILIO_PHONE_NUMBER exists: [33mtrue[39m
+Twilio SID first chars: ACe02
+Twilio Auth first chars: b7b30
+Twilio Phone: +18663503513
+================================
+5:08:56 PM [express] serving on port 5000
