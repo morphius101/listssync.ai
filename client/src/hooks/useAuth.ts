@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, getRedirectResult, User } from 'firebase/auth';
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -27,6 +27,16 @@ export function useAuth() {
 
   useEffect(() => {
     const auth = getAuth();
+
+    // Handle redirect result on mobile after Google sign-in redirect
+    getRedirectResult(auth).then(async (result) => {
+      if (result?.user) {
+        await registerUserInDatabase(result.user);
+      }
+    }).catch((error) => {
+      console.error('Redirect sign-in error:', error);
+    });
+
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       

@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
 import { getFirestore, collection, doc, setDoc, getDoc, updateDoc, deleteDoc, getDocs, query, where, onSnapshot, Timestamp, addDoc } from 'firebase/firestore';
 import { getStorage, ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/auth';
+import { getAuth, GoogleAuthProvider, signInWithPopup, signInWithRedirect, getRedirectResult, signOut } from 'firebase/auth';
 
 // Firebase configuration
 const firebaseConfig = {
@@ -81,19 +81,23 @@ export function signInWithGoogle() {
   const auth = getAuth();
   const provider = new GoogleAuthProvider();
   
-  // Add these settings to help with authentication across different environments
   provider.setCustomParameters({
     prompt: 'select_account',
-    // This helps with session storage issues in certain browsers and environments
-    auth_type: 'rerequest',
   });
+
+  // Use redirect on mobile (popup is blocked), popup on desktop
+  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
   
-  // Add better error handling
+  if (isMobile) {
+    // Redirect flow — returns a promise that resolves immediately (result comes back after redirect)
+    return signInWithRedirect(auth, provider);
+  }
+
+  // Desktop popup flow with error handling
   return signInWithPopup(auth, provider)
     .catch((error) => {
       console.error("Login failed:", error);
       
-      // Provide helpful error information
       if (error.code === 'auth/popup-blocked') {
         console.error("Unable to verify that the app domain is authorized");
       }
