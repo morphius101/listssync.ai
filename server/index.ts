@@ -2,11 +2,25 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { validateEnv } from "./validateEnv";
-import { initializeApp, getApps } from "firebase-admin/app";
+import { initializeApp, getApps, cert } from "firebase-admin/app";
 
 if (getApps().length === 0) {
-  // In production use a service account, in development use application default credentials
-  initializeApp();
+  if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
+    // Production: use service account from base64-encoded env var
+    try {
+      const serviceAccount = JSON.parse(
+        Buffer.from(process.env.FIREBASE_SERVICE_ACCOUNT_BASE64, 'base64').toString('utf8')
+      );
+      initializeApp({ credential: cert(serviceAccount) });
+      console.log('✅ Firebase Admin initialized with service account');
+    } catch (e) {
+      console.warn('⚠️  Firebase Admin: failed to parse service account, falling back to default');
+      initializeApp();
+    }
+  } else {
+    // Development: no service account, auth middleware uses JWT decode fallback
+    console.log('ℹ️  Firebase Admin: no service account configured (dev mode — JWT decode fallback active)');
+  }
 }
 
 validateEnv();
