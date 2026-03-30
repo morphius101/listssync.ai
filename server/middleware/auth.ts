@@ -4,7 +4,14 @@ import type { Request, Response, NextFunction } from "express";
 export async function requireAuth(req: Request, res: Response, next: NextFunction) {
   try {
     const authHeader = req.headers.authorization;
+    
+    // In development, allow requests without token (Firebase Admin not configured locally)
+    // In production, enforce strictly
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      if (process.env.NODE_ENV === 'development') {
+        (req as any).user = { uid: 'dev-user', email: 'dev@local' };
+        return next();
+      }
       return res.status(401).json({ error: "Unauthorized: missing token" });
     }
     const idToken = authHeader.split("Bearer ")[1];

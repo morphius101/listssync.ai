@@ -4,6 +4,33 @@ import { getAuth } from "firebase/auth";
 // API base URL
 const API_BASE = '/api';
 
+// Wait for auth to restore, then get token headers
+async function getAuthHeaders(): Promise<Record<string, string>> {
+  const auth = getAuth();
+  if (auth.currentUser) {
+    try {
+      const token = await auth.currentUser.getIdToken();
+      return { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` };
+    } catch {}
+  }
+  // Wait up to 5s for auth state to restore (happens on page load)
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve({ 'Content-Type': 'application/json' }), 5000);
+    const unsub = auth.onAuthStateChanged(async (user) => {
+      clearTimeout(timer);
+      unsub();
+      if (user) {
+        try {
+          const token = await user.getIdToken();
+          resolve({ 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` });
+          return;
+        } catch {}
+      }
+      resolve({ 'Content-Type': 'application/json' });
+    });
+  });
+}
+
 // Get all checklists (optionally filtered by current user)
 export const getChecklists = async (): Promise<ChecklistSummary[]> => {
   const auth = getAuth();
@@ -90,9 +117,7 @@ export const createChecklist = async (checklist: Checklist): Promise<ChecklistSu
     // Use PostgreSQL API instead of Firebase
     const response = await fetch(`${API_BASE}/checklists`, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: await getAuthHeaders(),
       body: JSON.stringify(checklistData),
     });
     
@@ -127,9 +152,7 @@ export const updateChecklist = async (checklist: Checklist): Promise<void> => {
     // Use PostgreSQL API instead of Firebase
     const response = await fetch(`${API_BASE}/checklists/${checklist.id}`, {
       method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: await getAuthHeaders(),
       body: JSON.stringify(checklist),
     });
     
@@ -152,6 +175,7 @@ export const deleteChecklist = async (id: string): Promise<void> => {
     // Use PostgreSQL API instead of Firebase
     const response = await fetch(`${API_BASE}/checklists/${id}`, {
       method: 'DELETE',
+      headers: await getAuthHeaders(),
     });
     
     if (!response.ok) {
@@ -173,9 +197,7 @@ export const updateTaskStatus = async (checklistId: string, taskId: string, upda
     // Use PostgreSQL API instead of Firebase
     const response = await fetch(`${API_BASE}/checklists/${checklistId}/tasks/${taskId}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: await getAuthHeaders(),
       body: JSON.stringify(updates),
     });
     
