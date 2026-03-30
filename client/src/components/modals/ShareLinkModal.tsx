@@ -1,227 +1,105 @@
 import { useState, useEffect } from 'react';
-import * as React from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogDescription,
 } from '@/components/ui/dialog';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { useVerification, SendVerificationParams } from '@/hooks/useVerification';
+import { Loader2, ClipboardCopy, Check, Phone, Globe, MessageSquare, Link2 } from 'lucide-react';
 import { useTranslation, LanguageCode } from '@/hooks/useTranslation';
-import { Checklist } from '@/types';
-import { AlertTriangle, Loader2, ClipboardCopy, Mail, Phone, Languages, Smartphone, Globe, Shield, MessageSquare } from 'lucide-react';
 
 interface ShareLinkModalProps {
   isOpen: boolean;
   onClose: () => void;
   checklistId: string;
-  checklist?: Checklist;
+  checklist?: any;
   onGenerateNewLink?: () => Promise<string>;
 }
 
-export default function ShareLinkModal({ 
-  isOpen, 
-  onClose, 
-  checklistId, 
-  checklist,
-  onGenerateNewLink
+export default function ShareLinkModal({
+  isOpen,
+  onClose,
+  checklistId,
 }: ShareLinkModalProps) {
-  const [shareLink, setShareLink] = useState<string | null>(null);
-  const [isCopied, setIsCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState('email');
-  const [recipientEmail, setRecipientEmail] = useState('');
-  const [recipientPhone, setRecipientPhone] = useState('');
-  const [recipientName, setRecipientName] = useState('');
+  const [step, setStep] = useState<'options' | 'link'>('options');
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>('en');
-  const [response, setResponse] = useState<any>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [phone, setPhone] = useState('');
   const [smsConsent, setSmsConsent] = useState(false);
-  const [emailConsent, setEmailConsent] = useState(false);
+  const [shareLink, setShareLink] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [maskedPhone, setMaskedPhone] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [smsSent, setSmsSent] = useState(false);
 
-  // Reset state when modal opens
+  const { languages } = useTranslation();
+
   useEffect(() => {
     if (isOpen) {
-      // Clear all form fields and states when modal opens
-      setShareLink(null);
-      setIsCopied(false);
-      setRecipientEmail('');
-      setRecipientPhone('');
-      setRecipientName('');
-      setSelectedLanguage('en');
-      setResponse(null);
-      setError(null);
-      setActiveTab('email');
+      setStep('options');
+      setPhone('');
       setSmsConsent(false);
-      setEmailConsent(false);
+      setShareLink('');
+      setVerificationCode('');
+      setMaskedPhone('');
+      setIsCopied(false);
+      setError('');
+      setSmsSent(false);
     }
   }, [isOpen]);
-  
-  const { isLoading, shareChecklist } = useVerification();
-  const { languages, isTranslating, translateChecklist } = useTranslation();
 
-  const handleShareLink = async (e?: React.FormEvent) => {
-    // If event provided, prevent default form submission
-    if (e) e.preventDefault();
-    
-    // Reset any previous errors
-    setError(null);
-    
-    // Debug form values
-    console.log('Share form values:', {
-      activeTab,
-      recipientEmail,
-      recipientPhone,
-      recipientName,
-      checklistId,
-      hasChecklist: !!checklist
-    });
-    
-    // Validate required fields with detailed logging
-    if (activeTab === 'email' && !recipientEmail) {
-      console.log('Email validation failed: empty email address');
-      setError('Please enter a valid email address.');
-      return;
-    }
-    
-    if (activeTab === 'phone' && !recipientPhone) {
-      console.log('Phone validation failed: empty phone number');
-      setError('Please enter a valid phone number.');
-      return;
-    }
-    
-    // Validate consent requirements
-    if (activeTab === 'email' && !emailConsent) {
-      setError('Please confirm that the recipient consents to receive emails.');
-      return;
-    }
-    
-    if (activeTab === 'phone' && !smsConsent) {
-      setError('Please confirm that the recipient consents to receive text messages.');
-      return;
-    }
-    
-    // Log which validation passed
-    console.log(`Validation passed for ${activeTab} with value: ${activeTab === 'email' ? recipientEmail : recipientPhone}`);
-    
-    // Validate checklist ID
-    if (!checklistId) {
-      console.error("Missing checklist ID");
-      setError('Unable to share: missing checklist ID.');
-      return;
-    }
-    
+  const handleGenerate = async () => {
+    setIsLoading(true);
+    setError('');
     try {
-      // Make a copy of the checklist for potential translation
-      let checklistToShare = checklist;
-      
-      // Skip translation during sharing - it will happen on the recipient's side
-      console.log('Sharing with language preference:', selectedLanguage);
-      
-      // Always proceed with sharing regardless of checklist object state
-      // The important thing is that we have a valid checklistId
-      if (!checklistId) {
-        setError('No checklist ID available for sharing');
-        return;
-      }
-      
-      // Generate a recipient ID and prepare sharing parameters
-      const recipientId = `recipient_${Date.now()}`;
-      
-      const params: SendVerificationParams = {
-        checklistId: checklistId, // Use the checklistId prop directly
-        recipientName,
-        recipientId,
-        targetLanguage: selectedLanguage // Include the target language
+      const params: any = {
+        checklistId,
+        recipientId: `recipient_${Date.now()}`,
+        targetLanguage: selectedLanguage,
       };
-      
-      // Add contact method based on active tab
-      if (activeTab === 'email' && recipientEmail) {
-        params.email = recipientEmail;
-      } else if (activeTab === 'phone' && recipientPhone) {
-        params.phone = recipientPhone;
+
+      // Only add phone if provided AND consented
+      if (phone && smsConsent) {
+        params.phone = phone;
       }
-      
-      console.log('Sharing checklist with simplified params:', params);
-      
-      // Log the complete parameters before making the API call
-      console.log('Sharing checklist with params:', params);
-      
-      // Try a direct fetch call to diagnose the issue
-      try {
-        console.log('Making direct fetch call with params:', params);
-        
-        const directResponse = await fetch('/api/verification/send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(params),
-          credentials: 'include'
-        });
-        
-        console.log('Direct fetch response status:', directResponse.status);
-        
-        if (directResponse.ok) {
-          const data = await directResponse.json();
-          console.log('Direct fetch success with data:', data);
-          
-          if (data.shareUrl) {
-            setShareLink(data.shareUrl);
-            setResponse(data);
-            return;
-          }
-        } else {
-          console.error('Direct fetch failed with status:', directResponse.status);
-          const errorText = await directResponse.text();
-          console.error('Error details:', errorText);
-          throw new Error(`API error: ${directResponse.status} - ${errorText}`);
-        }
-      } catch (directError) {
-        console.error('Direct fetch error:', directError);
-      }
-      
-      // If direct fetch failed or returned no data, fall back to the hook
-      console.log('Falling back to the shareChecklist hook');
-      const response = await shareChecklist(params);
-      
-      if (response?.shareUrl) {
-        setShareLink(response.shareUrl);
-        setResponse(response);
-      } else {
-        setError('Failed to generate a share link. Please try again.');
-      }
+
+      const res = await fetch('/api/verification/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params),
+      });
+
+      if (!res.ok) throw new Error('Failed to generate link');
+      const data = await res.json();
+
+      setShareLink(data.shareUrl || '');
+      setVerificationCode(data.verificationCode || '');
+      setMaskedPhone(data.maskedPhone || '');
+      setSmsSent(!!data.maskedPhone);
+      setStep('link');
     } catch (err: any) {
-      console.error('Share checklist error:', err);
-      setError(err.message || 'Failed to share checklist. Please try again.');
+      setError('Failed to generate share link. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
-  const handleCopyLink = async () => {
+  const handleCopy = async () => {
     if (!shareLink) return;
     try {
       if (navigator.clipboard && window.isSecureContext) {
         await navigator.clipboard.writeText(shareLink);
       } else {
-        // Fallback for HTTP (non-secure context like 192.168.x.x)
         const ta = document.createElement('textarea');
         ta.value = shareLink;
-        ta.style.position = 'fixed';
-        ta.style.opacity = '0';
+        ta.style.cssText = 'position:fixed;opacity:0';
         document.body.appendChild(ta);
         ta.focus();
         ta.select();
@@ -230,219 +108,147 @@ export default function ShareLinkModal({
       }
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
-    } catch (err) {
-      console.error('Copy failed:', err);
-    }
+    } catch {}
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Share Checklist</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Link2 className="h-5 w-5 text-primary" />
+            Share Checklist
+          </DialogTitle>
           <DialogDescription>
-            Send the checklist to someone for completion
+            {step === 'options'
+              ? 'Generate a secure link to share this checklist with anyone.'
+              : 'Copy the link and share it however you like.'}
           </DialogDescription>
         </DialogHeader>
-        
-        {shareLink ? (
-          <div className="space-y-4">
-            <div className="bg-green-50 p-3 rounded-md text-green-700 text-sm">
-              <p className="font-medium">
-                {response?.maskedEmail && (
-                  <>A verification code has been sent to <span className="font-bold">{response.maskedEmail}</span></>
-                )}
-                {response?.maskedPhone && (
-                  <>A verification code has been sent to <span className="font-bold">{response.maskedPhone}</span></>
-                )}
-                {!response?.maskedEmail && !response?.maskedPhone && (
-                  <>A verification code has been sent to the recipient</>
-                )}
-              </p>
-              <p className="text-xs mt-1">
-                The recipient will need this verification code to access the checklist.
-              </p>
-              
-              {/* Display verification code in development mode */}
-              {response?.verificationCode && (
-                <div className="mt-2 p-2 bg-yellow-100 rounded border border-yellow-300">
-                  <p className="text-yellow-800 text-xs font-medium">Development Mode: Verification Code</p>
-                  <p className="font-mono text-center text-lg font-bold tracking-wider text-yellow-900 mt-1">
-                    {response.verificationCode}
-                  </p>
-                  <p className="text-yellow-700 text-xs mt-1">
-                    This code appears only in development mode to help with testing.
-                  </p>
-                </div>
-              )}
-            </div>
-            
-            <div className="flex items-center space-x-2">
-              <Input readOnly value={shareLink} className="flex-1" />
-              <Button onClick={handleCopyLink} variant="outline" size="sm">
-                {isCopied ? 'Copied!' : 'Copy'}
-                <ClipboardCopy className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-            
-            <p className="text-sm text-gray-500 text-center">
-              The recipient will need to enter the verification code to access the checklist.
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={handleShareLink} className="space-y-4">
-            <div className="flex items-center space-x-2">
-              <Globe className="w-4 h-4 text-gray-500" />
-              <Label htmlFor="language">Language for recipient</Label>
-              <Select
-                value={selectedLanguage}
-                onValueChange={(value) => setSelectedLanguage(value as LanguageCode)}
-              >
-                <SelectTrigger id="language" className="flex-1">
-                  <SelectValue placeholder="Select language" />
+
+        {step === 'options' ? (
+          <div className="space-y-5">
+            {/* Language */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                <Globe className="h-4 w-4 text-muted-foreground" />
+                Recipient's language
+              </Label>
+              <Select value={selectedLanguage} onValueChange={(v) => setSelectedLanguage(v as LanguageCode)}>
+                <SelectTrigger>
+                  <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {languages.map((lang) => (
-                    <SelectItem key={lang.code} value={lang.code}>
-                      {lang.flag} {lang.name}
+                  {languages.map((l) => (
+                    <SelectItem key={l.code} value={l.code}>
+                      {l.flag} {l.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
-            
+
+            {/* Optional SMS */}
             <div className="space-y-2">
-              <Label htmlFor="recipient-name">Recipient's name (optional)</Label>
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                <Phone className="h-4 w-4 text-muted-foreground" />
+                Send code via SMS <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
               <Input
-                id="recipient-name"
-                value={recipientName}
-                onChange={(e) => setRecipientName(e.target.value)}
-                placeholder="Enter recipient's name"
+                type="tel"
+                placeholder="+1 (555) 123-4567"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
               />
-            </div>
-            
-            <Tabs defaultValue="email" value={activeTab} onValueChange={setActiveTab}>
-              <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="email" className="flex items-center">
-                  <Mail className="w-4 h-4 mr-2" />
-                  Email
-                </TabsTrigger>
-                <TabsTrigger value="phone" className="flex items-center">
-                  <Phone className="w-4 h-4 mr-2" />
-                  Phone
-                </TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="email" className="space-y-2">
-                <Label htmlFor="email">Email address</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  value={recipientEmail}
-                  onChange={(e) => setRecipientEmail(e.target.value)}
-                  placeholder="recipient@example.com"
-                />
-                
-                {/* Email consent banner */}
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                  <div className="flex items-start space-x-2">
-                    <Shield className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                    <div className="text-sm text-blue-800">
-                      <p className="font-medium mb-1">Email Communication Consent</p>
-                      <p className="text-xs">
-                        By sharing this checklist via email, you confirm that the recipient has agreed to receive communications from ListsSync.ai, including verification codes and checklist updates.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2 mt-3">
-                    <Checkbox
-                      id="email-consent"
-                      checked={emailConsent}
-                      onCheckedChange={(checked) => setEmailConsent(checked as boolean)}
-                    />
-                    <Label htmlFor="email-consent" className="text-xs text-blue-800">
-                      I confirm the recipient consents to receive emails from ListsSync.ai
-                    </Label>
-                  </div>
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="phone" className="space-y-2">
-                <Label htmlFor="phone">Phone number</Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={recipientPhone}
-                  onChange={(e) => setRecipientPhone(e.target.value)}
-                  placeholder="+1 (555) 123-4567"
-                />
-                
-                {/* SMS consent banner */}
-                <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
-                  <div className="flex items-start space-x-2">
-                    <MessageSquare className="w-4 h-4 text-amber-600 mt-0.5 flex-shrink-0" />
-                    <div className="text-sm text-amber-800">
-                      <p className="font-medium mb-1">SMS Communication Consent</p>
-                      <p className="text-xs mb-2">
-                        By sharing this checklist via SMS, you confirm that the recipient has agreed to receive text messages from ListsSync.ai, including verification codes and checklist updates.
-                      </p>
-                      <p className="text-xs text-amber-700">
-                        <strong>Important:</strong> Message and data rates may apply. The recipient can reply STOP to opt out at any time.
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-2 mt-3">
-                    <Checkbox
-                      id="sms-consent"
-                      checked={smsConsent}
-                      onCheckedChange={(checked) => setSmsConsent(checked as boolean)}
-                    />
-                    <Label htmlFor="sms-consent" className="text-xs text-amber-800">
-                      I confirm the recipient consents to receive SMS messages from ListsSync.ai
-                    </Label>
-                  </div>
-                </div>
-              </TabsContent>
-            </Tabs>
-            
-            <div className="bg-blue-50 p-3 rounded-md text-blue-700 text-sm flex items-start">
-              <Smartphone className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-              <p>
-                The recipient will receive a verification code to access the checklist.
-                They can complete it from any device with a web browser.
+              <p className="text-xs text-muted-foreground">
+                Leave blank to share the link yourself — the recipient will need the code to open the checklist.
               </p>
             </div>
-            
-            {error && (
-              <div className="bg-red-50 p-3 rounded-md text-red-700 text-sm flex items-start">
-                <AlertTriangle className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
-                <p>{error}</p>
+
+            {/* SMS consent — only show if phone entered */}
+            {phone && (
+              <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 space-y-2">
+                <div className="flex items-start gap-2 text-sm text-amber-800">
+                  <MessageSquare className="h-4 w-4 shrink-0 mt-0.5" />
+                  <p className="text-xs">
+                    By sending an SMS, you confirm the recipient agrees to receive a one-time verification code from ListsSync.ai. Msg & data rates may apply. Reply STOP to opt out.
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="sms-consent"
+                    checked={smsConsent}
+                    onCheckedChange={(c) => setSmsConsent(c as boolean)}
+                  />
+                  <Label htmlFor="sms-consent" className="text-xs text-amber-800 cursor-pointer">
+                    Recipient consents to receive SMS
+                  </Label>
+                </div>
               </div>
             )}
-            
-            <Button 
-              type="submit"
-              disabled={isLoading || isTranslating || 
-                (activeTab === 'email' && (!recipientEmail || !emailConsent)) || 
-                (activeTab === 'phone' && (!recipientPhone || !smsConsent))
-              }
+
+            {error && (
+              <p className="text-sm text-destructive">{error}</p>
+            )}
+
+            <Button
               className="w-full"
+              onClick={handleGenerate}
+              disabled={isLoading || (!!phone && !smsConsent)}
             >
-              {(isLoading || isTranslating) && (
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              {isLoading ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : null}
+              Generate Share Link
+            </Button>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Success state */}
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3 text-sm text-green-800">
+              <p className="font-medium flex items-center gap-2">
+                <Check className="h-4 w-4" />
+                Link generated!
+              </p>
+              {smsSent && maskedPhone && (
+                <p className="text-xs mt-1">Verification code sent via SMS to {maskedPhone}.</p>
               )}
-              {isTranslating ? 'Translating...' : (isLoading ? 'Sending...' : 'Share Checklist')}
-            </Button>
-          </form>
+              {!smsSent && (
+                <p className="text-xs mt-1">
+                  Copy the link and send it yourself. The recipient will enter a code to verify access.
+                </p>
+              )}
+            </div>
+
+            {/* Link + copy */}
+            <div className="flex items-center gap-2">
+              <Input readOnly value={shareLink} className="flex-1 text-sm" />
+              <Button variant="outline" size="sm" onClick={handleCopy} className="shrink-0">
+                {isCopied ? <Check className="h-4 w-4 text-green-500" /> : <ClipboardCopy className="h-4 w-4" />}
+                <span className="ml-1">{isCopied ? 'Copied!' : 'Copy'}</span>
+              </Button>
+            </div>
+
+            {/* Dev mode code display */}
+            {verificationCode && (
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
+                <p className="text-xs text-yellow-700 font-medium mb-1">Dev mode — verification code:</p>
+                <p className="font-mono text-2xl font-bold tracking-widest text-yellow-900">{verificationCode}</p>
+              </div>
+            )}
+
+            <p className="text-xs text-muted-foreground text-center">
+              Recipients need the verification code to open this checklist. The code is included in the SMS if sent, or the sender can share it separately.
+            </p>
+
+            <div className="flex gap-2">
+              <Button variant="outline" className="flex-1" onClick={() => setStep('options')}>
+                New Link
+              </Button>
+              <Button className="flex-1" onClick={onClose}>
+                Done
+              </Button>
+            </div>
+          </div>
         )}
-        
-        <DialogFooter>
-          {shareLink && (
-            <Button onClick={onClose}>
-              Done
-            </Button>
-          )}
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
