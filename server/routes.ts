@@ -724,15 +724,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log(`📌 Generated recipientId: ${recipientId}`);
       }
       
-      // Clean phone number if provided (remove any non-numeric characters)
-      if (phone) {
-        // Keep only digits
-        const cleanedPhone = phone.replace(/\D/g, '');
-        if (cleanedPhone !== phone) {
-          console.log(`Cleaned phone number from ${phone} to ${cleanedPhone}`);
-          phone = cleanedPhone;
-        }
-      }
+      // NOTE: Phone number has already been sanitized and E.164-formatted above.
+      // Do NOT strip digits again here — that would remove the '+' prefix.
       
       console.log(`Creating verification for recipient: ${recipientId}, contact: ${email || phone}`);
       
@@ -817,6 +810,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      let smsActuallySent = false;
+
       if (phone) {
         console.log(`Attempting to send verification SMS to: ${phone}`);
         
@@ -826,51 +821,61 @@ export async function registerRoutes(app: Express): Promise<Server> {
         console.log('TWILIO_AUTH_TOKEN status:', process.env.TWILIO_AUTH_TOKEN ? 'Present' : 'Missing');
         console.log('TWILIO_PHONE_NUMBER:', process.env.TWILIO_PHONE_NUMBER || 'Missing');
         console.log('NODE_ENV:', process.env.NODE_ENV || 'not set');
+
+        const hasTwilioCredentials = !!(
+          process.env.TWILIO_ACCOUNT_SID &&
+          process.env.TWILIO_AUTH_TOKEN &&
+          process.env.TWILIO_PHONE_NUMBER
+        );
         
-        try {
-          // Attempt to send SMS via Twilio
-          const smsSuccess = await sendVerificationSMS(phone, code, token);
-          
-          if (smsSuccess) {
-            console.log(`Successfully sent verification SMS to: ${phone}`);
-            sendSuccess = true;
-          } else {
-            console.error(`Failed to send verification SMS to ${phone}`);
-            
-            // Special handling for when credentials are missing
-            if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
-              console.log('⚠️ Twilio credentials missing or not properly configured');
-              
-              if (process.env.NODE_ENV === 'production') {
-                // In production, provide professional error response
-                return res.status(500).json({ 
-                  message: "SMS verification is currently unavailable. Please try email verification instead.",
-                  type: "error" 
-                });
-              } else {
-                // Only log verification code in development mode
-                console.log(`📱 Verification code for ${phone}: ${code}`);
-                sendSuccess = true; // Allow flow to continue in development
-              }
-            }
-          }
-        } catch (smsError) {
-          console.error('SMS SENDING ERROR (CAUGHT AT ROUTES LEVEL):', smsError);
-          
-          // Different behavior based on environment
-          if (process.env.NODE_ENV === 'development') {
-            // In development, log more details and allow flow to continue
-            console.log('⚠️ SMS sending failed, but allowing verification flow to continue');
-            console.log(`📱 Verification code in development: ${code}`);
-            sendSuccess = true; // Allow flow to continue without actual SMS
-          } else {
-            // In production, handle more professionally
-            console.error('⚠️ SMS verification failed in production environment');
-            // Return a professional error message immediately
+        if (!hasTwilioCredentials) {
+          // Missing credentials — don't pretend we sent anything
+          console.log('⚠️ Twilio credentials missing. SMS cannot be sent.');
+          if (process.env.NODE_ENV === 'production') {
             return res.status(500).json({ 
               message: "SMS verification is currently unavailable. Please try email verification instead.",
               type: "error" 
             });
+          } else {
+            // Dev: log code, mark sendSuccess but NOT smsActuallySent
+            console.log(`📱 [DEV] Verification code for ${phone}: ${code}`);
+            sendSuccess = true;
+          }
+        } else {
+          try {
+            // Attempt to send SMS via Twilio
+            const smsSuccess = await sendVerificationSMS(phone, code, token);
+            
+            if (smsSuccess) {
+              console.log(`✅ Successfully sent verification SMS to: ${phone}`);
+              sendSuccess = true;
+              smsActuallySent = true;
+            } else {
+              console.error(`❌ Failed to send verification SMS to ${phone}`);
+              if (process.env.NODE_ENV === 'development') {
+                console.log(`📱 [DEV] Verification code for ${phone}: ${code}`);
+                sendSuccess = true; // allow flow, but smsActuallySent stays false
+              } else {
+                return res.status(500).json({ 
+                  message: "SMS verification is currently unavailable. Please try email verification instead.",
+                  type: "error" 
+                });
+              }
+            }
+          } catch (smsError) {
+            console.error('SMS SENDING ERROR (CAUGHT AT ROUTES LEVEL):', smsError);
+            
+            if (process.env.NODE_ENV === 'development') {
+              console.log('⚠️ SMS sending failed, but allowing verification flow to continue');
+              console.log(`📱 [DEV] Verification code for ${phone}: ${code}`);
+              sendSuccess = true; // smsActuallySent stays false
+            } else {
+              console.error('⚠️ SMS verification failed in production environment');
+              return res.status(500).json({ 
+                message: "SMS verification is currently unavailable. Please try email verification instead.",
+                type: "error" 
+              });
+            }
           }
         }
       }
@@ -922,7 +927,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
         response.maskedEmail = formatEmailForDisplay(email);
       }
       
-      if (phone) {
+      // Only include maskedPhone when SMS was actually dispatched via Twilio
+      // This prevents the UI from falsely showing "sent via SMS" when credentials are missing
+      if (phone && smsActuallySent) {
         response.maskedPhone = formatPhoneForDisplay(phone);
       }
       
