@@ -7,6 +7,7 @@ import ShareLinkModal from "@/components/modals/ShareLinkModal";
 import MinimalistSubscriptionStatus from "@/components/MinimalistSubscriptionStatus";
 import { DevelopmentBanner } from "@/components/DevelopmentBanner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { UpgradeModal } from "@/components/UpgradeModal";
 import { Checklist, ChecklistSummary } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -48,6 +49,7 @@ const AdminDashboard = () => {
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [checklistToDelete, setChecklistToDelete] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [upgradeModal, setUpgradeModal] = useState<{ open: boolean; reason: 'lists' | 'languages' | 'general' }>({ open: false, reason: 'general' });
   const { toast } = useToast();
   const { user } = useAuth();
   const [location, setLocation] = useLocation();
@@ -94,12 +96,7 @@ const AdminDashboard = () => {
       
       if (subscription.limits.maxLists !== null && subscription.limits.maxLists !== Infinity && checklists.length >= subscription.limits.maxLists) {
         trackUserAction('create_checklist_limit_reached', subscription.tier);
-        toast({
-          title: "Checklist Limit Reached",
-          description: `You've reached your plan's limit of ${subscription.limits.maxLists} checklists. Please upgrade to create more.`,
-          variant: "destructive",
-        });
-        setLocation('/pricing');
+        setUpgradeModal({ open: true, reason: 'lists' });
         return;
       }
     } catch (error) {
@@ -274,16 +271,19 @@ const AdminDashboard = () => {
       return updatedAt >= today;
     }).length;
     
+    const totalTasks = checklists.reduce((sum, c) => sum + (c.taskCount || 0), 0);
+
     return {
       activeChecklists: totalActive,
       inProgressChecklists: inProgress,
       completedToday,
+      totalTasks,
     };
   };
 
   const handleUpgrade = () => {
     trackUserAction('upgrade_from_dashboard');
-    setLocation('/pricing');
+    setUpgradeModal({ open: true, reason: 'general' });
   };
 
   return (
@@ -292,9 +292,6 @@ const AdminDashboard = () => {
         <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
         <p className="text-gray-600 mt-1">Manage your checklists and track progress</p>
       </div>
-      
-      {/* Development Banner */}
-      <DevelopmentBanner />
       
       {/* Minimalist Subscription Status */}
       {user && (
@@ -336,6 +333,13 @@ const AdminDashboard = () => {
         />
       )}
       
+      <UpgradeModal
+        open={upgradeModal.open}
+        onClose={() => setUpgradeModal({ open: false, reason: 'general' })}
+        reason={upgradeModal.reason}
+        currentTier={undefined}
+      />
+
       <AlertDialog open={!!checklistToDelete} onOpenChange={() => setChecklistToDelete(null)}>
         <AlertDialogContent>
           <AlertDialogHeader>
