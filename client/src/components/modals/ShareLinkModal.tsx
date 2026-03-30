@@ -41,8 +41,6 @@ export default function ShareLinkModal({
   checklist,
   onGenerateNewLink
 }: ShareLinkModalProps) {
-  console.log("ShareLinkModal rendered with checklistId:", checklistId);
-  console.log("ShareLinkModal rendered with checklist:", checklist);
   const [shareLink, setShareLink] = useState<string | null>(null);
   const [isCopied, setIsCopied] = useState(false);
   const [activeTab, setActiveTab] = useState('email');
