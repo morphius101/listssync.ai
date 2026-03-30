@@ -47,7 +47,10 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
   // Use the same verified sender that worked previously with greyson.gardner.m@gmail.com
   // We'll stick to that known working configuration until we can verify other sender addresses
   // Use a verified SendGrid sender — must match a verified sender identity in SendGrid dashboard
-  const { to, subject, text, html, from = process.env.SENDGRID_FROM_EMAIL || 'greyson.gardner.m@gmail.com' } = options;
+  const fromEmail = process.env.SENDGRID_FROM_EMAIL || 'noreply@listssync.ai';
+  const fromName = process.env.SENDGRID_FROM_NAME || 'ListsSync.ai';
+  const defaultFrom = { email: fromEmail, name: fromName };
+  const { to, subject, text, html, from = defaultFrom as any } = options;
   
   // API Key validation - fail early if not configured
   if (!sendgridApiKey) {
@@ -132,6 +135,7 @@ This code will expire in 10 minutes.
 
 Thank you,
 The ListsSync.ai Team
+listssync.ai
   `.trim();
   
   const html = `
