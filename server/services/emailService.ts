@@ -46,7 +46,8 @@ interface EmailOptions {
 export async function sendEmail(options: EmailOptions): Promise<boolean> {
   // Use the same verified sender that worked previously with greyson.gardner.m@gmail.com
   // We'll stick to that known working configuration until we can verify other sender addresses
-  const { to, subject, text, html, from = 'greyson@listssync.ai' } = options;
+  // Use a verified SendGrid sender — must match a verified sender identity in SendGrid dashboard
+  const { to, subject, text, html, from = process.env.SENDGRID_FROM_EMAIL || 'greyson.gardner.m@gmail.com' } = options;
   
   // API Key validation - fail early if not configured
   if (!sendgridApiKey) {

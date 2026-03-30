@@ -211,11 +211,27 @@ export default function ShareLinkModal({
     }
   };
 
-  const handleCopyLink = () => {
-    if (shareLink) {
-      navigator.clipboard.writeText(shareLink);
+  const handleCopyLink = async () => {
+    if (!shareLink) return;
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(shareLink);
+      } else {
+        // Fallback for HTTP (non-secure context like 192.168.x.x)
+        const ta = document.createElement('textarea');
+        ta.value = shareLink;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.focus();
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+      }
       setIsCopied(true);
       setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      console.error('Copy failed:', err);
     }
   };
 
