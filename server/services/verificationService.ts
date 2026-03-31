@@ -353,17 +353,18 @@ export async function sendVerificationSMS(phone: string, code: string, token?: s
     console.log(`📱 Sending verification code to: ${formatPhoneForDisplay(formattedPhone)}`);
     console.log(`📱 Code: ${code}`);
     
-    // Construct message body with or without URL
-    let messageBody = `Your ListsSync.ai verification code is: ${code}`;
-    
-    // Add URL if token is available
+    // Build message — if we have a token, send a direct link (no code needed)
+    let messageBody: string;
     if (token) {
-      const baseUrl = process.env.NODE_ENV === 'production' 
+      const baseUrl = process.env.NODE_ENV === 'production'
         ? 'https://www.listssync.ai'
         : `http://localhost:5000`;
       const shareUrl = `${baseUrl}/shared/${token}`;
-      messageBody += `\n\nAccess your checklist: ${shareUrl}`;
-      messageBody += `\n\nThis link will take you directly to the shared checklist after verification.`;
+      messageBody = `Someone shared a checklist with you on ListsSync.ai.\n\nView it here: ${shareUrl}`;
+    } else if (code) {
+      messageBody = `Your ListsSync.ai verification code is: ${code}`;
+    } else {
+      messageBody = `You have a shared checklist on ListsSync.ai.`;
     }
 
     // Real SMS sending with Twilio
