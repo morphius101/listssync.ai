@@ -120,85 +120,80 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
  * @returns Promise resolving to true if email sent successfully
  */
 export async function sendVerificationEmail(email: string, code: string, token?: string): Promise<boolean> {
-  const subject = 'Your ListsSync.ai Verification Code';
-  
-  const baseUrl = process.env.NODE_ENV === 'production' 
+  const baseUrl = process.env.NODE_ENV === 'production'
     ? 'https://www.listssync.ai'
     : `http://localhost:5000`;
   const shareUrl = token ? `${baseUrl}/shared/${token}` : undefined;
-  
-  const text = `
+
+  const subject = shareUrl
+    ? 'A checklist has been shared with you on ListsSync.ai'
+    : 'Your ListsSync.ai Verification Code';
+
+  const text = shareUrl
+    ? `
+Someone shared a checklist with you on ListsSync.ai.
+
+Click the link below to view it:
+${shareUrl}
+
+Thank you,
+The ListsSync.ai Team
+listssync.ai
+    `.trim()
+    : `
 Your verification code for ListsSync.ai is: ${code}
 
-${shareUrl ? `Access your checklist here: ${shareUrl}\n` : ''}
 This code will expire in 10 minutes.
 
 Thank you,
 The ListsSync.ai Team
 listssync.ai
-  `.trim();
-  
-  const html = `
+    `.trim();
+
+  const html = shareUrl ? `
 <!DOCTYPE html>
 <html>
 <head>
   <style>
-    body {
-      font-family: Arial, sans-serif;
-      line-height: 1.6;
-      color: #333;
-    }
-    .container {
-      max-width: 600px;
-      margin: 0 auto;
-      padding: 20px;
-      border: 1px solid #ddd;
-      border-radius: 5px;
-    }
-    .code {
-      font-size: 24px;
-      font-weight: bold;
-      color: #4f46e5;
-      padding: 10px;
-      margin: 20px 0;
-      text-align: center;
-      letter-spacing: 5px;
-    }
-    .button {
-      display: inline-block;
-      background-color: #4f46e5;
-      color: white !important;
-      text-decoration: none;
-      padding: 12px 24px;
-      border-radius: 5px;
-      font-weight: bold;
-      margin: 20px 0;
-      text-align: center;
-      letter-spacing: normal;
-    }
-    .footer {
-      margin-top: 30px;
-      font-size: 12px;
-      color: #666;
-      text-align: center;
-    }
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+    .footer { margin-top: 30px; font-size: 12px; color: #666; text-align: center; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>A checklist has been shared with you</h2>
+    <p>Someone shared a checklist with you on ListsSync.ai. Click the button below to view it:</p>
+    <div style="text-align: center; margin: 30px 0;">
+      <a href="${shareUrl}" style="display: inline-block; background-color: #4f46e5; color: white; text-decoration: none; padding: 14px 28px; border-radius: 6px; font-weight: bold; font-size: 16px;">View Checklist</a>
+    </div>
+    <p style="font-size: 12px; color: #999;">Or copy this link: <a href="${shareUrl}">${shareUrl}</a></p>
+    <div class="footer">
+      <p>&copy; ${new Date().getFullYear()} ListsSync.ai | <a href="https://www.listssync.ai">www.listssync.ai</a></p>
+    </div>
+  </div>
+</body>
+</html>
+  `.trim() : `
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+    .container { max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+    .code { font-size: 28px; font-weight: bold; color: #4f46e5; padding: 10px; margin: 20px 0; text-align: center; letter-spacing: 8px; }
+    .footer { margin-top: 30px; font-size: 12px; color: #666; text-align: center; }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>Your Verification Code</h2>
-    <p>Please use the following code to verify your identity on ListsSync.ai:</p>
+    <p>Use the following code to verify your identity on ListsSync.ai:</p>
     <div class="code">${code}</div>
-    ${shareUrl ? `
-    <p>You can also access your checklist directly by clicking the button below:</p>
-    <div style="text-align: center;">
-      <a href="${shareUrl}" style="display: inline-block; background-color: #4f46e5; color: white; text-decoration: none; padding: 12px 24px; border-radius: 5px; font-weight: bold; margin: 20px 0; text-align: center; letter-spacing: normal;">View Checklist</a>
-    </div>
-    ` : ''}
     <p>This code will expire in 10 minutes.</p>
-    <p>If you didn't request this code, you can safely ignore this email.</p>
+    <p>If you didn't request this, you can safely ignore this email.</p>
     <div class="footer">
-      <p>&copy; ${new Date().getFullYear()} ListsSync.ai | www.listssync.ai</p>
+      <p>&copy; ${new Date().getFullYear()} ListsSync.ai | <a href="https://www.listssync.ai">www.listssync.ai</a></p>
     </div>
   </div>
 </body>
