@@ -1389,6 +1389,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
     });
   }
 
+  // ── New share/generate endpoint ──────────────────────────────────────────
+  // Generates a direct share link (no verification code required).
+  // Optionally sends the link via SMS and/or email.
+  app.post(`${API_BASE}/share/generate`, async (req, res) => {
+    try {
+      let { checklistId, recipientId, targetLanguage, phone, email } = req.body;
+
+      if (!checklistId) {
+        return res.status(400).json({ message: 'checklistId is required' });
+      }
+
+      if (!recipientId) {
+        recipientId = `recipient_${Date.now()}`;
+      }
+
+      // Store a verification record so /api/shared/checklist can look up the checklist
+      const { createVerification } = await import('./services/verificationService');
+      const { token, code } = await createVerification(
+        recipientId,
+        email || undefined,
+        phone || undefined,
+        checklistId,
+        targetLanguage || 'en'
+      );
+
+      // Mark as pre-verified — no code entry needed
+      await storage.markVerificationAsVerified(token);
+
+      // Build share URL
+      const protocol = process.env.NODE_ENV === 'production' ? 'https' : (req.protocol || 'http');
+      const host = process.env.NODE_ENV === 'production' ? 'www.listssync.ai' : (req.get('host') || 'localhost:5000');
+      let shareUrl = `${protocol}://${host}/shared/${token}`;
+      if (targetLanguage && targetLanguage !== 'en') {
+        shareUrl += `?lang=${targetLanguage}`;
+      }
+
+      const response: any = { token, shareUrl, message: 'Share link generated' };
+
+      // Send email if provided
+      if (email) {
+        try {
+          const { sendVerificationEmail } = await import('./services/verificationService');
+          const emailSuccess = await sendVerificationEmail(email, '', token);
+          if (emailSuccess) {
+            response.maskedEmail = formatEmailForDisplay(email);
+          }
+        } catch (e) {
+          console.error('Email send failed:', e);
+        }
+      }
+
+      // Send SMS if provided
+      if (phone) {
+        try {
+          const { sendVerificationSMS } = await import('./services/verificationService');
+          const smsSuccess = await sendVerificationSMS(phone, '', token);
+          if (smsSuccess) {
+            response.maskedPhone = formatPhoneForDisplay(phone);
+          }
+        } catch (e) {
+          console.error('SMS send failed:', e);
+        }
+      }
+
+      res.json(response);
+    } catch (error: any) {
+      console.error('Error generating share link:', error);
+      res.status(500).json({ message: error.message || 'Failed to generate share link' });
+    }
+  });
+
   // Endpoint to get shared checklist data with translation support (token-based)
   app.get(`${API_BASE}/shared/checklist`, async (req, res) => {
     try {
@@ -1407,9 +1478,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!verification) {
         return res.status(404).json({ 
           success: false, 
-          message: 'Invalid or expired token' 
+          message: 'Invalid or expired share link' 
         });
       }
+      // No verification gate — link access is open once generated
       
       console.log(`Found verification record for token: ${token}, checklist: ${verification.checklistId}, language: ${verification.targetLanguage}`);
       
