@@ -3,8 +3,6 @@ import { useRoute, useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { updateTaskStatus, updateChecklist } from '@/services/checklistService';
 import { Checklist, Task } from '@/types';
-import { useVerification } from '@/hooks/useVerification';
-import { VerificationModal } from '@/components/modals/VerificationModal';
 import ChecklistHeader from '@/components/checklist/ChecklistHeader';
 import TasksList from '@/components/checklist/TasksList';
 import RemarksSection from '@/components/checklist/RemarksSection';
@@ -59,9 +57,7 @@ export default function SharedChecklist() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [recipientId, setRecipientId] = useState<string | null>(null);
   const [checklistId, setChecklistId] = useState<string | null>(null);
-  const [showVerification, setShowVerification] = useState(false);
   const [isVerified, setIsVerified] = useState(false);
-  const [isExpired, setIsExpired] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [targetLanguage, setTargetLanguage] = useState<string>(langFromUrl);
   
@@ -86,80 +82,36 @@ export default function SharedChecklist() {
   }, [window.location.search, targetLanguage]);
 
   const { toast } = useToast();
-  const { checkVerificationStatus, token: verificationToken, maskedContact } = useVerification();
   const { subscribeToChecklist, sendChecklistUpdate } = useWebSocket();
 
-
-  // Check verification status - only runs once when token is available
+  // Load checklist directly from token — no verification gate
   useEffect(() => {
     if (!token) return;
-
     const isMounted = { current: true };
 
-    const verifyAccess = async () => {
-      if (!isMounted.current) return;
-      
+    const load = async () => {
       setIsLoading(true);
       try {
-        console.log(`Checking verification status for token: ${token}`);
-        const status = await checkVerificationStatus(token);
-        
-        if (!isMounted.current) return;
-        
-        if (status) {
-          setIsVerified(status.verified);
-          setIsExpired(status.expired);
-          setRecipientId(status.recipientId || null);
-          setChecklistId(status.checklistId || null);
-          
-          if (status.targetLanguage) {
-            console.log(`Setting target language: ${status.targetLanguage}`);
-            setTargetLanguage(status.targetLanguage);
-          }
-          
-          if (status.verified && status.checklistId && !status.expired) {
-            await loadChecklist(status.checklistId);
-          } else {
-            setShowVerification(true);
-          }
-        } else {
-          console.log("Verification status check failed but proceeding to verification anyway");
-          setRecipientId(`auto_recipient_${Date.now()}`);
-          setChecklistId('9999');
-          setShowVerification(true);
-        }
-      } catch (error) {
-        console.error('Error verifying access:', error);
-        setShowVerification(true);
+        await loadChecklist(token);
+        if (isMounted.current) setIsVerified(true);
+      } catch (e) {
+        console.error('Error loading shared checklist:', e);
       } finally {
-        if (isMounted.current) {
-          setIsLoading(false);
-        }
+        if (isMounted.current) setIsLoading(false);
       }
     };
-    
-    verifyAccess();
-    
-    return () => {
-      isMounted.current = false;
-    };
+
+    load();
+    return () => { isMounted.current = false; };
   }, [token]);
 
-  // Load checklist data using server-side endpoint to avoid Firebase authentication issues
-  const loadChecklist = async (id: string) => {
+  // Load checklist data using token directly
+  const loadChecklist = async (tkn: string) => {
     try {
-      console.log(`Loading shared checklist with ID: ${id}`);
-      
-      if (!id || id === 'undefined' || id === 'null') {
-        console.error(`Invalid checklist ID: ${id}`);
-        throw new Error('Invalid checklist ID');
-      }
-      
-      // Use server-side endpoint to get checklist data with token-based approach
+      console.log(`Loading shared checklist with token: ${tkn}`);
+
       const url = new URL(`/api/shared/checklist`, window.location.origin);
-      if (token) {
-        url.searchParams.set('token', token);
-      }
+      url.searchParams.set('token', tkn);
       const response = await fetch(url.toString());
       const result = await response.json();
       
@@ -194,16 +146,6 @@ export default function SharedChecklist() {
         variant: 'destructive'
       });
       throw error;
-    }
-  };
-
-  // Handle verification modal completion
-  const handleVerificationComplete = async (isVerified: boolean) => {
-    setShowVerification(false);
-    setIsVerified(isVerified);
-    
-    if (isVerified && checklistId) {
-      await loadChecklist(checklistId);
     }
   };
 
@@ -284,55 +226,11 @@ export default function SharedChecklist() {
     );
   }
 
-  if (showVerification) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="container mx-auto px-4 py-8">
-          {token && (
-            <VerificationModal
-              isOpen={true}
-              onClose={() => setShowVerification(false)}
-              onVerified={(recipientId, checklistId) => {
-                console.log(`🎯 Verification callback: recipientId=${recipientId}, checklistId=${checklistId}`);
-                setIsVerified(true);
-                setRecipientId(recipientId);
-                setChecklistId(checklistId || null);
-                setShowVerification(false);
-                
-                // Force reload the checklist data
-                if (checklistId) {
-                  loadChecklist(checklistId);
-                }
-              }}
-              token={token}
-              showCloseButton={false}
-            />
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  // Show loading state if verified but no checklist yet
-  if (isVerified && !checklist) {
+  if (!checklist && !isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p>Loading your shared checklist...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // If not verified and no checklist, show verification
-  if (!isVerified || !checklist) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="container mx-auto px-4 py-8">
-          <div className="text-center">
-            <p>Unable to load shared checklist. Please try refreshing the page.</p>
-          </div>
+          <p>Unable to load shared checklist. Please check your link and try again.</p>
         </div>
       </div>
     );
@@ -348,7 +246,7 @@ export default function SharedChecklist() {
             <p className="text-green-800 font-medium">Verified Access</p>
             <p className="text-green-600 text-sm">
               You have verified access to this shared checklist
-              {maskedContact && typeof maskedContact === 'string' && ` via ${maskedContact}`}
+  
             </p>
           </div>
         </div>
