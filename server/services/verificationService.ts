@@ -356,9 +356,9 @@ export async function sendVerificationSMS(phone: string, code: string, token?: s
     // Build message — if we have a token, send a direct link (no code needed)
     let messageBody: string;
     if (token) {
-      const baseUrl = process.env.NODE_ENV === 'production'
-        ? 'https://www.listssync.ai'
-        : `http://localhost:5000`;
+      const baseUrl = (process.env.APP_URL ||
+        (process.env.NODE_ENV === 'production' ? 'https://www.listssync.ai' : 'http://localhost:5000'))
+        .replace(/\/$/, '');
       const shareUrl = `${baseUrl}/shared/${token}`;
       messageBody = `Someone shared a checklist with you on ListsSync.ai.\n\nView it here: ${shareUrl}`;
     } else if (code) {
