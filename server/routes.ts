@@ -888,14 +888,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Create share URL with token, using custom domain in production
       // Ensure we have valid values for protocol and host regardless of environment
-      let protocol = 'https';
-      let host = 'www.listssync.ai';
-      
-      // In development, use server values
-      if (process.env.NODE_ENV === 'development') {
-        protocol = req.protocol || 'http';
-        host = req.get('host') || 'localhost:5000';
-      }
+      // Use APP_URL if set (covers Railway staging before domain cutover)
+      // Otherwise fall back to custom domain in production or request host in dev
+      let baseOrigin = process.env.APP_URL || 
+        (process.env.NODE_ENV === 'production' ? 'https://www.listssync.ai' : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`);
+      baseOrigin = baseOrigin.replace(/\/$/, '');
+      const [protocol, ...hostParts] = baseOrigin.replace('://', '|||').split('|||');
+      let host = hostParts[0];
       
       console.log(`DEBUG URL GENERATION:
 - Protocol: ${protocol}
@@ -1418,9 +1417,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       await storage.markVerificationAsVerified(token);
 
       // Build share URL
-      const protocol = process.env.NODE_ENV === 'production' ? 'https' : (req.protocol || 'http');
-      const host = process.env.NODE_ENV === 'production' ? 'www.listssync.ai' : (req.get('host') || 'localhost:5000');
-      let shareUrl = `${protocol}://${host}/shared/${token}`;
+      const appUrl = (process.env.APP_URL || 
+        (process.env.NODE_ENV === 'production' ? 'https://www.listssync.ai' : `${req.protocol || 'http'}://${req.get('host') || 'localhost:5000'}`))
+        .replace(/\/$/, '');
+      let shareUrl = `${appUrl}/shared/${token}`;
       if (targetLanguage && targetLanguage !== 'en') {
         shareUrl += `?lang=${targetLanguage}`;
       }
