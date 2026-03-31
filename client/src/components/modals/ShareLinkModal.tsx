@@ -167,7 +167,7 @@ export default function ShareLinkModal({
             <div className="space-y-2">
               <Label className="flex items-center gap-2 text-sm font-medium">
                 <Mail className="h-4 w-4 text-muted-foreground" />
-                Send link via email <span className="text-muted-foreground font-normal">(optional)</span>
+                Send link via email
               </Label>
               <Input
                 type="email"
@@ -181,7 +181,7 @@ export default function ShareLinkModal({
             <div className="space-y-2">
               <Label className="flex items-center gap-2 text-sm font-medium">
                 <Phone className="h-4 w-4 text-muted-foreground" />
-                Send link via SMS <span className="text-muted-foreground font-normal">(optional)</span>
+                Send link via SMS
               </Label>
               <Input
                 type="tel"
