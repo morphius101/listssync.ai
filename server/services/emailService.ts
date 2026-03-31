@@ -120,9 +120,9 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
  * @returns Promise resolving to true if email sent successfully
  */
 export async function sendVerificationEmail(email: string, code: string, token?: string): Promise<boolean> {
-  const baseUrl = process.env.NODE_ENV === 'production'
-    ? 'https://www.listssync.ai'
-    : `http://localhost:5000`;
+  const baseUrl = (process.env.APP_URL ||
+    (process.env.NODE_ENV === 'production' ? 'https://www.listssync.ai' : 'http://localhost:5000'))
+    .replace(/\/$/, '');
   const shareUrl = token ? `${baseUrl}/shared/${token}` : undefined;
 
   const subject = shareUrl
