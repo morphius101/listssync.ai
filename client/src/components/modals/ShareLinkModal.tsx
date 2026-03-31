@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
-import { Loader2, ClipboardCopy, Check, Phone, Globe, MessageSquare, Link2 } from 'lucide-react';
+import { Loader2, ClipboardCopy, Check, Phone, Globe, MessageSquare, Link2, Mail } from 'lucide-react';
 import { useTranslation, LanguageCode } from '@/hooks/useTranslation';
 
 interface ShareLinkModalProps {
@@ -30,14 +30,16 @@ export default function ShareLinkModal({
   const [step, setStep] = useState<'options' | 'link'>('options');
   const [selectedLanguage, setSelectedLanguage] = useState<LanguageCode>('en');
   const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [smsConsent, setSmsConsent] = useState(false);
   const [shareLink, setShareLink] = useState('');
-  const [verificationCode, setVerificationCode] = useState('');
   const [maskedPhone, setMaskedPhone] = useState('');
+  const [maskedEmail, setMaskedEmail] = useState('');
   const [isCopied, setIsCopied] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [smsSent, setSmsSent] = useState(false);
+  const [emailSent, setEmailSent] = useState(false);
 
   const { languages } = useTranslation();
 
@@ -45,13 +47,15 @@ export default function ShareLinkModal({
     if (isOpen) {
       setStep('options');
       setPhone('');
+      setEmail('');
       setSmsConsent(false);
       setShareLink('');
-      setVerificationCode('');
       setMaskedPhone('');
+      setMaskedEmail('');
       setIsCopied(false);
       setError('');
       setSmsSent(false);
+      setEmailSent(false);
     }
   }, [isOpen]);
 
@@ -65,12 +69,22 @@ export default function ShareLinkModal({
         targetLanguage: selectedLanguage,
       };
 
-      // Only add phone if provided AND consented
+      // Add phone if provided and consented
       if (phone && smsConsent) {
         params.phone = phone;
       }
 
-      const res = await fetch('/api/verification/send', {
+      // Add email if provided
+      if (email) {
+        params.email = email;
+      }
+
+      // If neither provided, still generate a link (no contact required)
+      if (!params.phone && !params.email) {
+        params.noContact = true;
+      }
+
+      const res = await fetch('/api/share/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
@@ -80,9 +94,10 @@ export default function ShareLinkModal({
       const data = await res.json();
 
       setShareLink(data.shareUrl || '');
-      setVerificationCode(data.verificationCode || '');
       setMaskedPhone(data.maskedPhone || '');
+      setMaskedEmail(data.maskedEmail || '');
       setSmsSent(!!data.maskedPhone);
+      setEmailSent(!!data.maskedEmail);
       setStep('link');
     } catch (err: any) {
       setError('Failed to generate share link. Please try again.');
@@ -121,8 +136,8 @@ export default function ShareLinkModal({
           </DialogTitle>
           <DialogDescription>
             {step === 'options'
-              ? 'Generate a secure link to share this checklist with anyone.'
-              : 'Copy the link and share it however you like.'}
+              ? 'Generate a link to share this checklist. Optionally notify the recipient via SMS or email.'
+              : 'Your share link is ready. Copy and send it however you like.'}
           </DialogDescription>
         </DialogHeader>
 
@@ -148,11 +163,25 @@ export default function ShareLinkModal({
               </Select>
             </div>
 
+            {/* Optional Email */}
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2 text-sm font-medium">
+                <Mail className="h-4 w-4 text-muted-foreground" />
+                Send link via email <span className="text-muted-foreground font-normal">(optional)</span>
+              </Label>
+              <Input
+                type="email"
+                placeholder="recipient@example.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+
             {/* Optional SMS */}
             <div className="space-y-2">
               <Label className="flex items-center gap-2 text-sm font-medium">
                 <Phone className="h-4 w-4 text-muted-foreground" />
-                Send code via SMS <span className="text-muted-foreground font-normal">(optional)</span>
+                Send link via SMS <span className="text-muted-foreground font-normal">(optional)</span>
               </Label>
               <Input
                 type="tel"
@@ -160,9 +189,6 @@ export default function ShareLinkModal({
                 value={phone}
                 onChange={(e) => setPhone(e.target.value)}
               />
-              <p className="text-xs text-muted-foreground">
-                Leave blank to share the link yourself — the recipient will need the code to open the checklist.
-              </p>
             </div>
 
             {/* SMS consent — only show if phone entered */}
@@ -171,7 +197,7 @@ export default function ShareLinkModal({
                 <div className="flex items-start gap-2 text-sm text-amber-800">
                   <MessageSquare className="h-4 w-4 shrink-0 mt-0.5" />
                   <p className="text-xs">
-                    By sending an SMS, you confirm the recipient agrees to receive a one-time verification code from ListsSync.ai. Msg & data rates may apply. Reply STOP to opt out.
+                    By sending an SMS, you confirm the recipient agrees to receive a message from ListsSync.ai. Msg & data rates may apply. Reply STOP to opt out.
                   </p>
                 </div>
                 <div className="flex items-center gap-2">
@@ -209,12 +235,13 @@ export default function ShareLinkModal({
                 Link generated!
               </p>
               {smsSent && maskedPhone && (
-                <p className="text-xs mt-1">Verification code sent via SMS to {maskedPhone}.</p>
+                <p className="text-xs mt-1">Link sent via SMS to {maskedPhone}.</p>
               )}
-              {!smsSent && (
-                <p className="text-xs mt-1">
-                  Copy the link and send it yourself. The recipient will enter a code to verify access.
-                </p>
+              {emailSent && maskedEmail && (
+                <p className="text-xs mt-1">Link sent via email to {maskedEmail}.</p>
+              )}
+              {!smsSent && !emailSent && (
+                <p className="text-xs mt-1">Copy the link below and share it directly.</p>
               )}
             </div>
 
@@ -226,18 +253,6 @@ export default function ShareLinkModal({
                 <span className="ml-1">{isCopied ? 'Copied!' : 'Copy'}</span>
               </Button>
             </div>
-
-            {/* Dev mode code display */}
-            {verificationCode && (
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-center">
-                <p className="text-xs text-yellow-700 font-medium mb-1">Dev mode — verification code:</p>
-                <p className="font-mono text-2xl font-bold tracking-widest text-yellow-900">{verificationCode}</p>
-              </div>
-            )}
-
-            <p className="text-xs text-muted-foreground text-center">
-              Recipients need the verification code to open this checklist. The code is included in the SMS if sent, or the sender can share it separately.
-            </p>
 
             <div className="flex gap-2">
               <Button variant="outline" className="flex-1" onClick={() => setStep('options')}>
