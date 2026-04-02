@@ -145,7 +145,7 @@ const LandingPage = () => {
           </h1>
           
           <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl">
-            Create, share, and verify task completion with photo proof — across any industry, any team, anywhere in the world. No downloads needed.
+            Create smart checklists, assign them to your team, and get photo proof of completion — all in real time, no app downloads required.
           </p>
           
           <Button 
@@ -226,7 +226,7 @@ const LandingPage = () => {
       <div className="py-16 bg-primary text-white">
         <div className="container mx-auto px-4 text-center">
           <h2 className="text-3xl font-bold mb-6">Ready to bring accountability to your business?</h2>
-          <p className="text-xl mb-8 max-w-2xl mx-auto">Join thousands of professionals across industries saving time with ListsSync.ai</p>
+          <p className="text-xl mb-8 max-w-2xl mx-auto">From Airbnb hosts to construction crews — ListsSync.ai keeps every job documented, verified, and on track.</p>
           
           <div className="mb-8 flex flex-wrap justify-center gap-4 text-sm">
             <span className="bg-white/20 rounded-full px-4 py-1">Airbnb Hosts</span>
@@ -253,15 +253,42 @@ const LandingPage = () => {
       {/* Footer */}
       <footer className="bg-gray-900 text-gray-400 py-12">
         <div className="container mx-auto px-4">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="flex items-center mb-6 md:mb-0">
-              <Logo size="sm" />
-              <span className="ml-2 text-white font-semibold">ListsSync.ai</span>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-8">
+            {/* Brand */}
+            <div>
+              <div className="flex items-center mb-3">
+                <Logo size="sm" />
+                <span className="ml-2 text-white font-semibold">ListsSync.ai</span>
+              </div>
+              <p className="text-sm text-gray-500 leading-relaxed">
+                Create, share, and verify task completion with photo proof — for any team, any industry.
+              </p>
             </div>
-            
-            <div className="text-sm">
-              &copy; {new Date().getFullYear()} ListsSync.ai — All rights reserved
+
+            {/* Product links */}
+            <div>
+              <h4 className="text-white text-sm font-semibold mb-3 uppercase tracking-wide">Product</h4>
+              <ul className="space-y-2 text-sm">
+                <li><a href="#features" className="hover:text-white transition-colors">Features</a></li>
+                <li><a href="#how-it-works" className="hover:text-white transition-colors">How It Works</a></li>
+                <li><a href="/pricing" className="hover:text-white transition-colors">Pricing</a></li>
+              </ul>
             </div>
+
+            {/* Legal links */}
+            <div>
+              <h4 className="text-white text-sm font-semibold mb-3 uppercase tracking-wide">Legal & Support</h4>
+              <ul className="space-y-2 text-sm">
+                <li><a href="/privacy-policy" className="hover:text-white transition-colors">Privacy Policy</a></li>
+                <li><a href="/terms" className="hover:text-white transition-colors">Terms of Service</a></li>
+                <li><a href="mailto:support@listssync.ai" className="hover:text-white transition-colors">Contact Support</a></li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="border-t border-gray-800 pt-6 flex flex-col md:flex-row justify-between items-center text-sm">
+            <p>&copy; {new Date().getFullYear()} ListsSync.ai · A product of Impact Development Consulting</p>
+            <p className="mt-2 md:mt-0 text-gray-600">Built for teams who value accountability</p>
           </div>
         </div>
       </footer>
