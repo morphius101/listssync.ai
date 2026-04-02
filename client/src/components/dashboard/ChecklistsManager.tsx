@@ -1,5 +1,5 @@
 import { ChecklistSummary } from "@/types";
-import { Plus, MoreVertical } from "lucide-react";
+import { Plus, MoreVertical, ClipboardList } from "lucide-react";
 import { useLocation } from "wouter";
 import { 
   DropdownMenu,
@@ -82,8 +82,20 @@ const ChecklistsManager = ({
       
       <div className="divide-y divide-gray-200">
         {checklists.length === 0 ? (
-          <div className="px-6 py-8 text-center">
-            <p className="text-gray-500">No checklists yet. Create your first one!</p>
+          <div className="px-6 py-16 flex flex-col items-center text-center">
+            <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+              <ClipboardList className="h-8 w-8 text-gray-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">You have no checklists yet</h3>
+            <p className="text-gray-500 max-w-sm mb-6">
+              Create your first checklist to get started. Assign tasks, track progress, and get photo proof of completion.
+            </p>
+            <button
+              onClick={onCreateNew}
+              className="px-5 py-2 bg-primary text-white rounded-md shadow-sm hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors"
+            >
+              Create your first checklist
+            </button>
           </div>
         ) : (
           checklists.map((checklist) => (

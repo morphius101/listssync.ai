@@ -25,6 +25,10 @@ const AdminDashboard = () => {
   const [location, setLocation] = useLocation();
 
   useEffect(() => {
+    document.title = 'Dashboard — ListsSync.ai';
+  }, []);
+
+  useEffect(() => {
     loadChecklists();
   }, []);
 

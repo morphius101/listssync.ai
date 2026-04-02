@@ -1,9 +1,9 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { 
+import {
   ArrowRight, Check, Wifi, WifiOff, Smartphone, XCircle,
-  Languages, Share2, Globe, MessageSquare
+  Languages, Share2, Globe, MessageSquare, Menu, X
 } from 'lucide-react';
 import { Logo } from './Logo';
 import { useAuth } from '@/hooks/useAuth';
@@ -13,6 +13,11 @@ const LandingPage = () => {
   const [location, navigate] = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+
+  useEffect(() => {
+    document.title = 'ListsSync.ai — Smart Checklists with Photo Verification';
+  }, []);
 
   const handleGetStarted = async () => {
     if (isAuthenticated) {
@@ -111,26 +116,50 @@ const LandingPage = () => {
             <a href="#features" className="text-gray-600 hover:text-primary transition-colors">Features</a>
             <a href="#how-it-works" className="text-gray-600 hover:text-primary transition-colors">How It Works</a>
             <a href="/pricing" className="text-gray-600 hover:text-primary transition-colors">Pricing</a>
-            <Button 
-              onClick={handleGetStarted}
-              disabled={isLoggingIn || isLoading}
-              size="sm"
-              variant="outline"
-            >
-              {isAuthenticated ? 'Dashboard' : 'Sign In'}
-            </Button>
+            {isAuthenticated ? (
+              <Button onClick={handleGetStarted} disabled={isLoggingIn || isLoading} size="sm" variant="outline">
+                Dashboard
+              </Button>
+            ) : (
+              <>
+                <Button onClick={handleGetStarted} disabled={isLoggingIn || isLoading} size="sm" variant="outline">
+                  Sign In
+                </Button>
+                <Button onClick={handleGetStarted} disabled={isLoggingIn || isLoading} size="sm">
+                  Sign Up Free
+                </Button>
+              </>
+            )}
           </nav>
-          
+
           <div className="md:hidden">
-            <Button 
-              onClick={handleGetStarted}
-              disabled={isLoggingIn || isLoading}
-              size="sm"
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-md text-gray-600 hover:text-primary hover:bg-gray-100 transition-colors"
+              aria-label="Toggle menu"
             >
-              {isAuthenticated ? 'Dashboard' : 'Sign In'}
-            </Button>
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
           </div>
         </div>
+        {/* Mobile menu */}
+        {mobileMenuOpen && (
+          <div className="md:hidden border-t border-gray-200 bg-white px-4 py-4 flex flex-col space-y-3">
+            <a href="#features" onClick={() => setMobileMenuOpen(false)} className="text-gray-700 hover:text-primary py-2 transition-colors">Features</a>
+            <a href="#how-it-works" onClick={() => setMobileMenuOpen(false)} className="text-gray-700 hover:text-primary py-2 transition-colors">How It Works</a>
+            <a href="/pricing" onClick={() => setMobileMenuOpen(false)} className="text-gray-700 hover:text-primary py-2 transition-colors">Pricing</a>
+            <div className="pt-2 flex flex-col space-y-2">
+              <Button onClick={handleGetStarted} disabled={isLoggingIn || isLoading} variant="outline" className="w-full">
+                {isAuthenticated ? 'Dashboard' : 'Sign In'}
+              </Button>
+              {!isAuthenticated && (
+                <Button onClick={handleGetStarted} disabled={isLoggingIn || isLoading} className="w-full">
+                  Sign Up Free
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
       </header>
 
       {/* Hero Section */}
@@ -148,15 +177,18 @@ const LandingPage = () => {
             Create smart checklists, assign them to your team, and get photo proof of completion — all in real time, no app downloads required.
           </p>
           
-          <Button 
+          <Button
             onClick={handleGetStarted}
             disabled={isLoggingIn || isLoading}
-            size="lg" 
+            size="lg"
             className="rounded-full px-8 py-6 text-lg"
           >
             {isLoggingIn ? 'Signing in...' : (isAuthenticated ? 'Go to Dashboard' : 'Get Started')}
             {!isLoggingIn && !isLoading && <ArrowRight className="ml-2 h-5 w-5" />}
           </Button>
+          {!isAuthenticated && (
+            <p className="mt-3 text-sm text-gray-500">Free plan available — no credit card required</p>
+          )}
         </div>
       </div>
       
