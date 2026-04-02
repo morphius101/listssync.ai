@@ -40,6 +40,18 @@ app.get('/api/health', (_req, res) => {
   res.status(200).send('OK');
 });
 
+// Legal pages — served before Vite catch-all
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+app.get('/privacy-policy', (_req, res) => {
+  res.sendFile(join(__dirname, 'legal', 'privacy-policy.html'));
+});
+app.get('/terms', (_req, res) => {
+  res.sendFile(join(__dirname, 'legal', 'terms-of-service.html'));
+});
+
 app.use((req, res, next) => {
   const start = Date.now();
   const path = req.path;
