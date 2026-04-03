@@ -3,6 +3,11 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { validateEnv } from "./validateEnv";
 import { initializeApp, getApps } from "firebase-admin/app";
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 if (getApps().length === 0) {
   // In production use a service account, in development use application default credentials
@@ -41,10 +46,6 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Legal pages — served before Vite catch-all
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 app.get('/privacy-policy', (_req, res) => {
   res.sendFile(join(__dirname, 'legal', 'privacy-policy.html'));
 });
