@@ -59,18 +59,13 @@ app.get('/api/health', (_req, res) => {
 });
 
 // Legal pages — served before Vite catch-all
-// In dev: __dirname = server/ so legal/ is adjacent
-// In prod: __dirname = dist/ so legal/ is at ../server/legal/
-const legalDir = join(__dirname, 'legal');
-const legalDirFallback = join(__dirname, '..', 'server', 'legal');
-import { existsSync } from 'fs';
-const resolvedLegalDir = existsSync(legalDir) ? legalDir : legalDirFallback;
-
+// Resolve legal dir relative to project root (one level above dist/ or server/)
+const projectRoot = join(__dirname, '..');
 app.get('/privacy-policy', (_req, res) => {
-  res.sendFile(join(resolvedLegalDir, 'privacy-policy.html'));
+  res.sendFile(join(projectRoot, 'server', 'legal', 'privacy-policy.html'));
 });
 app.get('/terms', (_req, res) => {
-  res.sendFile(join(resolvedLegalDir, 'terms-of-service.html'));
+  res.sendFile(join(projectRoot, 'server', 'legal', 'terms-of-service.html'));
 });
 
 app.use((req, res, next) => {

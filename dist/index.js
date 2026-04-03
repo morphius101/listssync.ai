@@ -3028,7 +3028,6 @@ function validateEnv() {
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
-import { existsSync } from "fs";
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = dirname(__filename);
 if (getApps().length === 0) {
@@ -3071,14 +3070,12 @@ app.use((req, res, next) => {
 app.get("/api/health", (_req, res) => {
   res.status(200).send("OK");
 });
-var legalDir = join(__dirname, "legal");
-var legalDirFallback = join(__dirname, "..", "server", "legal");
-var resolvedLegalDir = existsSync(legalDir) ? legalDir : legalDirFallback;
+var projectRoot = join(__dirname, "..");
 app.get("/privacy-policy", (_req, res) => {
-  res.sendFile(join(resolvedLegalDir, "privacy-policy.html"));
+  res.sendFile(join(projectRoot, "server", "legal", "privacy-policy.html"));
 });
 app.get("/terms", (_req, res) => {
-  res.sendFile(join(resolvedLegalDir, "terms-of-service.html"));
+  res.sendFile(join(projectRoot, "server", "legal", "terms-of-service.html"));
 });
 app.use((req, res, next) => {
   const start = Date.now();
