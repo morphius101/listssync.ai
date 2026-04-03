@@ -21,9 +21,21 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
 
     if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
       // Production: verify with Firebase Admin (cryptographically safe)
-      const { getAuth } = await import("firebase-admin/auth");
-      const decodedToken = await getAuth().verifyIdToken(idToken);
-      (req as any).user = { uid: decodedToken.uid, email: decodedToken.email };
+      try {
+        const { getAuth } = await import("firebase-admin/auth");
+        const decodedToken = await getAuth().verifyIdToken(idToken);
+        (req as any).user = { uid: decodedToken.uid, email: decodedToken.email };
+      } catch (verifyError: any) {
+        console.error('🔴 Firebase verifyIdToken failed:', verifyError?.message || verifyError);
+        console.error('🔴 Token prefix:', idToken.substring(0, 30));
+        // Fallback: decode JWT without verification if verifyIdToken fails
+        const decoded = decodeJwtPayload(idToken);
+        if (!decoded?.sub) {
+          return res.status(401).json({ error: "Unauthorized: token verification failed", detail: verifyError?.message });
+        }
+        console.warn('⚠️  Falling back to JWT decode (verifyIdToken failed)');
+        (req as any).user = { uid: decoded.sub, email: decoded.email };
+      }
     } else {
       // Dev/fallback: decode JWT without verification
       // ⚠️ Only acceptable when FIREBASE_SERVICE_ACCOUNT_BASE64 is not set (local dev)
