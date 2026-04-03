@@ -3027,7 +3027,7 @@ function validateEnv() {
 // server/index.ts
 import { initializeApp, getApps, cert } from "firebase-admin/app";
 import { fileURLToPath } from "url";
-import { dirname, join } from "path";
+import { dirname } from "path";
 var __filename = fileURLToPath(import.meta.url);
 var __dirname = dirname(__filename);
 if (getApps().length === 0) {
@@ -3069,13 +3069,6 @@ app.use((req, res, next) => {
 });
 app.get("/api/health", (_req, res) => {
   res.status(200).send("OK");
-});
-var projectRoot = join(__dirname, "..");
-app.get("/privacy-policy", (_req, res) => {
-  res.sendFile(join(projectRoot, "server", "legal", "privacy-policy.html"));
-});
-app.get("/terms", (_req, res) => {
-  res.sendFile(join(projectRoot, "server", "legal", "terms-of-service.html"));
 });
 app.use((req, res, next) => {
   const start = Date.now();

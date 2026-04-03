@@ -58,15 +58,8 @@ app.get('/api/health', (_req, res) => {
   res.status(200).send('OK');
 });
 
-// Legal pages — served before Vite catch-all
-// Resolve legal dir relative to project root (one level above dist/ or server/)
-const projectRoot = join(__dirname, '..');
-app.get('/privacy-policy', (_req, res) => {
-  res.sendFile(join(projectRoot, 'server', 'legal', 'privacy-policy.html'));
-});
-app.get('/terms', (_req, res) => {
-  res.sendFile(join(projectRoot, 'server', 'legal', 'terms-of-service.html'));
-});
+// Legal pages are served as static files from dist/public/
+// (copied there by the build script — see package.json "build" command)
 
 app.use((req, res, next) => {
   const start = Date.now();
