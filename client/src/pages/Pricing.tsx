@@ -6,6 +6,7 @@ import { Check, Crown, Zap, Building } from 'lucide-react';
 import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 import { trackStripeEvent, trackUserAction } from '@/lib/analytics';
+import { getAuth } from 'firebase/auth';
 
 interface PricingTier {
   id: 'free' | 'professional' | 'enterprise';
@@ -126,9 +127,26 @@ export default function Pricing({ userId, userEmail, currentTier = 'free' }: Pri
     setLoading(tier.id);
 
     try {
+      const auth = getAuth();
+      const firebaseUser = auth.currentUser;
+      const idToken = firebaseUser ? await firebaseUser.getIdToken() : null;
+
+      if (!idToken) {
+        toast({
+          title: 'Authentication Required',
+          description: 'Could not verify your session. Please sign in again.',
+          variant: 'destructive'
+        });
+        setLoading(null);
+        return;
+      }
+
       const response = await fetch('/api/create-subscription', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${idToken}`,
+        },
         body: JSON.stringify({
           userId,
           tier: tier.id,
