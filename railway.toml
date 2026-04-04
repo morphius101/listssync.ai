@@ -1,9 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm run build"
-
-[build.nixpacks]
-cacheKey = "v2"
+buildCommand = "echo 'Using pre-built dist'"
 
 [deploy]
 startCommand = "npm start"
