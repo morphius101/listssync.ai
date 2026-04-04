@@ -296,10 +296,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
     userId: z.string().optional(),
   });
 
-  // Get all checklists
-  app.get(`${API_BASE}/checklists`, async (req, res) => {
+  // Get all checklists — requires auth, scoped to the authenticated user
+  app.get(`${API_BASE}/checklists`, requireAuth, async (req, res) => {
     try {
-      const userId = req.query.userId as string | undefined;
+      const userId = (req as any).user?.uid;
+      if (!userId) {
+        return res.status(401).json({ error: "Unauthorized" });
+      }
       const checklists = await storage.getAllChecklists(userId);
       res.json(checklists);
     } catch (error: any) {
