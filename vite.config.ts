@@ -24,6 +24,9 @@ export default defineConfig({
     },
   },
   root: path.resolve(import.meta.dirname, "client"),
+  // Load .env from project root so VITE_* vars are available at build time
+  // (Vite defaults to root dir for env files, which is client/ — override to project root)
+  envDir: path.resolve(import.meta.dirname),
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
