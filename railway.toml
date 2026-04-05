@@ -1,6 +1,5 @@
 [build]
-builder = "nixpacks"
-buildCommand = "echo 'Pre-built dist committed — skipping build'"
+builder = "dockerfile"
 
 [deploy]
 startCommand = "npm start"
