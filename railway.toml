@@ -1,6 +1,6 @@
 [build]
 builder = "nixpacks"
-buildCommand = "npm run build"
+buildCommand = "echo 'Pre-built dist committed — skipping build'"
 
 [deploy]
 startCommand = "npm start"
