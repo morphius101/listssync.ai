@@ -192,7 +192,7 @@ export function useVerification() {
           verified: false,
           expired: false,
           recipientId: `recipient_${Date.now()}`,
-          checklistId: null
+          checklistId: undefined
         };
       }
       
@@ -204,7 +204,7 @@ export function useVerification() {
         verified: false,
         expired: false,
         recipientId: `recipient_${Date.now()}`,
-        checklistId: null
+        checklistId: undefined
       };
     } finally {
       setIsLoading(false);

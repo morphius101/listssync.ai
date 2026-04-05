@@ -43,6 +43,8 @@ export function useTranslation() {
   return {
     languages: LANGUAGES,
     getLanguageName,
-    t: (key: string) => key, // Simple passthrough since client-side translation is disabled
+    t: (key: string) => key,
+    isTranslating: false,
+    translateChecklist: async (_checklistId: string, _language: LanguageCode) => {},
   };
 }

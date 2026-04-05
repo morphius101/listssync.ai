@@ -34,8 +34,10 @@ const ChecklistView = ({ id: propId }: ChecklistViewProps) => {
     setIsLoading(true);
     try {
       const data = await getChecklistById(id);
-      setChecklist(data);
-      setRemarks(data.remarks || "");
+      if (data) {
+        setChecklist(data);
+        setRemarks(data.remarks || "");
+      }
     } catch (error) {
       console.error("Error fetching checklist:", error);
       toast({
