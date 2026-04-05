@@ -9,7 +9,7 @@ import ChecklistHeader from '@/components/checklist/ChecklistHeader';
 import TasksList from '@/components/checklist/TasksList';
 import RemarksSection from '@/components/checklist/RemarksSection';
 import { useToast } from '@/hooks/use-toast';
-import { useWebSocket } from '@/hooks/useWebSocket';
+// useWebSocket removed — using polling instead (no WebSocket server)
 import { getLanguageName } from '@/hooks/useTranslation';
 import { 
   Loader2, 
@@ -87,7 +87,26 @@ export default function SharedChecklist() {
 
   const { toast } = useToast();
   const { checkVerificationStatus, token: verificationToken, maskedContact } = useVerification();
-  const { subscribeToChecklist, sendChecklistUpdate } = useWebSocket();
+  // Polling for live updates (replaces WebSocket)
+  useEffect(() => {
+    if (!token || !checklist) return;
+    const interval = setInterval(async () => {
+      if (document.hidden) return; // don't poll when tab is hidden
+      try {
+        const url = new URL(`/api/shared/checklist`, window.location.origin);
+        url.searchParams.set('token', token);
+        const res = await fetch(url.toString());
+        const result = await res.json();
+        if (result.success && result.checklist) {
+          setChecklist((prev: any) => {
+            if (JSON.stringify(prev) === JSON.stringify(result.checklist)) return prev;
+            return result.checklist;
+          });
+        }
+      } catch { /* silent */ }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [token, !!checklist]);
 
 
   // Check verification status - only runs once when token is available
@@ -177,8 +196,7 @@ export default function SharedChecklist() {
       setChecklist(result.checklist);
       setRemarks(result.checklist.remarks || "");
       
-      // Subscribe to realtime updates
-      subscribeToChecklist(id);
+      // Real-time polling is handled by the useEffect above
       
       toast({
         title: 'Success',
@@ -229,7 +247,7 @@ export default function SharedChecklist() {
     
     setChecklist(updatedChecklist);
     if (checklist.id) {
-      sendChecklistUpdate(checklist.id, { checklist: updatedChecklist, recipientId });
+      
     }
     
     try {
@@ -259,7 +277,7 @@ export default function SharedChecklist() {
       await updateChecklist(updatedChecklist);
       setChecklist(updatedChecklist);
       if (checklist.id) {
-        sendChecklistUpdate(checklist.id, { checklist: updatedChecklist, recipientId });
+        
       }
       
       toast({

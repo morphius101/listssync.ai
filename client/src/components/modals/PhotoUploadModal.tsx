@@ -10,15 +10,19 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader2, Camera, Upload, X } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { initializeFirebase, ref, uploadBytes, getDownloadURL } from '@/lib/firebase';
 
 interface PhotoUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (photoUrl: string) => void;
+  taskId?: string;
+  checklistId?: string;
 }
 
-export const PhotoUploadModal = ({ isOpen, onClose, onSave }: PhotoUploadModalProps) => {
-  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+export const PhotoUploadModal = ({ isOpen, onClose, onSave, taskId, checklistId }: PhotoUploadModalProps) => {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
@@ -26,70 +30,72 @@ export const PhotoUploadModal = ({ isOpen, onClose, onSave }: PhotoUploadModalPr
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    
-    // Validate file type
+
     if (!file.type.startsWith('image/')) {
-      toast({
-        title: 'Invalid file type',
-        description: 'Please select an image file',
-        variant: 'destructive',
-      });
+      toast({ title: 'Invalid file type', description: 'Please select an image file', variant: 'destructive' });
       return;
     }
-    
-    // Validate file size (max 5MB)
-    if (file.size > 5 * 1024 * 1024) {
-      toast({
-        title: 'File too large',
-        description: 'Image size should be less than 5MB',
-        variant: 'destructive',
-      });
+
+    if (file.size > 10 * 1024 * 1024) {
+      toast({ title: 'File too large', description: 'Image must be under 10MB', variant: 'destructive' });
       return;
     }
-    
+
+    setSelectedFile(file);
     const reader = new FileReader();
-    reader.onload = () => {
-      setSelectedImage(reader.result as string);
-    };
+    reader.onload = () => setPreviewUrl(reader.result as string);
     reader.readAsDataURL(file);
   };
-  
-  const handleSelectPhoto = () => {
-    fileInputRef.current?.click();
-  };
-  
+
   const handleRemovePhoto = () => {
-    setSelectedImage(null);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    setSelectedFile(null);
+    setPreviewUrl(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
-  
+
   const handleSavePhoto = async () => {
-    if (!selectedImage) return;
-    
+    if (!selectedFile) return;
     setIsUploading(true);
+
     try {
-      // In a real implementation, we would upload the image to a server or cloud storage
-      // and get back a URL. For this demo, we'll just use the data URL directly.
-      
-      // Simulating a network delay
-      await new Promise(resolve => setTimeout(resolve, 1000));
-      
-      onSave(selectedImage);
-      setSelectedImage(null);
-      
-      toast({
-        title: 'Success',
-        description: 'Photo uploaded successfully',
-      });
-    } catch (error) {
-      console.error('Error uploading photo:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to upload photo. Please try again.',
-        variant: 'destructive',
-      });
+      const { storage } = initializeFirebase();
+
+      if (!storage || typeof storage.ref !== 'function' && !storage._delegate) {
+        // Firebase storage not available — fall back to base64 data URL
+        // This works for demo but won't persist across sessions
+        console.warn('Firebase Storage not available, using data URL fallback');
+        onSave(previewUrl!);
+        setSelectedFile(null);
+        setPreviewUrl(null);
+        toast({ title: 'Photo saved', description: 'Photo attached to task.' });
+        return;
+      }
+
+      // Build a unique path: task-photos/{checklistId}/{taskId}/{timestamp}-{filename}
+      const timestamp = Date.now();
+      const safeName = selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
+      const path = `task-photos/${checklistId || 'unknown'}/${taskId || 'unknown'}/${timestamp}-${safeName}`;
+
+      const storageRef = ref(storage, path);
+      await uploadBytes(storageRef, selectedFile);
+      const downloadUrl = await getDownloadURL(storageRef);
+
+      onSave(downloadUrl);
+      setSelectedFile(null);
+      setPreviewUrl(null);
+
+      toast({ title: 'Photo uploaded', description: 'Photo proof saved successfully.' });
+    } catch (error: any) {
+      console.error('Photo upload error:', error);
+      // If storage fails (e.g. CORS, rules), fall back to data URL
+      if (previewUrl) {
+        onSave(previewUrl);
+        setSelectedFile(null);
+        setPreviewUrl(null);
+        toast({ title: 'Photo saved locally', description: 'Cloud upload failed — photo attached as local preview.' });
+      } else {
+        toast({ title: 'Upload failed', description: error.message || 'Please try again.', variant: 'destructive' });
+      }
     } finally {
       setIsUploading(false);
     }
@@ -99,20 +105,14 @@ export const PhotoUploadModal = ({ isOpen, onClose, onSave }: PhotoUploadModalPr
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>Upload Photo</DialogTitle>
-          <DialogDescription>
-            Take or upload a photo for this task.
-          </DialogDescription>
+          <DialogTitle>Upload Photo Proof</DialogTitle>
+          <DialogDescription>Take or upload a photo to verify this task is complete.</DialogDescription>
         </DialogHeader>
-        
+
         <div className="space-y-4">
-          {selectedImage ? (
+          {previewUrl ? (
             <div className="relative">
-              <img 
-                src={selectedImage} 
-                alt="Selected" 
-                className="rounded-md w-full h-auto max-h-80 object-contain bg-gray-100" 
-              />
+              <img src={previewUrl} alt="Preview" className="rounded-md w-full h-auto max-h-80 object-contain bg-gray-100" />
               <Button
                 variant="destructive"
                 size="icon"
@@ -123,24 +123,21 @@ export const PhotoUploadModal = ({ isOpen, onClose, onSave }: PhotoUploadModalPr
               </Button>
             </div>
           ) : (
-            <div className="border-2 border-dashed border-gray-300 rounded-md p-8 text-center">
+            <div
+              className="border-2 border-dashed border-gray-300 rounded-md p-8 text-center cursor-pointer hover:border-indigo-400 transition-colors"
+              onClick={() => fileInputRef.current?.click()}
+            >
               <Camera className="mx-auto h-12 w-12 text-gray-400" />
               <div className="mt-4 flex flex-col space-y-2">
-                <p className="text-sm text-gray-500">
-                  Take a photo or upload from your device
-                </p>
-                <Button 
-                  variant="secondary" 
-                  className="mx-auto"
-                  onClick={handleSelectPhoto}
-                >
+                <p className="text-sm text-gray-500">Tap to take a photo or pick from your device</p>
+                <Button variant="secondary" className="mx-auto" type="button">
                   <Upload className="mr-2 h-4 w-4" />
                   Select Photo
                 </Button>
               </div>
             </div>
           )}
-          
+
           <input
             type="file"
             ref={fileInputRef}
@@ -150,23 +147,13 @@ export const PhotoUploadModal = ({ isOpen, onClose, onSave }: PhotoUploadModalPr
             capture="environment"
           />
         </div>
-        
+
         <DialogFooter>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button 
-            onClick={handleSavePhoto} 
-            disabled={!selectedImage || isUploading}
-          >
+          <Button variant="outline" onClick={onClose} disabled={isUploading}>Cancel</Button>
+          <Button onClick={handleSavePhoto} disabled={!selectedFile || isUploading}>
             {isUploading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Uploading...
-              </>
-            ) : (
-              'Save Photo'
-            )}
+              <><Loader2 className="mr-2 h-4 w-4 animate-spin" />Uploading...</>
+            ) : 'Save Photo'}
           </Button>
         </DialogFooter>
       </DialogContent>

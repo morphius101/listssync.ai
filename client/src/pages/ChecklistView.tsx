@@ -6,7 +6,8 @@ import RemarksSection from "@/components/checklist/RemarksSection";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { Checklist, Task } from "@/types";
-import { getChecklistById, updateTaskStatus, updateChecklist } from "@/services/checklistService";
+import { updateTaskStatus, updateChecklist } from "@/services/checklistService";
+import { useRealtimeChecklist } from "@/hooks/useRealtimeChecklist";
 import { AlertDialog, AlertDialogAction, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Loader2 } from "lucide-react";
 
@@ -16,39 +17,17 @@ interface ChecklistViewProps {
 
 const ChecklistView = ({ id: propId }: ChecklistViewProps) => {
   const [match, params] = useRoute("/checklist/:id");
-  const [checklist, setChecklist] = useState<Checklist | null>(null);
+  const checklistId = propId || params?.id;
+  const { checklist, setChecklist, isLoading } = useRealtimeChecklist(checklistId);
   const [remarks, setRemarks] = useState("");
-  const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showCompletionDialog, setShowCompletionDialog] = useState(false);
   const { toast } = useToast();
 
+  // Sync remarks when checklist loads
   useEffect(() => {
-    const checklistId = propId || params?.id;
-    if (checklistId) {
-      loadChecklist(checklistId);
-    }
-  }, [propId, params?.id]);
-
-  const loadChecklist = async (id: string) => {
-    setIsLoading(true);
-    try {
-      const data = await getChecklistById(id);
-      if (data) {
-        setChecklist(data);
-        setRemarks(data.remarks || "");
-      }
-    } catch (error) {
-      console.error("Error fetching checklist:", error);
-      toast({
-        title: "Error",
-        description: "Failed to load checklist. It may have been deleted or the link is invalid.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    if (checklist) setRemarks(checklist.remarks || "");
+  }, [checklist?.id]);
 
   const handleTaskUpdate = async (taskId: string, updates: Partial<Task>) => {
     if (!checklist) return;
@@ -98,8 +77,9 @@ const ChecklistView = ({ id: propId }: ChecklistViewProps) => {
         variant: "destructive",
       });
       
-      // Revert the optimistic update
-      loadChecklist(checklist.id);
+      // Revert the optimistic update by refetching
+      const fresh = await import('@/services/checklistService').then(m => m.getChecklistById(checklist.id));
+      if (fresh) setChecklist(fresh);
     }
   };
 
