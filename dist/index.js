@@ -1247,11 +1247,17 @@ Access your checklist: ${shareUrl}`;
 This link will take you directly to the shared checklist after verification.`;
     }
     try {
-      const message = await client.messages.create({
+      const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+      const messageParams = {
         body: messageBody,
-        from: twilioPhone,
         to: formattedPhone
-      });
+      };
+      if (messagingServiceSid) {
+        messageParams.messagingServiceSid = messagingServiceSid;
+      } else {
+        messageParams.from = twilioPhone;
+      }
+      const message = await client.messages.create(messageParams);
       console.log(`\u{1F4F1} Verification SMS sent successfully to: ${formatPhoneForDisplay(formattedPhone)} \u2705`);
       console.log(`\u{1F4F1} Twilio message SID: ${message.sid}`);
       return true;
@@ -2275,11 +2281,14 @@ async function registerRoutes(app2) {
           console.log(`\u{1F4F1} Formatted phone number: ${formattedPhone}`);
           const twilio2 = await import("twilio").then((module) => module.default);
           const client = twilio2(accountSid, authToken);
-          const message = await client.messages.create({
-            body: testMessage,
-            from: twilioPhone,
-            to: formattedPhone
-          });
+          const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+          const msgParams = { body: testMessage, to: formattedPhone };
+          if (messagingServiceSid) {
+            msgParams.messagingServiceSid = messagingServiceSid;
+          } else {
+            msgParams.from = twilioPhone;
+          }
+          const message = await client.messages.create(msgParams);
           console.log(`\u2705 Test SMS sent successfully. SID: ${message.sid}`);
           return res.json({
             success: true,

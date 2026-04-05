@@ -1309,12 +1309,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         const twilio = await import('twilio').then(module => module.default);
         const client = twilio(accountSid, authToken);
         
-        // Send the test message
-        const message = await client.messages.create({
-          body: testMessage,
-          from: twilioPhone,
-          to: formattedPhone
-        });
+        // Send the test message (use Messaging Service if available)
+        const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+        const msgParams: any = { body: testMessage, to: formattedPhone };
+        if (messagingServiceSid) {
+          msgParams.messagingServiceSid = messagingServiceSid;
+        } else {
+          msgParams.from = twilioPhone;
+        }
+        const message = await client.messages.create(msgParams);
         
         console.log(`✅ Test SMS sent successfully. SID: ${message.sid}`);
         

@@ -367,12 +367,20 @@ export async function sendVerificationSMS(phone: string, code: string, token?: s
     }
 
     // Real SMS sending with Twilio
+    // Use Messaging Service SID if available (bypasses carrier 10DLC filtering)
+    // Fallback to direct phone number if no service configured
     try {
-      const message = await client.messages.create({
+      const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+      const messageParams: any = {
         body: messageBody,
-        from: twilioPhone,
         to: formattedPhone
-      });
+      };
+      if (messagingServiceSid) {
+        messageParams.messagingServiceSid = messagingServiceSid;
+      } else {
+        messageParams.from = twilioPhone;
+      }
+      const message = await client.messages.create(messageParams);
       
       console.log(`📱 Verification SMS sent successfully to: ${formatPhoneForDisplay(formattedPhone)} ✅`);
       console.log(`📱 Twilio message SID: ${message.sid}`);
