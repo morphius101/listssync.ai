@@ -5,7 +5,7 @@ import ChecklistsManager from "@/components/dashboard/ChecklistsManager";
 import ChecklistEditor from "@/components/dashboard/ChecklistEditor";
 import ShareLinkModal from "@/components/modals/ShareLinkModal";
 import MinimalistSubscriptionStatus from "@/components/MinimalistSubscriptionStatus";
-import { DevelopmentBanner } from "@/components/DevelopmentBanner";
+
 import { Checklist, ChecklistSummary } from "@/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/hooks/useAuth";
@@ -236,9 +236,6 @@ const AdminDashboard = () => {
         <h1 className="text-2xl font-semibold text-gray-900">Dashboard</h1>
         <p className="text-gray-600 mt-1">Manage your checklists and track progress</p>
       </div>
-      
-      {/* Development Banner */}
-      <DevelopmentBanner />
       
       {/* Minimalist Subscription Status */}
       {user && (

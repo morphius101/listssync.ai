@@ -46,7 +46,7 @@ const pricingTiers: PricingTier[] = [
     description: 'For growing businesses',
     icon: Crown,
     popular: true,
-    buttonText: 'Start Free Trial',
+    buttonText: 'Start 14-Day Free Trial',
     yearlyDiscount: 'Save 20% yearly',
     features: [
       'Up to 100 checklists',
