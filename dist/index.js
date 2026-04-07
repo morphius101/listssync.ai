@@ -78,7 +78,7 @@ ${JSON.stringify(checklist)}`;
     }
     const parsed = JSON.parse(translatedText);
     parsed.translatedTo = targetLanguage;
-    parsed.translatedAt = (/* @__PURE__ */ new Date()).toISOString();
+    parsed.translatedAt = checklist?.updatedAt || checklist?.translatedAt || (/* @__PURE__ */ new Date()).toISOString();
     console.log(`\u2705 Checklist translation to ${targetLanguage} completed`);
     return parsed;
   } catch (error) {
@@ -170,15 +170,15 @@ async function sendEmail(options) {
   }
 }
 async function sendVerificationEmail(email, code, token) {
-  const subject = "Your ListsSync.ai Verification Code";
+  const subject = token ? "Your ListsSync.ai Checklist Link" : "Your ListsSync.ai Verification Code";
   const baseUrl = process.env.NODE_ENV === "production" ? "https://www.listssync.ai" : `http://localhost:5000`;
   const shareUrl = token ? `${baseUrl}/shared/${token}` : void 0;
   const text2 = `
-Your verification code for ListsSync.ai is: ${code}
+${shareUrl ? `You can open your shared ListsSync.ai checklist here: ${shareUrl}
 
-${shareUrl ? `Access your checklist here: ${shareUrl}
-` : ""}
-This code will expire in 10 minutes.
+This secure email link already verifies your access. No extra code entry is required.` : `Your verification code for ListsSync.ai is: ${code}
+
+This code will expire in 10 minutes.`}
 
 Thank you,
 The ListsSync.ai Team
@@ -231,16 +231,20 @@ The ListsSync.ai Team
 </head>
 <body>
   <div class="container">
-    <h2>Your Verification Code</h2>
-    <p>Please use the following code to verify your identity on ListsSync.ai:</p>
-    <div class="code">${code}</div>
     ${shareUrl ? `
+    <h2>Your Shared Checklist</h2>
+    <p>Use the secure link below to open your ListsSync.ai checklist.</p>
     <p>You can also access your checklist directly by clicking the button below:</p>
     <div style="text-align: center;">
       <a href="${shareUrl}" style="display: inline-block; background-color: #4f46e5; color: white; text-decoration: none; padding: 12px 24px; border-radius: 5px; font-weight: bold; margin: 20px 0; text-align: center; letter-spacing: normal;">View Checklist</a>
     </div>
-    ` : ""}
+    <p>This secure email link already verifies your access, so you do not need to enter a separate code.</p>
+    ` : `
+    <h2>Your Verification Code</h2>
+    <p>Please use the following code to verify your identity on ListsSync.ai:</p>
+    <div class="code">${code}</div>
     <p>This code will expire in 10 minutes.</p>
+    `}
     <p>If you didn't request this code, you can safely ignore this email.</p>
     <div class="footer">
       <p>&copy; ${(/* @__PURE__ */ new Date()).getFullYear()} ListsSync.ai | www.listssync.ai</p>
@@ -1908,28 +1912,15 @@ async function registerRoutes(app2) {
         }
       }
       console.log(`Creating verification for recipient: ${recipientId}, contact: ${email || phone}`);
-      let token, code;
-      try {
-        const result = await createVerification(
-          recipientId,
-          email,
-          phone,
-          checklistId,
-          targetLanguage
-        );
-        token = result.token;
-        code = result.code;
-        console.log(`\u2705 Verification created with token: ${token}, code: ${code}`);
-      } catch (verificationError) {
-        console.error("\u274C Error during verification creation:", verificationError);
-        token = `manual_${Date.now()}_${Math.random().toString(36).substring(2, 10)}`;
-        code = Math.floor(1e5 + Math.random() * 9e5).toString();
-        console.log(`\u26A0\uFE0F Using fallback verification: token=${token}, code=${code}`);
-      }
-      if (!token || !code) {
-        console.error("\u274C Failed to generate verification credentials");
-        return res.status(500).json({ message: "Failed to generate verification. Please try again." });
-      }
+      const { token, code } = await createVerification(
+        recipientId,
+        email,
+        phone,
+        checklistId,
+        targetLanguage
+      );
+      console.log(`\u2705 Verification created with token: ${token}, code: ${code}`);
+      const requiresCode = Boolean(phone && !email);
       let sendSuccess = false;
       if (email) {
         console.log("================================================");
@@ -1949,6 +1940,7 @@ async function registerRoutes(app2) {
           if (emailSuccess) {
             console.log(`\u2705 Successfully sent verification email to: ${email}`);
             sendSuccess = true;
+            await storage.markVerificationAsVerified(token);
           } else {
             console.error(`\u274C Failed to send verification email to ${email}`);
             console.error(`\u{1F4E7} Verification email failure details:`);
@@ -2039,7 +2031,8 @@ async function registerRoutes(app2) {
       const response = {
         token,
         shareUrl,
-        message: "Verification code sent to recipient"
+        requiresCode,
+        message: requiresCode ? "Verification code sent to recipient" : "Checklist link sent to recipient"
       };
       if (email) {
         response.maskedEmail = formatEmailForDisplay(email);
@@ -2248,25 +2241,32 @@ async function registerRoutes(app2) {
         });
       }
       let finalChecklist = checklist;
-      const targetLanguage = verification.targetLanguage || "en";
-      if (targetLanguage && targetLanguage !== "en") {
-        console.log(`Translating checklist to: ${targetLanguage}`);
+      let effectiveTargetLanguage = verification.targetLanguage || "en";
+      let translationApplied = false;
+      if (effectiveTargetLanguage && effectiveTargetLanguage !== "en") {
+        console.log(`Translating checklist to: ${effectiveTargetLanguage}`);
         try {
           const { translateChecklist: translateChecklist2 } = await Promise.resolve().then(() => (init_geminiTranslationService(), geminiTranslationService_exports));
           const validLanguages = ["en", "es", "fr", "de", "pt", "zh", "ru", "ja", "ar", "hi"];
-          if (validLanguages.includes(targetLanguage)) {
-            finalChecklist = await translateChecklist2(checklist, targetLanguage, "en");
+          if (validLanguages.includes(effectiveTargetLanguage)) {
+            finalChecklist = await translateChecklist2(checklist, effectiveTargetLanguage, "en");
+            translationApplied = finalChecklist !== checklist && finalChecklist?.translatedTo === effectiveTargetLanguage;
+            if (!translationApplied) {
+              effectiveTargetLanguage = "en";
+            }
           } else {
             finalChecklist = checklist;
+            effectiveTargetLanguage = "en";
           }
-          console.log(`Successfully translated checklist to ${targetLanguage}`);
+          console.log(`Successfully translated checklist to ${effectiveTargetLanguage}`);
         } catch (translationError) {
           console.error("Translation failed, serving original checklist:", translationError);
           finalChecklist = checklist;
+          effectiveTargetLanguage = "en";
         }
       }
-      console.log(`Serving checklist in target language: ${targetLanguage}`);
-      res.json({ success: true, checklist: finalChecklist, targetLanguage });
+      console.log(`Serving checklist in target language: ${effectiveTargetLanguage}`);
+      res.json({ success: true, checklist: finalChecklist, targetLanguage: effectiveTargetLanguage, translationApplied });
     } catch (error) {
       console.error("Error fetching shared checklist:", error);
       res.status(500).json({ success: false, message: "Failed to fetch checklist" });
@@ -2301,26 +2301,33 @@ async function registerRoutes(app2) {
           message: "Checklist not found"
         });
       }
-      let targetLanguage = verification.targetLanguage || "en";
+      let effectiveTargetLanguage = verification.targetLanguage || "en";
       let finalChecklist = checklist;
-      if (targetLanguage && targetLanguage !== "en") {
-        console.log(`Translating checklist to: ${targetLanguage}`);
+      let translationApplied = false;
+      if (effectiveTargetLanguage && effectiveTargetLanguage !== "en") {
+        console.log(`Translating checklist to: ${effectiveTargetLanguage}`);
         try {
           const { translateChecklist: translateChecklist2 } = await Promise.resolve().then(() => (init_geminiTranslationService(), geminiTranslationService_exports));
           const validLanguages = ["en", "es", "fr", "de", "pt", "zh", "ru", "ja", "ar", "hi"];
-          if (validLanguages.includes(targetLanguage)) {
-            finalChecklist = await translateChecklist2(checklist, targetLanguage, "en");
+          if (validLanguages.includes(effectiveTargetLanguage)) {
+            finalChecklist = await translateChecklist2(checklist, effectiveTargetLanguage, "en");
+            translationApplied = finalChecklist !== checklist && finalChecklist?.translatedTo === effectiveTargetLanguage;
+            if (!translationApplied) {
+              effectiveTargetLanguage = "en";
+            }
           } else {
             finalChecklist = checklist;
+            effectiveTargetLanguage = "en";
           }
-          console.log(`Successfully translated checklist to ${targetLanguage}`);
+          console.log(`Successfully translated checklist to ${effectiveTargetLanguage}`);
         } catch (translationError) {
           console.error("Translation failed, serving original checklist:", translationError);
           finalChecklist = checklist;
+          effectiveTargetLanguage = "en";
         }
       }
-      console.log(`Serving checklist in target language: ${targetLanguage}`);
-      res.json({ success: true, checklist: finalChecklist, targetLanguage });
+      console.log(`Serving checklist in target language: ${effectiveTargetLanguage}`);
+      res.json({ success: true, checklist: finalChecklist, targetLanguage: effectiveTargetLanguage, translationApplied });
     } catch (error) {
       console.error("Error fetching shared checklist:", error);
       res.status(500).json({ success: false, message: "Failed to fetch checklist" });
@@ -2340,7 +2347,9 @@ async function registerRoutes(app2) {
         expired,
         recipientId: verification.recipientId,
         checklistId: verification.checklistId || null,
-        targetLanguage: verification.targetLanguage || "en"
+        targetLanguage: verification.targetLanguage || "en",
+        maskedEmail: verification.recipientEmail ? formatEmailForDisplay(verification.recipientEmail) : void 0,
+        maskedPhone: verification.recipientPhone ? formatPhoneForDisplay(verification.recipientPhone) : void 0
       });
     } catch (error) {
       console.error("Error in verification status check:", error);
