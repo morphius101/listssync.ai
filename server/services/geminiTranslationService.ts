@@ -69,11 +69,8 @@ export async function translateText(
 }
 
 /**
- * Translate an entire checklist to a target language
- * 
- * @param checklist Checklist object to translate
- * @param targetLanguage Target language code
- * @returns Translated checklist
+ * Translate an entire checklist in one model call so translation is atomic.
+ * Either the full checklist comes back translated, or we return the original.
  */
 export async function translateChecklist(
   checklist: any,
@@ -82,58 +79,48 @@ export async function translateChecklist(
 ): Promise<any> {
   try {
     console.log(`🔄 Starting checklist translation to ${targetLanguage}`);
-    
+
     if (!process.env.GEMINI_API_KEY) {
       console.warn("⚠️ GEMINI_API_KEY not found, returning original checklist");
       return checklist;
     }
 
-    // Don't translate if target is English
     if (targetLanguage === 'en') {
       return checklist;
     }
 
-    const translatedChecklist = { ...checklist };
-    
-    // Translate title
-    if (checklist.title) {
-      translatedChecklist.title = await translateText(checklist.title, targetLanguage);
+    const targetLangName = AVAILABLE_LANGUAGES[targetLanguage];
+    const prompt = `Translate this checklist JSON into ${targetLangName}.
+
+Rules:
+- Preserve the exact JSON structure and all keys.
+- Translate only human-readable text fields such as name, remarks, task descriptions, and task details.
+- Do not translate IDs, status enums, booleans, URLs, timestamps, or numeric fields.
+- Return valid JSON only. No markdown, no explanation.
+
+Checklist JSON:
+${JSON.stringify(checklist)}`;
+
+    const result = await genAI.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
+    });
+
+    const translatedText = result.text?.trim();
+    if (!translatedText) {
+      console.warn("⚠️ Gemini returned empty checklist translation; using original checklist");
+      return checklist;
     }
-    
-    // Translate description
-    if (checklist.description) {
-      translatedChecklist.description = await translateText(checklist.description, targetLanguage);
-    }
-    
-    // Translate tasks
-    if (checklist.tasks && Array.isArray(checklist.tasks)) {
-      translatedChecklist.tasks = await Promise.all(
-        checklist.tasks.map(async (task: any) => {
-          const translatedTask = { ...task };
-          
-          if (task.title) {
-            translatedTask.title = await translateText(task.title, targetLanguage);
-          }
-          
-          if (task.description) {
-            translatedTask.description = await translateText(task.description, targetLanguage);
-          }
-          
-          return translatedTask;
-        })
-      );
-    }
-    
-    // Add translation metadata
-    translatedChecklist.translatedTo = targetLanguage;
-    translatedChecklist.translatedAt = new Date().toISOString();
-    
+
+    const parsed = JSON.parse(translatedText);
+    parsed.translatedTo = targetLanguage;
+    parsed.translatedAt = new Date().toISOString();
+
     console.log(`✅ Checklist translation to ${targetLanguage} completed`);
-    return translatedChecklist;
-    
+    return parsed;
   } catch (error) {
     console.error("❌ Checklist translation error:", error);
-    return checklist; // Return original on error
+    return checklist;
   }
 }
 

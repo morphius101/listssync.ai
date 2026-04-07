@@ -1395,13 +1395,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const host = SITE_CONFIG.host || req.get('host');
       const shareUrl = `${protocol}://${host}/shared/${token}`;
       
-      // Send verification via email or SMS
+      // Send verification via email or SMS and fail honestly if delivery fails
       if (recipientEmail) {
-        await sendVerificationEmail(recipientEmail, code);
+        const emailSent = await sendVerificationEmail(recipientEmail, code, token);
+        if (!emailSent) {
+          return res.status(502).json({ message: 'Failed to send verification email' });
+        }
       }
       
       if (recipientPhone) {
-        await sendVerificationSMS(recipientPhone, code);
+        const smsSent = await sendVerificationSMS(recipientPhone, code, token);
+        if (!smsSent) {
+          return res.status(502).json({ message: 'Failed to send verification SMS' });
+        }
       }
       
       res.json({
