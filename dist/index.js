@@ -2711,6 +2711,9 @@ function serveStatic(app2) {
     );
   }
   app2.use(express.static(distPath));
+  app2.use("/api", (_req, res) => {
+    res.status(404).json({ message: "Not Found" });
+  });
   app2.use("*", (_req, res) => {
     res.sendFile(path.resolve(distPath, "index.html"));
   });
