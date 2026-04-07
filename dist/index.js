@@ -1354,11 +1354,18 @@ if (stripeKey) {
 } else {
   console.log("\u274C No Stripe secret key found in environment");
 }
+var APP_URL = process.env.APP_URL?.replace(/\/$/, "");
 var SITE_CONFIG = {
   protocol: process.env.NODE_ENV === "production" ? "https" : "http",
   host: process.env.NODE_ENV === "production" ? "www.listssync.ai" : void 0
   // undefined will use req.get('host')
 };
+function getSiteBaseUrl(req) {
+  if (APP_URL) return APP_URL;
+  const protocol = SITE_CONFIG.protocol || req.protocol;
+  const host = SITE_CONFIG.host || req.get("host");
+  return `${protocol}://${host}`;
+}
 async function registerRoutes(app2) {
   const API_BASE = "/api";
   app2.get(`${API_BASE}/health`, (_req, res) => {
@@ -1466,6 +1473,7 @@ async function registerRoutes(app2) {
       };
       console.log(`\u{1F511} Using price IDs: Professional=${priceIds.professional}, Enterprise=${priceIds.enterprise}`);
       console.log(`\u{1F511} Stripe key type: ${stripeKey?.substring(0, 8) ?? "unknown"}...`);
+      const siteBaseUrl = getSiteBaseUrl(req);
       const session = await stripe.checkout.sessions.create({
         customer: customer.id,
         payment_method_types: ["card"],
@@ -1476,8 +1484,8 @@ async function registerRoutes(app2) {
           }
         ],
         mode: "subscription",
-        success_url: `${req.protocol}://${req.get("host")}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${req.protocol}://${req.get("host")}/subscription/cancel`,
+        success_url: `${siteBaseUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${siteBaseUrl}/subscription/cancel`,
         metadata: {
           userId,
           tier
@@ -1858,20 +1866,36 @@ async function registerRoutes(app2) {
     console.log("\u{1F4E8} VERIFICATION REQUEST RECEIVED");
     console.log("================================================");
     try {
-      console.log("\u{1F4DD} verification/send raw request body:", req.body);
-      console.log("\u{1F4DD} verification/send request headers:", req.headers);
-      console.log("\u{1F4DD} Environment:", process.env.NODE_ENV || "not set");
       let { recipientId, email, phone, checklistId, recipientName, targetLanguage } = req.body;
-      console.log("\u{1F4CB} verification/send parsed fields:", {
-        recipientId,
-        email,
-        phone,
-        checklistId,
-        recipientName,
-        targetLanguage
-      });
-      console.log("\u{1F511} SENDGRID_API_KEY available:", !!process.env.SENDGRID_API_KEY);
-      console.log("\u{1F511} TWILIO_ACCOUNT_SID available:", !!process.env.TWILIO_ACCOUNT_SID);
+      const isProduction = process.env.NODE_ENV === "production";
+      const maskedEmail = email ? formatEmailForDisplay(email) : void 0;
+      const maskedPhone = phone ? formatPhoneForDisplay(phone) : void 0;
+      if (isProduction) {
+        console.log("\u{1F4E8} verification/send request:", {
+          checklistId,
+          recipientId,
+          recipientName: recipientName || null,
+          targetLanguage: targetLanguage || "en",
+          hasEmail: !!email,
+          hasPhone: !!phone,
+          maskedEmail,
+          maskedPhone
+        });
+      } else {
+        console.log("\u{1F4DD} verification/send raw request body:", req.body);
+        console.log("\u{1F4DD} verification/send request headers:", req.headers);
+        console.log("\u{1F4DD} Environment:", process.env.NODE_ENV || "not set");
+        console.log("\u{1F4CB} verification/send parsed fields:", {
+          recipientId,
+          email,
+          phone,
+          checklistId,
+          recipientName,
+          targetLanguage
+        });
+        console.log("\u{1F511} SENDGRID_API_KEY available:", !!process.env.SENDGRID_API_KEY);
+        console.log("\u{1F511} TWILIO_ACCOUNT_SID available:", !!process.env.TWILIO_ACCOUNT_SID);
+      }
       if (!email && !phone) {
         console.error("\u274C Verification request missing both email and phone");
         return res.status(400).json({
