@@ -41,6 +41,11 @@ console.log('Twilio Phone:', process.env.TWILIO_PHONE_NUMBER);
 console.log('================================');
 
 const app = express();
+
+// Trust Railway/proxy forwarding headers so secure redirects, IP logging, and rate limiting
+// work correctly behind the platform edge/load balancer.
+app.set('trust proxy', 1);
+
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 
