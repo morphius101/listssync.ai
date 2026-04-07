@@ -64,9 +64,12 @@ export default function SharedChecklist() {
   const [isExpired, setIsExpired] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [targetLanguage, setTargetLanguage] = useState<string>(langFromUrl);
+  const [languageLocked, setLanguageLocked] = useState(false);
   
-  // Force language update if URL changes
+  // Use URL language only until the server gives us an authoritative verification/checklist language.
   useEffect(() => {
+    if (languageLocked) return;
+
     const urlParams = new URLSearchParams(window.location.search);
     let currentLang = urlParams.get('lang') || 'en';
     
@@ -83,7 +86,7 @@ export default function SharedChecklist() {
       setTargetLanguage(currentLang);
       console.log(`🔄 Updated target language to: ${currentLang}`);
     }
-  }, [window.location.search, targetLanguage]);
+  }, [targetLanguage, languageLocked]);
 
   const { toast } = useToast();
   const { checkVerificationStatus, token: verificationToken, maskedContact } = useVerification();
@@ -134,6 +137,7 @@ export default function SharedChecklist() {
           if (status.targetLanguage) {
             console.log(`Setting target language: ${status.targetLanguage}`);
             setTargetLanguage(status.targetLanguage);
+            setLanguageLocked(true);
           }
           
           if (status.verified && status.checklistId && !status.expired) {
@@ -188,9 +192,10 @@ export default function SharedChecklist() {
       }
       
       // Server automatically handles translation based on verification record
-      // Use the target language returned by the server
+      // Use the authoritative target language returned by the server
       if (result.targetLanguage) {
         setTargetLanguage(result.targetLanguage);
+        setLanguageLocked(true);
       }
       
       setChecklist(result.checklist);
