@@ -35,6 +35,8 @@ interface VerificationStatus {
   recipientId?: string;
   checklistId?: string;
   targetLanguage?: string;
+  maskedEmail?: string;
+  maskedPhone?: string;
 }
 
 interface VerificationMaskedContact {
@@ -54,7 +56,8 @@ export function useVerification() {
     email,
     phone,
     recipientName,
-    recipientId
+    recipientId,
+    targetLanguage,
   }: SendVerificationParams): Promise<ShareChecklistResponse | null> => {
     setIsLoading(true);
     setError(null);
@@ -116,19 +119,27 @@ export function useVerification() {
       
       console.log("📤 Sending verification request to /api/verification/send");
       
-      const response = await apiRequest('/api/verification/send', {
+      if (targetLanguage) {
+        requestData.targetLanguage = targetLanguage;
+      }
+
+      const response = await fetch('/api/verification/send', {
         method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
         body: JSON.stringify(requestData),
       });
-      
+
       console.log("📥 Received verification API response status:", response.status);
-      
+
+      const data = await response.json().catch(() => ({}));
+
       if (!response.ok) {
-        console.error("❌ Verification API request failed with status:", response.status);
-        throw new Error(`Verification request failed with status: ${response.status}`);
+        console.error("❌ Verification API request failed with status:", response.status, data);
+        throw new Error(data?.message || `Verification request failed with status: ${response.status}`);
       }
-      
-      const data = await response.json();
       console.log("📦 Verification response data:", data);
       
       if (data.token) {
@@ -158,15 +169,21 @@ export function useVerification() {
     setError(null);
     
     try {
-      const response = await apiRequest('/api/verification/verify', {
+      const response = await fetch('/api/verification/verify', {
         method: 'POST',
-        body: JSON.stringify({
-          token,
-          code
-        }),
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ token, code }),
       });
-      
-      return await response.json();
+
+      const data = await response.json().catch(() => ({ verified: false }));
+      if (!response.ok) {
+        throw new Error(data?.message || 'Failed to verify code');
+      }
+
+      return data;
     } catch (err) {
       setError('Failed to verify code');
       console.error('Verify code error:', err);
@@ -182,30 +199,23 @@ export function useVerification() {
     setError(null);
     
     try {
-      const response = await apiRequest(`/api/verification/status/${token}`, {
-        method: 'GET'
+      const response = await fetch(`/api/verification/status/${encodeURIComponent(token)}`, {
+        method: 'GET',
+        credentials: 'include'
       });
-      
+
       if (!response.ok) {
-        // If status check fails, return a default state that will prompt verification
-        return {
-          verified: false,
-          expired: false,
-          recipientId: `recipient_${Date.now()}`,
-          checklistId: undefined
-        };
+        return null;
       }
-      
+
       const data = await response.json();
+      setMaskedContact({
+        email: data.maskedEmail,
+        phone: data.maskedPhone,
+      });
       return data;
     } catch (err) {
-      // Silently handle errors and return a safe default state
-      return {
-        verified: false,
-        expired: false,
-        recipientId: `recipient_${Date.now()}`,
-        checklistId: undefined
-      };
+      return null;
     } finally {
       setIsLoading(false);
     }

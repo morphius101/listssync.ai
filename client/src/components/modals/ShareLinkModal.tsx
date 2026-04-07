@@ -24,7 +24,7 @@ import {
 import { useVerification, SendVerificationParams } from '@/hooks/useVerification';
 import { useTranslation, LanguageCode } from '@/hooks/useTranslation';
 import { Checklist } from '@/types';
-import { AlertTriangle, Loader2, ClipboardCopy, Mail, Phone, Languages, Smartphone, Globe, Shield, MessageSquare } from 'lucide-react';
+import { AlertTriangle, Loader2, ClipboardCopy, Mail, Phone, Smartphone, Globe, Shield, MessageSquare } from 'lucide-react';
 
 interface ShareLinkModalProps {
   isOpen: boolean;
@@ -74,7 +74,7 @@ export default function ShareLinkModal({
   }, [isOpen]);
   
   const { isLoading, shareChecklist } = useVerification();
-  const { languages, isTranslating, translateChecklist } = useTranslation();
+  const { languages, isTranslating } = useTranslation();
 
   const handleShareLink = async (e?: React.FormEvent) => {
     // If event provided, prevent default form submission
@@ -163,53 +163,17 @@ export default function ShareLinkModal({
       // Log the complete parameters before making the API call
       console.log('Sharing checklist with params:', params);
       
-      // Try a direct fetch call to diagnose the issue
-      try {
-        console.log('Making direct fetch call with params:', params);
-        
-        const directResponse = await fetch('/api/verification/send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify(params),
-          credentials: 'include'
-        });
-        
-        console.log('Direct fetch response status:', directResponse.status);
-        
-        if (directResponse.ok) {
-          const data = await directResponse.json();
-          console.log('Direct fetch success with data:', data);
-          
-          if (data.shareUrl) {
-            setShareLink(data.shareUrl);
-            setResponse(data);
-            return;
-          }
-        } else {
-          console.error('Direct fetch failed with status:', directResponse.status);
-          const errorText = await directResponse.text();
-          console.error('Error details:', errorText);
-          throw new Error(`API error: ${directResponse.status} - ${errorText}`);
-        }
-      } catch (directError) {
-        console.error('Direct fetch error:', directError);
-      }
-      
-      // If direct fetch failed or returned no data, fall back to the hook
-      console.log('Falling back to the shareChecklist hook');
       const response = await shareChecklist(params);
       
       if (response?.shareUrl) {
         setShareLink(response.shareUrl);
         setResponse(response);
       } else {
-        setError('Failed to generate a share link. Please try again.');
+        setError('Failed to deliver the share link. Please try again.');
       }
     } catch (err: any) {
       console.error('Share checklist error:', err);
-      setError(err.message || 'Failed to share checklist. Please try again.');
+      setError(err.message || 'Failed to deliver the share link. Please try again.');
     }
   };
 
@@ -236,17 +200,19 @@ export default function ShareLinkModal({
             <div className="bg-green-50 p-3 rounded-md text-green-700 text-sm">
               <p className="font-medium">
                 {response?.maskedEmail && (
-                  <>A verification code has been sent to <span className="font-bold">{response.maskedEmail}</span></>
+                  <>Checklist link emailed to <span className="font-bold">{response.maskedEmail}</span></>
                 )}
                 {response?.maskedPhone && (
-                  <>A verification code has been sent to <span className="font-bold">{response.maskedPhone}</span></>
+                  <>Verification code sent by SMS to <span className="font-bold">{response.maskedPhone}</span></>
                 )}
                 {!response?.maskedEmail && !response?.maskedPhone && (
-                  <>A verification code has been sent to the recipient</>
+                  <>Checklist link sent to the recipient</>
                 )}
               </p>
               <p className="text-xs mt-1">
-                The recipient will need this verification code to access the checklist.
+                {response?.maskedEmail
+                  ? 'The email link is already verified for that recipient — no extra code entry is required.'
+                  : 'The recipient will need the SMS verification code to open the checklist.'}
               </p>
               
               {/* Display verification code in development mode */}
@@ -272,7 +238,9 @@ export default function ShareLinkModal({
             </div>
             
             <p className="text-sm text-gray-500 text-center">
-              The recipient will need to enter the verification code to access the checklist.
+              {response?.maskedEmail
+                ? 'Email recipients can open the checklist directly from the secure link.'
+                : 'SMS recipients will still need to enter their verification code.'}
             </p>
           </div>
         ) : (
@@ -394,8 +362,8 @@ export default function ShareLinkModal({
             <div className="bg-blue-50 p-3 rounded-md text-blue-700 text-sm flex items-start">
               <Smartphone className="w-4 h-4 mr-2 mt-0.5 flex-shrink-0" />
               <p>
-                The recipient will receive a verification code to access the checklist.
-                They can complete it from any device with a web browser.
+                Email shares open directly from the secure inbox link. SMS shares still require a verification code.
+                Recipients can complete the checklist from any device with a web browser.
               </p>
             </div>
             

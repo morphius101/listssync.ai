@@ -8,7 +8,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { useVerification, VerifyCodeResponse } from '@/hooks/useVerification';
+import { useVerification } from '@/hooks/useVerification';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, Mail, ShieldCheck, Phone } from 'lucide-react';
 import { Input } from '@/components/ui/input';
@@ -53,92 +53,29 @@ export function VerificationModal({
     }
 
     setIsVerifying(true);
-    
+
     try {
-      console.log(`🔍 Starting verification process with token: ${token}`);
-      
-      // Step 1: Try the standard verification API
-      try {
-        const result = await verifyCode({
-          token,
-          code: verificationCode,
-        });
-
-        console.log(`📋 Verification API response:`, result);
-
-        if (result?.verified) {
-          console.log(`✅ Verification successful with checklistId: ${result.checklistId || '(not set)'}`);
-          
-          toast({
-            title: 'Success',
-            description: 'Verification successful',
-          });
-          
-          // Use the original checklist ID that was shared
-          if (result.checklistId) {
-            console.log(`📋 Using original shared checklist ID: ${result.checklistId}`);
-            
-            // Close modal and trigger callback
-            setTimeout(() => {
-              onVerified(result.recipientId || '', result.checklistId);
-            }, 1000);
-            return;
-          }
-        }
-      } catch (verifyError) {
-        console.error("❌ Error during verification:", verifyError);
-      }
-      
-      // Step 2: Try to get the original checklist ID from the verification status
-      try {
-        console.log("🔍 Querying verification status API for original checklist ID");
-        const response = await fetch(`/api/verification/status/${token}`);
-        
-        if (response.ok) {
-          const statusData = await response.json();
-          
-          if (statusData.checklistId) {
-            console.log(`✅ Found original checklist ID: ${statusData.checklistId}`);
-            const originalRecipientId = statusData.recipientId || `recipient_${Date.now()}`;
-            
-            onVerified(originalRecipientId, statusData.checklistId);
-            return;
-          }
-        }
-      } catch (statusError) {
-        console.error("❌ Error getting verification status:", statusError);
-      }
-      
-      // Step 3: Try to extract checklist ID from token
-      try {
-        const possibleChecklistId = token.split('-').pop() || token;
-        console.log(`🔍 Extracted possible checklist ID from token: ${possibleChecklistId}`);
-        
-        const testResponse = await fetch(`/api/checklists/${possibleChecklistId}`);
-        
-        if (testResponse.ok) {
-          console.log(`✅ Found checklist with ID: ${possibleChecklistId}`);
-          onVerified(`recipient_${Date.now()}`, possibleChecklistId);
-          return;
-        }
-      } catch (extractError) {
-        console.error("❌ Error testing extracted ID:", extractError);
-      }
-      
-      // No valid checklist ID found, show error
-      console.error("❌ All attempts to find original checklist failed");
-      
-      toast({
-        title: 'Error',
-        description: 'Could not find the shared checklist. Please contact the sender.',
-        variant: 'destructive',
+      const result = await verifyCode({
+        token,
+        code: verificationCode.trim(),
       });
-    } catch (error) {
+
+      if (!result?.verified || !result.checklistId) {
+        throw new Error(result?.message || 'Verification failed');
+      }
+
+      toast({
+        title: 'Success',
+        description: 'Verification successful',
+      });
+
+      onVerified(result.recipientId || '', result.checklistId);
+    } catch (error: any) {
       console.error('Verification error:', error);
-      
+
       toast({
         title: 'Error',
-        description: 'Failed to verify code. Please try again.',
+        description: error?.message || 'Failed to verify code. Please try again.',
         variant: 'destructive',
       });
     } finally {
@@ -195,9 +132,11 @@ export function VerificationModal({
         </div>
 
         <DialogFooter>
-          <Button onClick={onClose} variant="outline">
-            Cancel
-          </Button>
+          {showCloseButton && (
+            <Button onClick={onClose} variant="outline">
+              Cancel
+            </Button>
+          )}
           <Button onClick={handleVerification} disabled={isVerifying}>
             {isVerifying ? (
               <>

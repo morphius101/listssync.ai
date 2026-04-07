@@ -116,7 +116,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
  * @returns Promise resolving to true if email sent successfully
  */
 export async function sendVerificationEmail(email: string, code: string, token?: string): Promise<boolean> {
-  const subject = 'Your ListsSync.ai Verification Code';
+  const subject = token ? 'Your ListsSync.ai Checklist Link' : 'Your ListsSync.ai Verification Code';
   
   const baseUrl = process.env.NODE_ENV === 'production' 
     ? 'https://www.listssync.ai'
@@ -124,10 +124,9 @@ export async function sendVerificationEmail(email: string, code: string, token?:
   const shareUrl = token ? `${baseUrl}/shared/${token}` : undefined;
   
   const text = `
-Your verification code for ListsSync.ai is: ${code}
-
-${shareUrl ? `Access your checklist here: ${shareUrl}\n` : ''}
-This code will expire in 10 minutes.
+${shareUrl
+    ? `You can open your shared ListsSync.ai checklist here: ${shareUrl}\n\nThis secure email link already verifies your access. No extra code entry is required.`
+    : `Your verification code for ListsSync.ai is: ${code}\n\nThis code will expire in 10 minutes.`}
 
 Thank you,
 The ListsSync.ai Team
@@ -181,16 +180,20 @@ The ListsSync.ai Team
 </head>
 <body>
   <div class="container">
-    <h2>Your Verification Code</h2>
-    <p>Please use the following code to verify your identity on ListsSync.ai:</p>
-    <div class="code">${code}</div>
     ${shareUrl ? `
+    <h2>Your Shared Checklist</h2>
+    <p>Use the secure link below to open your ListsSync.ai checklist.</p>
     <p>You can also access your checklist directly by clicking the button below:</p>
     <div style="text-align: center;">
       <a href="${shareUrl}" style="display: inline-block; background-color: #4f46e5; color: white; text-decoration: none; padding: 12px 24px; border-radius: 5px; font-weight: bold; margin: 20px 0; text-align: center; letter-spacing: normal;">View Checklist</a>
     </div>
-    ` : ''}
+    <p>This secure email link already verifies your access, so you do not need to enter a separate code.</p>
+    ` : `
+    <h2>Your Verification Code</h2>
+    <p>Please use the following code to verify your identity on ListsSync.ai:</p>
+    <div class="code">${code}</div>
     <p>This code will expire in 10 minutes.</p>
+    `}
     <p>If you didn't request this code, you can safely ignore this email.</p>
     <div class="footer">
       <p>&copy; ${new Date().getFullYear()} ListsSync.ai | www.listssync.ai</p>

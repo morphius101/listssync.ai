@@ -1,9 +1,22 @@
 import { useState, useEffect } from 'react';
+import { getApps } from 'firebase/app';
 import { getAuth, onAuthStateChanged, getRedirectResult, User } from 'firebase/auth';
 
+function getFirebaseAuthSafe() {
+  if (getApps().length === 0) {
+    return null;
+  }
+
+  try {
+    return getAuth();
+  } catch {
+    return null;
+  }
+}
+
 export async function getAuthHeaders(): Promise<Record<string, string>> {
-  const auth = getAuth();
-  const user = auth.currentUser;
+  const auth = getFirebaseAuthSafe();
+  const user = auth?.currentUser;
 
   if (!user) {
     return { 'Content-Type': 'application/json' };
@@ -47,13 +60,17 @@ export function useAuth() {
   };
 
   useEffect(() => {
-    const auth = getAuth();
+    const auth = getFirebaseAuthSafe();
+
+    if (!auth) {
+      setIsLoading(false);
+      return;
+    }
 
     // Handle redirect result on mobile after Google sign-in redirect
     getRedirectResult(auth).then(async (result) => {
       if (result?.user) {
         await registerUserInDatabase(result.user);
-        // Redirect to dashboard after successful mobile sign-in
         if (window.location.pathname === '/') {
           window.location.href = '/dashboard';
         }
@@ -64,16 +81,14 @@ export function useAuth() {
 
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
-      
-      // Automatically register new users in the free tier
+
       if (currentUser) {
         await registerUserInDatabase(currentUser);
       }
-      
+
       setIsLoading(false);
     });
 
-    // Cleanup subscription on unmount
     return () => unsubscribe();
   }, []);
 

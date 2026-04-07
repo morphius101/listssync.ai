@@ -29,17 +29,8 @@ export default function SharedChecklist() {
   const match = match1 || match2;
   const params = params1 || params2;
   
-  // Extract language from URL query parameters with multiple fallback methods
   const urlParams = new URLSearchParams(window.location.search);
-  let langFromUrl = urlParams.get('lang') || 'en';
-  
-  // Alternative: check if lang is in the hash or URL
-  if (langFromUrl === 'en' && window.location.href.includes('lang=')) {
-    const langMatch = window.location.href.match(/lang=([a-z]{2})/);
-    if (langMatch) {
-      langFromUrl = langMatch[1];
-    }
-  }
+  const langFromUrl = urlParams.get('lang') || 'en';
   
   // Clean the token to remove any query parameters that might be included
   const rawToken = params?.token;
@@ -64,37 +55,15 @@ export default function SharedChecklist() {
   const [isExpired, setIsExpired] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [targetLanguage, setTargetLanguage] = useState<string>(langFromUrl);
-  const [languageLocked, setLanguageLocked] = useState(false);
-  
-  // Use URL language only until the server gives us an authoritative verification/checklist language.
-  useEffect(() => {
-    if (languageLocked) return;
-
-    const urlParams = new URLSearchParams(window.location.search);
-    let currentLang = urlParams.get('lang') || 'en';
-    
-    // Alternative: check if lang is in the URL string directly
-    if (currentLang === 'en' && window.location.href.includes('lang=')) {
-      const langMatch = window.location.href.match(/lang=([a-z]{2})/);
-      if (langMatch) {
-        currentLang = langMatch[1];
-      }
-    }
-    
-    console.log(`🔄 Language detection update: ${currentLang} (from ${window.location.href})`);
-    if (currentLang !== targetLanguage) {
-      setTargetLanguage(currentLang);
-      console.log(`🔄 Updated target language to: ${currentLang}`);
-    }
-  }, [targetLanguage, languageLocked]);
+  const [translationApplied, setTranslationApplied] = useState(false);
 
   const { toast } = useToast();
   const { checkVerificationStatus, token: verificationToken, maskedContact } = useVerification();
   // Polling for live updates (replaces WebSocket)
   useEffect(() => {
-    if (!token || !checklist) return;
+    if (!token || !checklist || !isVerified) return;
     const interval = setInterval(async () => {
-      if (document.hidden) return; // don't poll when tab is hidden
+      if (document.hidden) return;
       try {
         const url = new URL(`/api/shared/checklist`, window.location.origin);
         url.searchParams.set('token', token);
@@ -105,11 +74,17 @@ export default function SharedChecklist() {
             if (JSON.stringify(prev) === JSON.stringify(result.checklist)) return prev;
             return result.checklist;
           });
+          setTranslationApplied(Boolean(result.translationApplied));
+          if (result.targetLanguage) {
+            setTargetLanguage(result.targetLanguage);
+          }
         }
-      } catch { /* silent */ }
+      } catch {
+        /* silent */
+      }
     }, 10000);
     return () => clearInterval(interval);
-  }, [token, !!checklist]);
+  }, [token, checklist, isVerified]);
 
 
   // Check verification status - only runs once when token is available
@@ -128,32 +103,33 @@ export default function SharedChecklist() {
         
         if (!isMounted.current) return;
         
-        if (status) {
-          setIsVerified(status.verified);
-          setIsExpired(status.expired);
-          setRecipientId(status.recipientId || null);
-          setChecklistId(status.checklistId || null);
-          
-          if (status.targetLanguage) {
-            console.log(`Setting target language: ${status.targetLanguage}`);
-            setTargetLanguage(status.targetLanguage);
-            setLanguageLocked(true);
-          }
-          
-          if (status.verified && status.checklistId && !status.expired) {
-            await loadChecklist(status.checklistId);
-          } else {
-            setShowVerification(true);
-          }
+        if (!status) {
+          setError('This shared link is invalid or no longer available.');
+          return;
+        }
+
+        setIsVerified(status.verified);
+        setIsExpired(status.expired);
+        setRecipientId(status.recipientId || null);
+        setChecklistId(status.checklistId || null);
+
+        if (status.targetLanguage) {
+          setTargetLanguage(status.targetLanguage);
+        }
+
+        if (status.expired) {
+          setError('This shared link has expired. Please ask the sender for a new one.');
+          return;
+        }
+
+        if (status.verified && status.checklistId) {
+          await loadChecklist(status.checklistId);
         } else {
-          console.log("Verification status check failed but proceeding to verification anyway");
-          setRecipientId(`auto_recipient_${Date.now()}`);
-          setChecklistId('9999');
           setShowVerification(true);
         }
       } catch (error) {
         console.error('Error verifying access:', error);
-        setShowVerification(true);
+        setError('We could not verify this shared link right now. Please try again.');
       } finally {
         if (isMounted.current) {
           setIsLoading(false);
@@ -191,22 +167,15 @@ export default function SharedChecklist() {
         throw new Error(result.message || 'Failed to load checklist');
       }
       
-      // Server automatically handles translation based on verification record
-      // Use the authoritative target language returned by the server
       if (result.targetLanguage) {
         setTargetLanguage(result.targetLanguage);
-        setLanguageLocked(true);
       }
-      
+      setTranslationApplied(Boolean(result.translationApplied));
+
       setChecklist(result.checklist);
       setRemarks(result.checklist.remarks || "");
       
       // Real-time polling is handled by the useEffect above
-      
-      toast({
-        title: 'Success',
-        description: 'Your shared checklist has been loaded successfully.',
-      });
       
       return result.checklist;
     } catch (error) {
@@ -315,6 +284,7 @@ export default function SharedChecklist() {
             <VerificationModal
               isOpen={true}
               onClose={() => setShowVerification(false)}
+              maskedContact={maskedContact}
               onVerified={(recipientId, checklistId) => {
                 console.log(`🎯 Verification callback: recipientId=${recipientId}, checklistId=${checklistId}`);
                 setIsVerified(true);
@@ -331,6 +301,20 @@ export default function SharedChecklist() {
               showCloseButton={false}
             />
           )}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-xl mx-auto bg-white rounded-lg border p-6 text-center space-y-3">
+            <AlertTriangle className="w-8 h-8 text-amber-600 mx-auto" />
+            <p className="font-medium text-gray-900">Shared checklist unavailable</p>
+            <p className="text-sm text-gray-600">{error}</p>
+          </div>
         </div>
       </div>
     );
@@ -377,7 +361,7 @@ export default function SharedChecklist() {
         </div>
 
         {/* Language Indicator */}
-        {targetLanguage !== 'en' && (
+        {translationApplied && targetLanguage !== 'en' && (
           <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-3">
             <Globe className="w-5 h-5 text-blue-600" />
             <div>

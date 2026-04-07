@@ -114,7 +114,7 @@ ${JSON.stringify(checklist)}`;
 
     const parsed = JSON.parse(translatedText);
     parsed.translatedTo = targetLanguage;
-    parsed.translatedAt = new Date().toISOString();
+    parsed.translatedAt = checklist?.updatedAt || checklist?.translatedAt || new Date().toISOString();
 
     console.log(`✅ Checklist translation to ${targetLanguage} completed`);
     return parsed;
