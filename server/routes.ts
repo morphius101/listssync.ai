@@ -53,11 +53,19 @@ if (stripeKey) {
   console.log('❌ No Stripe secret key found in environment');
 }
 
-// Site configuration for URLs - use custom domain in production
+// Site configuration for URLs - prefer an explicit canonical app URL in production.
+const APP_URL = process.env.APP_URL?.replace(/\/$/, '');
 const SITE_CONFIG = {
   protocol: process.env.NODE_ENV === 'production' ? 'https' : 'http',
   host: process.env.NODE_ENV === 'production' ? 'www.listssync.ai' : undefined // undefined will use req.get('host')
 };
+
+function getSiteBaseUrl(req: Request): string {
+  if (APP_URL) return APP_URL;
+  const protocol = SITE_CONFIG.protocol || req.protocol;
+  const host = SITE_CONFIG.host || req.get('host');
+  return `${protocol}://${host}`;
+}
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // API base path
@@ -203,6 +211,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       console.log(`🔑 Using price IDs: Professional=${priceIds.professional}, Enterprise=${priceIds.enterprise}`);
       console.log(`🔑 Stripe key type: ${stripeKey?.substring(0, 8) ?? 'unknown'}...`);
 
+      const siteBaseUrl = getSiteBaseUrl(req);
+
       const session = await stripe.checkout.sessions.create({
         customer: customer.id,
         payment_method_types: ['card'],
@@ -213,8 +223,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         ],
         mode: 'subscription',
-        success_url: `${req.protocol}://${req.get('host')}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${req.protocol}://${req.get('host')}/subscription/cancel`,
+        success_url: `${siteBaseUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${siteBaseUrl}/subscription/cancel`,
         metadata: {
           userId,
           tier
@@ -701,25 +711,38 @@ export async function registerRoutes(app: Express): Promise<Server> {
     console.log('================================================');
     
     try {
-      // Log the entire request body for debugging
-      console.log('📝 verification/send raw request body:', req.body);
-      console.log('📝 verification/send request headers:', req.headers);
-      console.log('📝 Environment:', process.env.NODE_ENV || 'not set');
-      
       let { recipientId, email, phone, checklistId, recipientName, targetLanguage } = req.body;
-      
-      console.log('📋 verification/send parsed fields:', { 
-        recipientId, 
-        email, 
-        phone, 
-        checklistId, 
-        recipientName,
-        targetLanguage 
-      });
-      
-      // Verify environment variables are available
-      console.log('🔑 SENDGRID_API_KEY available:', !!process.env.SENDGRID_API_KEY);
-      console.log('🔑 TWILIO_ACCOUNT_SID available:', !!process.env.TWILIO_ACCOUNT_SID);
+
+      const isProduction = process.env.NODE_ENV === 'production';
+      const maskedEmail = email ? formatEmailForDisplay(email) : undefined;
+      const maskedPhone = phone ? formatPhoneForDisplay(phone) : undefined;
+
+      if (isProduction) {
+        console.log('📨 verification/send request:', {
+          checklistId,
+          recipientId,
+          recipientName: recipientName || null,
+          targetLanguage: targetLanguage || 'en',
+          hasEmail: !!email,
+          hasPhone: !!phone,
+          maskedEmail,
+          maskedPhone,
+        });
+      } else {
+        console.log('📝 verification/send raw request body:', req.body);
+        console.log('📝 verification/send request headers:', req.headers);
+        console.log('📝 Environment:', process.env.NODE_ENV || 'not set');
+        console.log('📋 verification/send parsed fields:', { 
+          recipientId, 
+          email, 
+          phone, 
+          checklistId, 
+          recipientName,
+          targetLanguage 
+        });
+        console.log('🔑 SENDGRID_API_KEY available:', !!process.env.SENDGRID_API_KEY);
+        console.log('🔑 TWILIO_ACCOUNT_SID available:', !!process.env.TWILIO_ACCOUNT_SID);
+      }
       
       // Input validation with more detailed logging
       if (!email && !phone) {
