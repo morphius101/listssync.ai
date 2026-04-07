@@ -42,12 +42,11 @@ const pricingTiers: PricingTier[] = [
   {
     id: 'professional',
     name: 'Professional',
-    price: '$49',
+    price: '$9',
     description: 'For growing businesses',
     icon: Crown,
     popular: true,
-    buttonText: 'Start 14-Day Free Trial',
-    yearlyDiscount: 'Save 20% yearly',
+    buttonText: 'Start Professional',
     features: [
       'Up to 100 checklists',
       '10 team members',
@@ -57,19 +56,17 @@ const pricingTiers: PricingTier[] = [
       'Advanced analytics',
       'API access',
       'Workflow automation',
-      'Integrations (Slack, Teams, etc)',
-      '14-day free trial'
+      'Integrations (Slack, Teams, etc)'
     ]
   },
 
   {
     id: 'enterprise',
     name: 'Enterprise',
-    price: '$299',
+    price: '$29',
     description: 'For enterprise needs',
     icon: Building,
-    buttonText: 'Start Free Trial',
-    yearlyDiscount: 'Save 20% yearly',
+    buttonText: 'Start Enterprise',
     features: [
       'Unlimited checklists',
       'Unlimited users',
@@ -79,8 +76,7 @@ const pricingTiers: PricingTier[] = [
       'Custom deployment',
       'Enterprise SLA',
       'Custom integrations',
-      'Dedicated onboarding',
-      '30-day free trial'
+      'Dedicated onboarding'
     ]
   }
 ];
@@ -270,7 +266,7 @@ export default function Pricing({ userId, userEmail, currentTier = 'free' }: Pri
             
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">Do you offer refunds?</h3>
-              <p className="text-gray-600">We offer a 7-day free trial for Pro plans. For other refund requests, please contact support.</p>
+              <p className="text-gray-600">If you have billing or refund questions, please contact support.</p>
             </div>
             
             <div>

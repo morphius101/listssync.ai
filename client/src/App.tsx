@@ -91,13 +91,9 @@ function Router() {
       {/* SMS Consent page - public access required for compliance */}
       <Route path="/sms-consent" component={SmsConsent} />
       
-      {/* Pricing page */}
+      {/* Pricing page - public so prospects can evaluate plans before signing in */}
       <Route path="/pricing">
-        {() => (
-          <ProtectedRoute>
-            <PricingWithAuth />
-          </ProtectedRoute>
-        )}
+        {() => <PricingWithAuth />}
       </Route>
       
       {/* Subscription success/cancel pages */}

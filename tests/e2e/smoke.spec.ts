@@ -35,6 +35,15 @@ test('landing page responds and shows core marketing copy', async ({ page }) => 
   await expect(page.getByText(/photo verification/i)).toBeVisible();
 });
 
+test('pricing page shows the intended live plan prices', async ({ page }) => {
+  await page.goto('/pricing');
+  await expect(page.getByRole('heading', { name: /choose your plan/i })).toBeVisible();
+  await expect(page.getByText('$9')).toBeVisible();
+  await expect(page.getByText('$29')).toBeVisible();
+  await expect(page.getByText('$49')).toHaveCount(0);
+  await expect(page.getByText('$299')).toHaveCount(0);
+});
+
 test('unknown API routes return JSON 404 instead of SPA HTML', async ({ request }) => {
   const response = await request.get('/api/definitely-not-a-real-route');
   expect(response.status()).toBe(404);
@@ -141,3 +150,4 @@ test('shared checklist does not claim translation when server falls back to orig
   await expect(page.getByText(/auto-translated/i)).toHaveCount(0);
   await expect(page.getByText(/warehouse closeout/i)).toBeVisible();
 });
+
