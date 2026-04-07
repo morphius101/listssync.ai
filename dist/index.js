@@ -2794,6 +2794,7 @@ console.log("Twilio Auth first chars:", process.env.TWILIO_AUTH_TOKEN?.substring
 console.log("Twilio Phone:", process.env.TWILIO_PHONE_NUMBER);
 console.log("================================");
 var app = express2();
+app.set("trust proxy", 1);
 app.use(express2.json());
 app.use(express2.urlencoded({ extended: false }));
 app.use((req, res, next) => {
