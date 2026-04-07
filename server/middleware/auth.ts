@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from "express";
 
-// Decode JWT payload without verification (fallback only — not cryptographically safe)
+// Decode JWT payload without verification (dev fallback only — not cryptographically safe)
 function decodeJwtPayload(token: string): any {
   try {
     const payload = token.split('.')[1];
@@ -17,38 +17,37 @@ export async function requireAuth(req: Request, res: Response, next: NextFunctio
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ error: "Unauthorized: missing token" });
     }
-    const idToken = authHeader.split("Bearer ")[1];
 
-    if (process.env.FIREBASE_SERVICE_ACCOUNT_BASE64) {
-      // Production: verify with Firebase Admin (cryptographically safe)
+    const idToken = authHeader.split("Bearer ")[1];
+    const hasServiceAccount = !!process.env.FIREBASE_SERVICE_ACCOUNT_BASE64;
+
+    if (hasServiceAccount) {
       try {
         const { getAuth } = await import("firebase-admin/auth");
         const decodedToken = await getAuth().verifyIdToken(idToken);
         (req as any).user = { uid: decodedToken.uid, email: decodedToken.email };
+        return next();
       } catch (verifyError: any) {
-        console.error('🔴 Firebase verifyIdToken failed:', verifyError?.message || verifyError);
-        console.error('🔴 Token prefix:', idToken.substring(0, 30));
-        // Fallback: decode JWT without verification if verifyIdToken fails
-        const decoded = decodeJwtPayload(idToken);
-        if (!decoded?.sub) {
-          return res.status(401).json({ error: "Unauthorized: token verification failed", detail: verifyError?.message });
-        }
-        console.warn('⚠️  Falling back to JWT decode (verifyIdToken failed)');
-        (req as any).user = { uid: decoded.sub, email: decoded.email };
+        console.error("🔴 Firebase verifyIdToken failed:", verifyError?.message || verifyError);
+        return res.status(401).json({ error: "Unauthorized: token verification failed" });
       }
-    } else {
-      // Dev/fallback: decode JWT without verification
-      // ⚠️ Only acceptable when FIREBASE_SERVICE_ACCOUNT_BASE64 is not set (local dev)
-      const decoded = decodeJwtPayload(idToken);
-      if (!decoded?.sub) {
-        return res.status(401).json({ error: "Unauthorized: invalid token" });
-      }
-      (req as any).user = { uid: decoded.sub, email: decoded.email };
     }
 
-    next();
+    if (process.env.NODE_ENV === "production") {
+      console.error("🔴 FIREBASE_SERVICE_ACCOUNT_BASE64 is missing in production");
+      return res.status(500).json({ error: "Authentication is not configured correctly" });
+    }
+
+    // Development-only fallback when Firebase Admin is not configured locally.
+    const decoded = decodeJwtPayload(idToken);
+    if (!decoded?.sub) {
+      return res.status(401).json({ error: "Unauthorized: invalid token" });
+    }
+
+    (req as any).user = { uid: decoded.sub, email: decoded.email };
+    return next();
   } catch (error) {
-    console.error('Auth middleware error:', error);
+    console.error("Auth middleware error:", error);
     return res.status(401).json({ error: "Unauthorized: invalid token" });
   }
 }

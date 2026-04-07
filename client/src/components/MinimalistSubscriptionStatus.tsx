@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Crown, Zap, Building } from 'lucide-react';
 import { trackUserAction } from '@/lib/analytics';
+import { getAuthHeaders } from '@/hooks/useAuth';
 
 interface SubscriptionData {
   tier: 'free' | 'professional' | 'enterprise';
@@ -49,7 +50,9 @@ const MinimalistSubscriptionStatus = ({ userId, onUpgrade }: MinimalistSubscript
   useEffect(() => {
     const fetchSubscription = async () => {
       try {
-        const response = await fetch(`/api/user/${userId}/subscription`);
+        const response = await fetch(`/api/user/${userId}/subscription`, {
+          headers: await getAuthHeaders(),
+        });
         const data = await response.json();
         setSubscription(data);
       } catch (error) {

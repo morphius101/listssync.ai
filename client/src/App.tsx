@@ -14,7 +14,7 @@ import Footer from "@/components/Footer";
 import LandingPage from "@/components/LandingPage";
 import ProtectedRoute from "@/components/ProtectedRoute";
 import { useEffect, useState } from "react";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, getAuthHeaders } from "@/hooks/useAuth";
 import { initializeFirebase } from "./lib/firebase";
 import { initGA, trackStripeEvent, trackUserAction } from "@/lib/analytics";
 import { useAnalytics } from "@/hooks/use-analytics";
@@ -35,7 +35,9 @@ function PricingWithAuth() {
     const fetchUserTier = async () => {
       if (user) {
         try {
-          const response = await fetch(`/api/user/${user.uid}/subscription`);
+          const response = await fetch(`/api/user/${user.uid}/subscription`, {
+            headers: await getAuthHeaders(),
+          });
           const subscription = await response.json();
           setCurrentTier(subscription.tier || 'free');
         } catch (error) {

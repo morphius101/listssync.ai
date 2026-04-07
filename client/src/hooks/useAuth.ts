@@ -1,5 +1,24 @@
 import { useState, useEffect } from 'react';
-import { getAuth, onAuthStateChanged, getRedirectResult, User, getIdToken } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, getRedirectResult, User } from 'firebase/auth';
+
+export async function getAuthHeaders(): Promise<Record<string, string>> {
+  const auth = getAuth();
+  const user = auth.currentUser;
+
+  if (!user) {
+    return { 'Content-Type': 'application/json' };
+  }
+
+  try {
+    const token = await user.getIdToken();
+    return {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}`,
+    };
+  } catch {
+    return { 'Content-Type': 'application/json' };
+  }
+}
 
 export function useAuth() {
   const [user, setUser] = useState<User | null>(null);
@@ -11,7 +30,7 @@ export function useAuth() {
       await fetch('/api/user/register', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          ...(await getAuthHeaders()),
           'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({

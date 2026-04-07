@@ -35,26 +35,19 @@ import Stripe from "stripe";
 
 // Initialize Stripe (conditional on API key availability)
 let stripe: Stripe | null = null;
-
-// TEMPORARY FIX: Use live key directly due to Replit environment caching
-// The publishable key shows 'pk_live_51RicxhARacWLsYzM...' so the corresponding secret key should be 'sk_live_51RicxhARacWLsYzM...'
-const liveSecretKey = process.env.STRIPE_PUBLISHABLE_KEY?.replace('pk_live_', 'sk_live_');
-
-const stripeKey = (liveSecretKey && liveSecretKey.startsWith('sk_live_')) ? liveSecretKey : process.env.STRIPE_SECRET_KEY;
+const stripeKey = process.env.STRIPE_SECRET_KEY;
 
 if (stripeKey) {
-  // Check if we're using test keys and log appropriate message
   const isTestMode = stripeKey.startsWith('sk_test_');
   const isLiveMode = stripeKey.startsWith('sk_live_');
-  
+
   console.log(`🔑 Stripe initialization: ${isLiveMode ? 'LIVE MODE' : isTestMode ? 'TEST MODE' : 'UNKNOWN MODE'}`);
   console.log(`🔑 Key type detected: ${stripeKey.substring(0, 8)}...`);
-  console.log(`🔑 Using ${liveSecretKey && liveSecretKey.startsWith('sk_live_') ? 'derived live key' : 'environment variable'}`);
-  
+
   if (process.env.NODE_ENV === 'production' && isTestMode) {
     console.warn('⚠️  WARNING: Using Stripe test keys in production environment!');
   }
-  
+
   stripe = new Stripe(stripeKey);
 } else {
   console.log('❌ No Stripe secret key found in environment');
@@ -83,9 +76,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // ===============================
 
   // Get user subscription status
-  app.get(`${API_BASE}/user/:userId/subscription`, async (req, res) => {
+  app.get(`${API_BASE}/user/:userId/subscription`, requireAuth, async (req, res) => {
     try {
       const { userId } = req.params;
+      const authenticatedUserId = (req as any).user?.uid;
+
+      if (!authenticatedUserId || authenticatedUserId !== userId) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+
       const user = await storage.getUser(userId);
       
       if (!user) {
@@ -113,12 +112,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create or update user with automatic free tier enrollment
-  app.post(`${API_BASE}/user/register`, async (req, res) => {
+  app.post(`${API_BASE}/user/register`, requireAuth, async (req, res) => {
     try {
       const { userId, email, firstName, lastName, profileImageUrl } = req.body;
+      const authenticatedUserId = (req as any).user?.uid;
       
       if (!userId || !email) {
         return res.status(400).json({ error: 'Missing required fields: userId and email' });
+      }
+
+      if (!authenticatedUserId || authenticatedUserId !== userId) {
+        return res.status(403).json({ error: 'Forbidden' });
       }
 
       // Create or update user with free tier by default
@@ -159,9 +163,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       const { userId, tier, email } = req.body;
+      const authenticatedUserId = (req as any).user?.uid;
       
       if (!userId || !tier || !email) {
         return res.status(400).json({ error: 'Missing required fields' });
+      }
+
+      if (!authenticatedUserId || authenticatedUserId !== userId) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
+
+      if (!['professional', 'enterprise'].includes(tier)) {
+        return res.status(400).json({ error: 'Invalid subscription tier' });
       }
 
       // Create or get Stripe customer
@@ -311,7 +324,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Batch API endpoint for optimizing multiple requests
-  app.post(`${API_BASE}/batch`, async (req, res) => {
+  app.post(`${API_BASE}/batch`, requireAuth, async (req, res) => {
     try {
       // Validate batch request structure
       if (!req.body.batch || !Array.isArray(req.body.batch)) {
@@ -378,7 +391,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get checklist by ID - GUARANTEED to return a valid response
-  app.get(`${API_BASE}/checklists/:id`, async (req, res) => {
+  app.get(`${API_BASE}/checklists/:id`, requireAuth, async (req, res) => {
     try {
       console.log(`🔍 Getting checklist by ID: ${req.params.id}`);
       
@@ -413,11 +426,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         };
       };
       
+      const authenticatedUserId = (req as any).user?.uid;
+
       // First try to get the requested checklist
       let checklist;
       try {
         checklist = await storage.getChecklistById(req.params.id);
         if (checklist) {
+          if (!authenticatedUserId || checklist.userId !== authenticatedUserId) {
+            return res.status(403).json({ error: 'Forbidden' });
+          }
+
           console.log(`✅ Found checklist: ${checklist.name}`);
           return res.json(checklist);
         }
@@ -436,27 +455,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error('💥 Unexpected error in checklist endpoint:', error);
-      
-      // Even in case of a server error, return a valid checklist
-      const emergencyChecklist = {
-        id: req.params.id,
-        name: 'Welcome to ListsSync.ai',
-        tasks: [{
-          id: '1',
-          description: 'Getting Started',
-          details: 'Welcome to ListsSync.ai - your checklist companion',
-          completed: false,
-          photoRequired: false,
-          photoUrl: null
-        }],
-        status: 'not-started' as 'not-started',
-        progress: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        remarks: 'Welcome to ListsSync.ai!'
-      };
-      
-      return res.json(emergencyChecklist);
+      return res.status(500).json({ error: 'Failed to fetch checklist' });
     }
   });
 
@@ -464,36 +463,35 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.post(`${API_BASE}/checklists`, requireAuth, async (req, res) => {
     try {
       const validatedData = checklistSchema.parse(req.body);
-      
-      // Check user limits if userId is provided
-      if (validatedData.userId) {
-        const limits = await storage.checkUserLimits(validatedData.userId, 'create_list');
-        if (!limits.allowed) {
-          return res.status(403).json({ 
-            error: 'Subscription limit reached',
-            message: `You've reached the limit of ${limits.limit} lists for your ${limits.tier} plan. Please upgrade to create more lists.`,
-            tier: limits.tier,
-            limit: limits.limit,
-            current: limits.current,
-            upgradeRequired: true
-          });
-        }
+      const authenticatedUserId = (req as any).user?.uid;
+
+      if (!authenticatedUserId) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      const limits = await storage.checkUserLimits(authenticatedUserId, 'create_list');
+      if (!limits.allowed) {
+        return res.status(403).json({ 
+          error: 'Subscription limit reached',
+          message: `You've reached the limit of ${limits.limit} lists for your ${limits.tier} plan. Please upgrade to create more lists.`,
+          tier: limits.tier,
+          limit: limits.limit,
+          current: limits.current,
+          upgradeRequired: true
+        });
       }
       
       // Add createdAt and updatedAt timestamps since they're required by ChecklistDTO
       const checklistData = {
         ...validatedData,
+        userId: authenticatedUserId,
         remarks: validatedData.remarks || "",
         createdAt: new Date(),
         updatedAt: new Date()
       };
       
       const newChecklist = await storage.createChecklist(checklistData);
-      
-      // Increment user usage count
-      if (validatedData.userId) {
-        await storage.incrementUserUsage(validatedData.userId, 'sync');
-      }
+      await storage.incrementUserUsage(authenticatedUserId, 'sync');
       
       res.status(201).json(newChecklist);
     } catch (error: any) {
@@ -507,10 +505,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Update checklist
   app.put(`${API_BASE}/checklists/:id`, requireAuth, async (req, res) => {
     try {
+      const authenticatedUserId = (req as any).user?.uid;
+
       // Check if checklist exists
       const existingChecklist = await storage.getChecklistById(req.params.id);
       if (!existingChecklist) {
         return res.status(404).json({ message: "Checklist not found" });
+      }
+
+      if (!authenticatedUserId || existingChecklist.userId !== authenticatedUserId) {
+        return res.status(403).json({ error: 'Forbidden' });
       }
       
       const validatedData = checklistSchema.parse(req.body);
@@ -546,10 +550,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Delete checklist
   app.delete(`${API_BASE}/checklists/:id`, requireAuth, async (req, res) => {
     try {
+      const authenticatedUserId = (req as any).user?.uid;
+
       // Check if checklist exists
       const existingChecklist = await storage.getChecklistById(req.params.id);
       if (!existingChecklist) {
         return res.status(404).json({ message: "Checklist not found" });
+      }
+
+      if (!authenticatedUserId || existingChecklist.userId !== authenticatedUserId) {
+        return res.status(403).json({ error: 'Forbidden' });
       }
       
       const success = await storage.deleteChecklist(req.params.id);
@@ -565,14 +575,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update task status
-  app.patch(`${API_BASE}/checklists/:checklistId/tasks/:taskId`, async (req, res) => {
+  app.patch(`${API_BASE}/checklists/:checklistId/tasks/:taskId`, requireAuth, async (req, res) => {
     try {
       const { checklistId, taskId } = req.params;
+      const authenticatedUserId = (req as any).user?.uid;
       
       // Check if checklist exists
       const existingChecklist = await storage.getChecklistById(checklistId);
       if (!existingChecklist) {
         return res.status(404).json({ message: "Checklist not found" });
+      }
+
+      if (!authenticatedUserId || existingChecklist.userId !== authenticatedUserId) {
+        return res.status(403).json({ error: 'Forbidden' });
       }
       
       const updates = req.body;
@@ -616,10 +631,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post(`${API_BASE}/translate/checklist/:id`, async (req, res) => {
+  app.post(`${API_BASE}/translate/checklist/:id`, requireAuth, async (req, res) => {
     try {
       const { targetLanguage, sourceLanguage, userId } = req.body;
+      const authenticatedUserId = (req as any).user?.uid;
       console.log('Translation request received:', { id: req.params.id, targetLanguage, sourceLanguage, userId });
+
+      if (!authenticatedUserId || (userId && userId !== authenticatedUserId)) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
       
       if (!targetLanguage) {
         return res.status(400).json({ 
@@ -651,6 +671,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (!checklist) {
         return res.status(404).json({ message: "Checklist not found" });
       }
+
+      if (checklist.userId !== authenticatedUserId) {
+        return res.status(403).json({ error: 'Forbidden' });
+      }
       
       console.log('Starting translation process...');
       const translatedChecklist = await translateChecklist(
@@ -660,9 +684,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       );
 
       // Increment language usage count
-      if (userId) {
-        await storage.incrementUserUsage(userId, 'language');
-      }
+      await storage.incrementUserUsage(authenticatedUserId, 'language');
       
       console.log('Translation completed successfully');
       res.json(translatedChecklist);
@@ -967,283 +989,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Create a fallback checklist helper function
-  function createDefaultChecklist(id: string): ChecklistDTO {
-    return {
-      id: id,
-      name: "Welcome to ListsSync.ai",
-      tasks: [
-        {
-          id: "1",
-          description: "Welcome to ListsSync.ai",
-          details: "This is an automatically created checklist to get you started.",
-          completed: false,
-          photoRequired: false,
-          photoUrl: null
-        },
-        {
-          id: "2",
-          description: "Create your own checklist",
-          details: "Visit the dashboard to create your own custom checklists.",
-          completed: false,
-          photoRequired: false,
-          photoUrl: null
-        }
-      ],
-      status: 'not-started',
-      progress: 0,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      remarks: "This is a default welcome checklist."
-    };
-  }
-  
-  // Special endpoint to ensure a fallback checklist is always available in production
-  app.get(`${API_BASE}/verification/fallback-checklist`, async (req, res) => {
-    try {
-      // First try to find any existing checklist
-      const allChecklists = await storage.getAllChecklists();
-      
-      if (allChecklists && allChecklists.length > 0) {
-        return res.json({
-          success: true,
-          checklistId: allChecklists[0].id,
-          message: "Found existing checklist"
-        });
-      }
-      
-      // If no checklists exist, create a fallback checklist with ID "1"
-      const defaultChecklist: ChecklistDTO = {
-        id: "1",
-        name: "Welcome to ListsSync.ai",
-        tasks: [
-          {
-            id: "1",
-            description: "Welcome to your first checklist",
-            details: "This is an automatically created checklist to get you started.",
-            completed: false,
-            photoRequired: false,
-            photoUrl: null
-          },
-          {
-            id: "2",
-            description: "Create your own checklist",
-            details: "Visit the dashboard to create your own custom checklists.",
-            completed: false,
-            photoRequired: false,
-            photoUrl: null
-          }
-        ],
-        status: 'not-started',
-        progress: 0,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-        remarks: "This is a default welcome checklist."
-      };
-      
-      try {
-        await storage.createChecklist(defaultChecklist);
-        console.log("Created fallback checklist with ID: 1");
-      } catch (error) {
-        console.error("Error creating fallback checklist:", error);
-        // Continue anyway - we'll return the ID even if saving fails
-      }
-      
-      return res.json({
-        success: true,
-        checklistId: "1",
-        message: "Created fallback checklist"
-      });
-    } catch (error) {
-      console.error("Error in fallback checklist endpoint:", error);
-      // Even in case of error, return a valid response
-      return res.json({
-        success: true,
-        checklistId: "1",
-        message: "Using emergency fallback"
-      });
-    }
-  });
-
   app.post(`${API_BASE}/verification/verify`, async (req, res) => {
     try {
       const { token, code } = req.body;
-      
-      console.log(`🔍 VERIFICATION ATTEMPT for token: ${token}`);
-      console.log(`🔍 VERIFICATION ATTEMPT with code: ${code}`);
-      
+
       if (!token || !code) {
-        console.log(`❌ Missing token or code in request`);
-        return res.status(400).json({ 
+        return res.status(400).json({
           verified: false,
-          message: "Missing required fields: token, code" 
+          message: "Missing required fields: token, code"
         });
       }
-      
-      // Get the verification record and log everything about it for debugging
-      console.log(`🔍 LOOKING UP verification for token: ${token}`);
+
       const verification = await storage.getVerificationByToken(token);
-      console.log(`🔍 VERIFICATION RECORD FOUND:`, verification ? 'YES' : 'NO');
-      
-      if (verification) {
-        console.log(`VERIFICATION DETAILS: {
-          checklistId: ${verification.checklistId || 'NONE'},
-          recipientId: ${verification.recipientId || 'NONE'},
-          verified: ${verification.verified ? 'TRUE' : 'FALSE'},
-          expires: ${verification.expiresAt ? verification.expiresAt.toISOString() : 'NONE'}
-        }`);
+      if (!verification) {
+        return res.status(404).json({ verified: false, message: "Invalid or expired verification token" });
       }
-      
-      // Ensure fallback checklist exists
-      const fallbackChecklistId = "1";
-      
-      // This function prioritizes returning the originally shared checklist ID
-      const getSharedChecklistId = async (token: string): Promise<string> => {
-        try {
-          // First try to get the verification record with this token
-          const verification = await storage.getVerificationByToken(token);
-          
-          if (verification) {
-            console.log(`✅ Found verification record for token: ${token}`);
-            
-            // CRITICAL: If this verification has a specific checklist ID, that's what we MUST return!
-            if (verification.checklistId && verification.checklistId !== 'null' && verification.checklistId !== 'undefined') {
-              console.log(`📋 Found specific checklist ID in verification: ${verification.checklistId}`);
-              
-              // PRODUCTION FIX: Validate that the checklist actually exists before proceeding
-              try {
-                const checklistExists = await storage.getChecklistById(verification.checklistId);
-                if (!checklistExists) {
-                  console.error(`❌ Checklist ${verification.checklistId} not found in database`);
-                  throw new Error(`Checklist ${verification.checklistId} no longer exists`);
-                }
-              } catch (error) {
-                console.error(`❌ Error validating checklist existence:`, error);
-                throw new Error(`Shared checklist is no longer available`);
-              }
-              
-              // Mark as verified immediately so the user gets access
-              await storage.markVerificationAsVerified(token);
-              
-              console.log(`Using original checklist ID: ${verification.checklistId}`);
-              
-              // Return the original checklist ID
-              return verification.checklistId;
-            } else {
-              console.log(`⚠️ No valid checklist ID found in verification record`);
-              
-              // If there's no valid checklist ID in the verification record, try to extract it from token
-              // This is a critical fix for backward compatibility with existing shared links
-              const possibleId = token.split('-').pop() || token;
-              console.log(`🔍 Extracted possible checklist ID from token: ${possibleId}`);
-              
-              // Try to update the verification record with this ID
-              try {
-                // Update the verification record with the extracted ID
-                verification.checklistId = possibleId;
-                await storage.markVerificationAsVerified(token);
-                console.log(`✅ Updated verification record with checklist ID: ${possibleId}`);
-                return possibleId;
-              } catch (updateError) {
-                console.error(`Error updating verification with checklist ID:`, updateError);
-              }
-            }
-            
-            // Mark as verified in any case
-            await storage.markVerificationAsVerified(token);
-          } else {
-            console.log(`⚠️ No verification record found for token: ${token}`);
-            
-            // Extract a potential checklist ID from the token itself
-            const possibleId = token.split('-').pop() || token;
-            console.log(`🔍 Extracted possible checklist ID from token: ${possibleId}`);
-            
-            // If there's no verification record, create one with the extracted ID
-            console.log(`🔧 Creating new verification record for token: ${token} with checklist ID: ${possibleId}`);
-            try {
-              await storage.createVerification({
-                token: token,
-                code: "000000", // Dummy code for auto-creation
-                createdAt: new Date(),
-                expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
-                verified: true,
-                recipientId: `auto_${Date.now()}`,
-                checklistId: possibleId // Use extracted ID instead of token directly
-              });
-              
-              return possibleId;
-            } catch (createError) {
-              console.error(`Error creating verification record:`, createError);
-            }
-          }
-        } catch (error) {
-          console.error(`Error retrieving verification:`, error);
-        }
-        
-        // Last resort - use the token itself as the checklist ID
-        console.log(`⚠️ Using token as checklist ID: ${token}`);
-        return token;
-      };
-      
-      // Get the specific shared checklist ID
-      console.log(`🔍 Retrieving original checklist ID for verification token: ${token}`);
-      const sharedChecklistId = await getSharedChecklistId(token);
-      
-      // Store the original ID in a variable that persists if errors happen
-      const originalChecklistId = sharedChecklistId || "1";
-      console.log(`📋 Using verified checklist ID: ${originalChecklistId}`);
-      
-      // Update the verification record to store the checklist ID permanently
-      try {
-        const verification = await getVerification(token);
-        if (verification && verification.checklistId !== originalChecklistId) {
-          console.log(`🔄 Updating verification record to ensure checklistId is stored: ${originalChecklistId}`);
-          
-          // This is a critical step - ensure the verification record has the checklist ID
-          verification.checklistId = originalChecklistId;
-          
-          // Store the updated verification
-          try {
-            // Mark as verified and update the checklist ID in one operation
-            await storage.markVerificationAsVerified(token);
-            console.log(`✅ Verification record updated and marked as verified`);
-          } catch (updateError) {
-            console.error("Error updating verification record:", updateError);
-          }
-        }
-      } catch (verificationError) {
-        console.error("Error getting verification details:", verificationError);
+
+      if (!verification.checklistId) {
+        return res.status(400).json({ verified: false, message: "Verification is not linked to a checklist" });
       }
-      
-      // Ensure the checklist exists in our system - create if missing
-      try {
-        const checklist = await storage.getChecklistById(originalChecklistId);
-        
-        if (!checklist) {
-          console.log(`❌ Checklist ${originalChecklistId} not found in database`);
-          return res.status(404).json({ 
-            success: false, 
-            message: 'The requested checklist was not found. Please check the link and try again.' 
-          });
-        } else {
-          console.log(`✅ Checklist with ID ${originalChecklistId} exists: ${checklist.name}`);
-        }
-      } catch (checkError) {
-        console.error("Error checking/creating checklist:", checkError);
+
+      if (verification.expiresAt < new Date()) {
+        return res.status(410).json({ verified: false, message: "Verification token has expired" });
       }
-      
-      // Always return verification success with the original checklist ID
-      console.log(`🎯 Verification complete, returning shared checklist ID: ${originalChecklistId}`);
-      
-      // Get verification data to include target language
-      const verificationData = await getVerification(token);
-      const targetLanguage = verificationData?.targetLanguage || 'en';
-      
-      return res.json({ 
-        verified: true, 
-        recipientId: `verified_${Date.now()}`,
-        checklistId: originalChecklistId,
-        targetLanguage: targetLanguage,
+
+      const verified = await verifyCode(token, code);
+      if (!verified) {
+        return res.status(400).json({ verified: false, message: "Invalid verification code" });
+      }
+
+      const checklist = await storage.getChecklistById(verification.checklistId);
+      if (!checklist) {
+        return res.status(404).json({ verified: false, message: "Shared checklist is no longer available" });
+      }
+
+      return res.json({
+        verified: true,
+        recipientId: verification.recipientId,
+        checklistId: verification.checklistId,
+        targetLanguage: verification.targetLanguage || 'en',
         message: "Verification successful"
       });
     } catch (error: any) {
@@ -1425,6 +1209,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
           message: 'Invalid or expired token' 
         });
       }
+
+      if (!verification.verified) {
+        return res.status(403).json({ success: false, message: 'Verification required' });
+      }
+
+      if (verification.expiresAt < new Date()) {
+        return res.status(410).json({ success: false, message: 'Verification token has expired' });
+      }
       
       console.log(`Found verification record for token: ${token}, checklist: ${verification.checklistId}, language: ${verification.targetLanguage}`);
       
@@ -1476,50 +1268,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { checklistId } = req.params;
       const { token } = req.query;
       console.log(`Fetching shared checklist: ${checklistId}, token: ${token ? 'provided' : 'none'}`);
-      
-      let checklist = null;
-      
-      // Check if this is a Firebase ID (contains letters/longer format) vs PostgreSQL ID (numeric)
-      const isFirebaseId = /[a-zA-Z]/.test(checklistId) && checklistId.length > 10;
-      
-      if (isFirebaseId) {
-        console.log(`Detected Firebase checklist ID: ${checklistId}`);
-        // For Firebase IDs, we need to use the client-side service or create a server-side Firebase integration
-        // For now, let's check if we have this checklist in our verification records and create a mapped version
-        
-        try {
-          // Check if we have this checklist referenced in verification records
-          const verifications = await storage.getAllVerifications();
-          const relevantVerification = verifications.find(v => v.checklistId === checklistId);
-          
-          if (relevantVerification) {
-            console.log(`Found verification record for Firebase checklist: ${checklistId}`);
-            
-            // Check if we already have a mapped PostgreSQL version
-            const existingChecklist = await storage.getChecklistById(checklistId);
-            
-            if (!existingChecklist) {
-              // For Firebase checklists, we need to fetch the original data from Firebase
-              // Instead of creating placeholder content, return error so client handles it properly
-              console.log(`Firebase checklist ${checklistId} not found in PostgreSQL, returning error to let client handle`);
-              return res.status(404).json({ 
-                success: false, 
-                message: 'Original checklist not found. Please verify the sharing link is correct.',
-                checklistId,
-                needsClientFetch: true // Signal to client to try Firebase fetch
-              });
-            } else {
-              checklist = existingChecklist;
-            }
-          }
-        } catch (firebaseError) {
-          console.error('Error handling Firebase checklist:', firebaseError);
-        }
-      } else {
-        // Try to get from PostgreSQL for numeric IDs
-        checklist = await storage.getChecklistById(checklistId);
+
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ success: false, message: 'Token is required' });
       }
-      
+
+      const verification = await storage.getVerificationByToken(token);
+      if (!verification) {
+        return res.status(404).json({ success: false, message: 'Invalid or expired token' });
+      }
+
+      if (!verification.verified) {
+        return res.status(403).json({ success: false, message: 'Verification required' });
+      }
+
+      if (verification.expiresAt < new Date()) {
+        return res.status(410).json({ success: false, message: 'Verification token has expired' });
+      }
+
+      if (verification.checklistId !== checklistId) {
+        return res.status(403).json({ success: false, message: 'Token does not match requested checklist' });
+      }
+
+      const checklist = await storage.getChecklistById(checklistId);
       if (!checklist) {
         console.log(`Checklist ${checklistId} not found in any data source`);
         return res.status(404).json({ 
@@ -1529,18 +1300,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
       
       // Determine target language from verification record if token is provided
-      let targetLanguage = 'en';
-      if (token && typeof token === 'string') {
-        try {
-          const verification = await storage.getVerificationByToken(token);
-          if (verification && verification.targetLanguage) {
-            targetLanguage = verification.targetLanguage;
-            console.log(`Using target language from verification: ${targetLanguage}`);
-          }
-        } catch (verificationError) {
-          console.error('Error getting verification for language:', verificationError);
-        }
-      }
+      let targetLanguage = verification.targetLanguage || 'en';
       
       // Apply translation if target language is not English
       let finalChecklist = checklist;
@@ -1570,219 +1330,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Special endpoint to get a valid checklist for verification fallbacks
-  app.get(`${API_BASE}/verification/fallback-checklist`, async (req, res) => {
-    try {
-      // Get all checklists
-      const checklists = await storage.getAllChecklists();
-      
-      if (checklists && checklists.length > 0) {
-        // Return the first available checklist
-        res.json({
-          success: true,
-          checklistId: checklists[0].id
-        });
-      } else {
-        // Create a sample checklist using the storage interface
-        const fallbackId = `fallback_${Date.now()}`;
-        
-        const newChecklist = {
-          id: fallbackId,
-          name: 'Welcome to ListsSync.ai',
-          tasks: [
-            {
-              id: `task_${Date.now()}_1`,
-              description: 'Create your first checklist',
-              details: 'Click the "+" button on the dashboard to create a new checklist',
-              completed: false,
-              photoRequired: false,
-              photoUrl: null
-            },
-            {
-              id: `task_${Date.now()}_2`,
-              description: 'Share your checklist with team members',
-              details: 'Use the share button to collaborate with others',
-              completed: false,
-              photoRequired: false,
-              photoUrl: null
-            }
-          ],
-          status: 'not-started' as 'not-started' | 'in-progress' | 'completed',
-          progress: 0,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-          remarks: 'Welcome to ListsSync.ai! This is your default checklist.'
-        };
-        
-        // Save using storage interface
-        const savedChecklist = await storage.createChecklist(newChecklist);
-        
-        // Return the ID of the new checklist
-        res.json({
-          success: true,
-          checklistId: savedChecklist.id
-        });
-      }
-    } catch (error) {
-      console.error('Error getting fallback checklist:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to get or create fallback checklist',
-        // Return a hardcoded ID in worst case
-        checklistId: '9999'
-      });
-    }
-  });
-
-
-  
-  // Cache for verification status checks to reduce database load
-  const verificationStatusCache = new Map();
-  const CACHE_TTL = 60 * 1000; // 60 seconds cache TTL
-  
   app.get(`${API_BASE}/verification/status/:token`, async (req, res) => {
     try {
       const rawToken = req.params.token;
-      
-      // Clean the token to remove any URL-encoded query parameters
       const token = decodeURIComponent(rawToken).split('?')[0];
-      
-      console.log(`Checking verification status for token: ${token} (original: ${rawToken})`);
-      
-      // CRITICAL FIX: First check if there's a verification record with this token
-      // that already has a mapped checklist ID
-      let originalChecklistId = null;
-      try {
-        const verification = await storage.getVerificationByToken(token);
-        if (verification && verification.checklistId) {
-          originalChecklistId = verification.checklistId;
-          console.log(`Found original checklist ID in verification: ${originalChecklistId}`);
-        }
-      } catch (verificationError) {
-        console.error('Error checking verification record:', verificationError);
-      }
-      
-      // If we didn't find a checklist ID in the verification record,
-      // check if the token itself might be a checklist ID
-      if (!originalChecklistId) {
-        try {
-          // Extract potential checklist ID from token
-          const extractedId = token.includes('-') ? token.split('-').pop() || token : token;
-          const checklist = await storage.getChecklistById(extractedId);
-          
-          if (checklist) {
-            originalChecklistId = extractedId;
-            console.log(`Found checklist by extracted ID: ${originalChecklistId}`);
-          }
-        } catch (checklistError) {
-          console.error('Error checking extracted checklist ID:', checklistError);
-        }
-      }
-      
-      // Always use the original checklist ID if we found it
-      if (originalChecklistId) {
-        console.log(`Using identified original checklist ID: ${originalChecklistId}`);
-      } else {
-        // Only use a fallback if we absolutely couldn't find the original
-        // Try to find any valid checklist ID as a last resort
-        originalChecklistId = 'test-checklist-original'; // Special test ID
-        try {
-          const allChecklists = await storage.getAllChecklists();
-          if (allChecklists && allChecklists.length > 0) {
-            originalChecklistId = allChecklists[0].id;
-          }
-        } catch (listError) {
-          console.error('Error fetching fallback checklists:', listError);
-        }
-        console.log(`⚠️ Using fallback checklist ID: ${originalChecklistId}`);
-      }
-      
-      // In production, always provide a valid verification status response
-      if (process.env.NODE_ENV === 'production') {
-        console.log(`[PRODUCTION] Providing verification status response for token: ${token}`);
-        
-        // IMPORTANT: Always use the original checklist ID if available!
-        return res.json({
-          verified: false, // Will trigger verification form
-          expired: false,
-          recipientId: `auto_${Date.now()}`,
-          checklistId: originalChecklistId
-        });
-      }
-      
-      // Development flow continues below
-      // Check if we have a cached response for this token
-      const cachedResult = verificationStatusCache.get(token);
-      if (cachedResult && (Date.now() - cachedResult.timestamp < CACHE_TTL)) {
-        console.log(`Using cached verification status for token: ${token}`);
-        return res.json(cachedResult.data);
-      }
-      
-      console.log(`Checking verification status for token: ${token}`);
-      
-      // Try to get verification record
-      let verification = await getVerification(token);
-      let isExpired = false;
-      
-      // Auto-create verification record if it doesn't exist
+
+      const verification = await getVerification(token);
       if (!verification) {
-        console.log(`🔧 No verification record found for token: ${token}. Creating one automatically.`);
-        
-        try {
-          // Create placeholder code and verification record
-          const placeholderCode = Math.floor(100000 + Math.random() * 900000).toString();
-          await storage.createVerification({
-            token: token,
-            code: placeholderCode,
-            createdAt: new Date(),
-            expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours
-            verified: false,
-            recipientId: `auto_recipient_${Date.now()}`,
-            checklistId: originalChecklistId // Use the original checklist ID we found earlier
-          });
-          
-          // Fetch the newly created verification
-          verification = await getVerification(token);
-          console.log(`✅ Successfully created verification record for token: ${token}`);
-        } catch (error) {
-          console.error(`❌ Failed to create verification record:`, error);
-        }
+        return res.status(404).json({ message: "Verification token not found" });
       }
-      
-      // Initialize default result with valid values
-      let verified = false;
-      
-      // Process verification if we have a record
-      if (verification) {
-        // Check if it's expired and extend if needed
-        isExpired = verification.expiresAt < new Date();
-        
-        // If expired, simply allow access for shared checklists
-        if (isExpired) {
-          console.log(`⏰ Token expired but allowing access for shared checklist: ${token}`);
-          isExpired = false; // Override expiration for shared access
-        }
-      }
-      
-      // Refresh verification status
-      verified = await isVerified(token);
-      
-      // Always provide a valid result object with fallbacks for all fields
-      const result = { 
-        verified, 
-        expired: isExpired,
-        recipientId: verification ? verification.recipientId : `auto_${Date.now()}`,
-        checklistId: verification && verification.checklistId ? verification.checklistId : originalChecklistId
-      };
-      
-      // Cache the result
-      verificationStatusCache.set(token, {
-        timestamp: Date.now(),
-        data: result
+
+      const expired = verification.expiresAt < new Date();
+
+      return res.json({
+        verified: verification.verified,
+        expired,
+        recipientId: verification.recipientId,
+        checklistId: verification.checklistId || null,
+        targetLanguage: verification.targetLanguage || 'en'
       });
-      
-      console.log(`Returning verification status for token ${token}:`, result);
-      res.json(result);
     } catch (error: any) {
       console.error("Error in verification status check:", error);
       res.status(500).json({ message: error.message });
@@ -1790,15 +1356,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Share checklist route with mobile-friendly options
-  app.post(`${API_BASE}/checklists/:id/share`, async (req, res) => {
+  app.post(`${API_BASE}/checklists/:id/share`, requireAuth, async (req, res) => {
     try {
       const { id } = req.params;
       const { recipientEmail, recipientPhone, recipientName, targetLanguage } = req.body;
+      const authenticatedUserId = (req as any).user?.uid;
       
       const checklist = await storage.getChecklistById(id);
       
       if (!checklist) {
         return res.status(404).json({ message: "Checklist not found" });
+      }
+
+      if (!authenticatedUserId || checklist.userId !== authenticatedUserId) {
+        return res.status(403).json({ error: 'Forbidden' });
       }
       
       if (!recipientEmail && !recipientPhone) {

@@ -8,7 +8,7 @@ import MinimalistSubscriptionStatus from "@/components/MinimalistSubscriptionSta
 
 import { Checklist, ChecklistSummary } from "@/types";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth, getAuthHeaders } from "@/hooks/useAuth";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { getChecklists, getChecklistById, createChecklist, updateChecklist, deleteChecklist, generateShareLink } from "@/services/checklistService";
 import { trackUserAction } from "@/lib/analytics";
@@ -60,6 +60,7 @@ const AdminDashboard = () => {
       const response = await fetch(`/api/user/${user.uid}/subscription`, {
         cache: 'no-cache',
         headers: {
+          ...(await getAuthHeaders()),
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }

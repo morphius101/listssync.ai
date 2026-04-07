@@ -28,9 +28,9 @@ export const getChecklists = async (): Promise<ChecklistSummary[]> => {
   console.log('🔍 Fetching checklists from PostgreSQL for user:', userId);
   
   try {
-    // Use PostgreSQL API instead of Firebase
-    const url = userId ? `${API_BASE}/checklists?userId=${userId}` : `${API_BASE}/checklists`;
-    const response = await fetch(url);
+    const response = await fetch(`${API_BASE}/checklists`, {
+      headers: await getAuthHeaders(),
+    });
     
     if (!response.ok) {
       throw new Error(`Failed to fetch checklists: ${response.status}`);
@@ -61,8 +61,9 @@ export const getChecklistById = async (id: string): Promise<Checklist | null> =>
   console.log(`🔍 Client: Attempting to fetch checklist from PostgreSQL with ID: ${id}`);
   
   try {
-    // Use PostgreSQL API instead of Firebase
-    const response = await fetch(`${API_BASE}/checklists/${id}`);
+    const response = await fetch(`${API_BASE}/checklists/${id}`, {
+      headers: await getAuthHeaders(),
+    });
     
     if (!response.ok) {
       console.log(`❌ Checklist not found in PostgreSQL: ${id}`);
@@ -184,12 +185,9 @@ export const updateTaskStatus = async (checklistId: string, taskId: string, upda
   console.log('🔍 Updating task status in PostgreSQL:', checklistId, taskId);
   
   try {
-    // Use PostgreSQL API instead of Firebase
     const response = await fetch(`${API_BASE}/checklists/${checklistId}/tasks/${taskId}`, {
       method: 'PATCH',
-      headers: {
-        'Content-Type': 'application/json',
-      },
+      headers: await getAuthHeaders(),
       body: JSON.stringify(updates),
     });
     

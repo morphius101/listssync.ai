@@ -4,8 +4,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Crown, Zap, Building, AlertTriangle } from 'lucide-react';
-import { apiRequest } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
+import { getAuthHeaders } from '@/hooks/useAuth';
 
 interface SubscriptionData {
   tier: 'free' | 'professional' | 'enterprise';
@@ -66,6 +66,7 @@ export default function SubscriptionStatus({ userId, onUpgrade }: SubscriptionSt
       const data = await fetch(`/api/user/${userId}/subscription`, {
         cache: 'no-cache',
         headers: {
+          ...(await getAuthHeaders()),
           'Cache-Control': 'no-cache',
           'Pragma': 'no-cache'
         }

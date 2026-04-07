@@ -144,58 +144,18 @@ export async function createVerification(
 export async function verifyCode(token: string, code: string): Promise<boolean> {
   try {
     console.log(`🔍 Verifying code for token: ${token}`);
-    
-    // First check if a record exists for this token
-    let record = await storage.getVerificationByToken(token);
-    
-    // If no record is found, create one for this token and code (auto-recovery)
+
+    const record = await storage.getVerificationByToken(token);
     if (!record) {
-      console.log(`🔧 No verification record found for token: ${token}. Creating one automatically.`);
-      
-      try {
-        await storage.createVerification({
-          token: token,
-          code: code,
-          createdAt: new Date(),
-          expiresAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hour validity
-          verified: false,
-          recipientId: `auto_recipient_${Date.now()}`,
-          checklistId: '9999' // Default checklist ID
-        });
-        
-        // Retrieve the newly created record
-        record = await storage.getVerificationByToken(token);
-        console.log(`✅ Created verification record for token: ${token}`);
-      } catch (createError) {
-        console.error(`❌ Failed to create verification record:`, createError);
-      }
-    }
-    
-    // Check if we have a valid record now
-    if (!record) {
-      console.log(`❌ Verification token not found even after creation attempt`);
+      console.log(`❌ Verification token not found`);
       return false;
     }
-    
-    // Check if token has expired
+
     if (record.expiresAt < new Date()) {
       console.log(`⏰ Verification token has expired`);
-      
-      // Auto-extend expiration for better user experience
-      try {
-        await storage.createVerification({
-          ...record,
-          expiresAt: new Date(Date.now() + 60 * 60 * 1000), // Extend by 1 hour
-        });
-        console.log(`⏰ Extended verification expiration time`);
-      } catch (extendError) {
-        console.error(`❌ Failed to extend verification expiration:`, extendError);
-      }
-      
-      // Continue with verification despite previous expiration
+      return false;
     }
-    
-    // Enhanced logging for debugging
+
     console.log(`Verification details:
     - Token: ${token}
     - Provided code: ${code}
@@ -204,32 +164,14 @@ export async function verifyCode(token: string, code: string): Promise<boolean> 
     - Created at: ${record.createdAt}
     - Expires at: ${record.expiresAt}
     - Currently expired: ${record.expiresAt < new Date()}`);
-    
-    // Make verification more robust in both environments
-    // Always auto-update and auto-verify for better user experience
-    try {
-      console.log(`🔄 Updating verification code to match user input`);
-      await storage.updateVerificationCode(token, code);
-      
-      // Mark as verified and return success
-      console.log(`✅ Auto-verified token: ${token}`);
-      const success = await storage.markVerificationAsVerified(token);
-      return success;
-    } catch (updateError) {
-      console.error(`❌ Failed to update verification code:`, updateError);
-      // Continue with normal verification flow
+
+    if (record.code !== code) {
+      console.log(`❌ Verification failed - code mismatch`);
+      return false;
     }
-    
-    // For development or if production auto-update failed, verify normally
-    if (record.code === code) {
-      // Mark as verified in database
-      console.log(`✅ Verification successful - marking as verified in database`);
-      const success = await storage.markVerificationAsVerified(token);
-      return success;
-    }
-    
-    console.log(`❌ Verification failed - code mismatch`);
-    return false;
+
+    console.log(`✅ Verification successful - marking as verified in database`);
+    return await storage.markVerificationAsVerified(token);
   } catch (error) {
     console.error("❌ Error verifying code:", error);
     return false;
