@@ -56,31 +56,31 @@ async function translateChecklist(checklist, targetLanguage, _sourceLanguage) {
     if (targetLanguage === "en") {
       return checklist;
     }
-    const translatedChecklist = { ...checklist };
-    if (checklist.title) {
-      translatedChecklist.title = await translateText(checklist.title, targetLanguage);
+    const targetLangName = AVAILABLE_LANGUAGES[targetLanguage];
+    const prompt = `Translate this checklist JSON into ${targetLangName}.
+
+Rules:
+- Preserve the exact JSON structure and all keys.
+- Translate only human-readable text fields such as name, remarks, task descriptions, and task details.
+- Do not translate IDs, status enums, booleans, URLs, timestamps, or numeric fields.
+- Return valid JSON only. No markdown, no explanation.
+
+Checklist JSON:
+${JSON.stringify(checklist)}`;
+    const result = await genAI.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt
+    });
+    const translatedText = result.text?.trim();
+    if (!translatedText) {
+      console.warn("\u26A0\uFE0F Gemini returned empty checklist translation; using original checklist");
+      return checklist;
     }
-    if (checklist.description) {
-      translatedChecklist.description = await translateText(checklist.description, targetLanguage);
-    }
-    if (checklist.tasks && Array.isArray(checklist.tasks)) {
-      translatedChecklist.tasks = await Promise.all(
-        checklist.tasks.map(async (task) => {
-          const translatedTask = { ...task };
-          if (task.title) {
-            translatedTask.title = await translateText(task.title, targetLanguage);
-          }
-          if (task.description) {
-            translatedTask.description = await translateText(task.description, targetLanguage);
-          }
-          return translatedTask;
-        })
-      );
-    }
-    translatedChecklist.translatedTo = targetLanguage;
-    translatedChecklist.translatedAt = (/* @__PURE__ */ new Date()).toISOString();
+    const parsed = JSON.parse(translatedText);
+    parsed.translatedTo = targetLanguage;
+    parsed.translatedAt = (/* @__PURE__ */ new Date()).toISOString();
     console.log(`\u2705 Checklist translation to ${targetLanguage} completed`);
-    return translatedChecklist;
+    return parsed;
   } catch (error) {
     console.error("\u274C Checklist translation error:", error);
     return checklist;
@@ -2376,10 +2376,16 @@ async function registerRoutes(app2) {
       const host = SITE_CONFIG.host || req.get("host");
       const shareUrl = `${protocol}://${host}/shared/${token}`;
       if (recipientEmail) {
-        await sendVerificationEmail2(recipientEmail, code);
+        const emailSent = await sendVerificationEmail2(recipientEmail, code, token);
+        if (!emailSent) {
+          return res.status(502).json({ message: "Failed to send verification email" });
+        }
       }
       if (recipientPhone) {
-        await sendVerificationSMS(recipientPhone, code);
+        const smsSent = await sendVerificationSMS(recipientPhone, code, token);
+        if (!smsSent) {
+          return res.status(502).json({ message: "Failed to send verification SMS" });
+        }
       }
       res.json({
         shareUrl,
