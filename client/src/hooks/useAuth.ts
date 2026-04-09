@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react';
 import { getApps } from 'firebase/app';
 import { getAuth, onAuthStateChanged, getRedirectResult, User } from 'firebase/auth';
 
+const APP_ORIGIN = import.meta.env.PROD ? 'https://www.listssync.ai' : window.location.origin;
+const DASHBOARD_URL = `${APP_ORIGIN}/dashboard`;
+
 function getFirebaseAuthSafe() {
   if (getApps().length === 0) {
     return null;
@@ -67,12 +70,15 @@ export function useAuth() {
       return;
     }
 
-    // Handle redirect result on mobile after Google sign-in redirect
+    // Handle redirect result on mobile after Google sign-in redirect.
+    // Always bounce back to the canonical app domain after successful auth so we never
+    // strand users on the Firebase-hosted auth domain.
     getRedirectResult(auth).then(async (result) => {
       if (result?.user) {
         await registerUserInDatabase(result.user);
-        if (window.location.pathname === '/') {
-          window.location.href = '/dashboard';
+
+        if (window.location.origin !== APP_ORIGIN || window.location.pathname === '/') {
+          window.location.replace(DASHBOARD_URL);
         }
       }
     }).catch((error) => {
@@ -84,6 +90,11 @@ export function useAuth() {
 
       if (currentUser) {
         await registerUserInDatabase(currentUser);
+
+        if (window.location.origin !== APP_ORIGIN && window.location.pathname !== '/shared') {
+          window.location.replace(DASHBOARD_URL);
+          return;
+        }
       }
 
       setIsLoading(false);
