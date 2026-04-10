@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "NODE_ENV=development tsx --env-file=.env server/index.ts",
-    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --external:vite --external:@vitejs/plugin-react --external:@replit/vite-plugin-runtime-error-modal --external:@replit/vite-plugin-cartographer --external:../vite.config --external:./vite.config && cp server/legal/privacy-policy.html dist/public/privacy-policy.html && cp server/legal/terms-of-service.html dist/public/terms.html",
+    "build": "vite build && esbuild server/index.ts --platform=node --packages=external --bundle --format=esm --outdir=dist --external:vite --external:@vitejs/plugin-react --external:@replit/vite-plugin-runtime-error-modal --external:@replit/vite-plugin-cartographer --external:../vite.config --external:./vite.config && cp server/legal/privacy-policy.html dist/public/privacy-policy.html && cp server/legal/privacy-policy.html dist/public/privacy-policy && cp server/legal/terms-of-service.html dist/public/terms.html && cp server/legal/terms-of-service.html dist/public/terms",
     "start": "NODE_ENV=production node dist/index.js",
     "check": "tsc",
     "db:push": "drizzle-kit push",
