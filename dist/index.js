@@ -2831,6 +2831,12 @@ app.use((req, res, next) => {
 app.get("/api/health", (_req, res) => {
   res.status(200).send("OK");
 });
+app.get("/terms", (_req, res) => {
+  res.redirect(301, "/terms.html");
+});
+app.get("/privacy-policy", (_req, res) => {
+  res.redirect(301, "/privacy-policy.html");
+});
 app.use((req, res, next) => {
   const start = Date.now();
   const path2 = req.path;
