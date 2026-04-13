@@ -19,6 +19,12 @@ const LandingPage = () => {
     document.title = 'ListsSync.ai — Smart Checklists with Photo Verification';
   }, []);
 
+  useEffect(() => {
+    if (!isLoading && isAuthenticated && location === '/') {
+      navigate('/dashboard');
+    }
+  }, [isAuthenticated, isLoading, location, navigate]);
+
   const handleGetStarted = async () => {
     if (isAuthenticated) {
       navigate('/dashboard');
