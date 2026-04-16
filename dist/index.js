@@ -34,7 +34,7 @@ async function translateText(text2, targetLanguage, sourceLanguage) {
     Text to translate: "${text2}"`;
     const result = await genAI.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: prompt
+      contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
     const translatedText = result.text || text2;
     console.log(`\u{1F30D} Gemini Translation: ${sourceLanguage || "auto"} \u2192 ${targetLanguage}`);
@@ -69,7 +69,7 @@ Checklist JSON:
 ${JSON.stringify(checklist)}`;
     const result = await genAI.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: prompt
+      contents: [{ role: "user", parts: [{ text: prompt }] }]
     });
     const translatedText = result.text?.trim();
     if (!translatedText) {
@@ -1174,26 +1174,22 @@ async function verifyCode(token, code) {
     console.log(`\u{1F50D} Verifying code for token: ${token}`);
     const record = await storage.getVerificationByToken(token);
     if (!record) {
-      console.log(`\u274C Verification token not found`);
+      console.log(`\u274C Verification token not found: ${token}`);
       return false;
     }
     if (record.expiresAt < /* @__PURE__ */ new Date()) {
       console.log(`\u23F0 Verification token has expired`);
       return false;
     }
-    console.log(`Verification details:
-    - Token: ${token}
-    - Provided code: ${code}
-    - Stored code: ${record.code}
-    - Codes match: ${record.code === code}
-    - Created at: ${record.createdAt}
-    - Expires at: ${record.expiresAt}
-    - Currently expired: ${record.expiresAt < /* @__PURE__ */ new Date()}`);
-    if (record.code !== code) {
-      console.log(`\u274C Verification failed - code mismatch`);
+    if (record.verified) {
+      console.log(`\u26A0\uFE0F Verification token already used`);
       return false;
     }
-    console.log(`\u2705 Verification successful - marking as verified in database`);
+    if (record.code !== code) {
+      console.log(`\u274C Verification failed \u2014 code mismatch`);
+      return false;
+    }
+    console.log(`\u2705 Code matched \u2014 marking as verified`);
     return await storage.markVerificationAsVerified(token);
   } catch (error) {
     console.error("\u274C Error verifying code:", error);
@@ -1346,7 +1342,6 @@ if (stripeKey) {
   const isTestMode = stripeKey.startsWith("sk_test_");
   const isLiveMode = stripeKey.startsWith("sk_live_");
   console.log(`\u{1F511} Stripe initialization: ${isLiveMode ? "LIVE MODE" : isTestMode ? "TEST MODE" : "UNKNOWN MODE"}`);
-  console.log(`\u{1F511} Key type detected: ${stripeKey.substring(0, 8)}...`);
   if (process.env.NODE_ENV === "production" && isTestMode) {
     console.warn("\u26A0\uFE0F  WARNING: Using Stripe test keys in production environment!");
   }
@@ -1484,8 +1479,8 @@ async function registerRoutes(app2) {
           }
         ],
         mode: "subscription",
-        success_url: `${siteBaseUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${siteBaseUrl}/subscription/cancel`,
+        success_url: `${getSiteBaseUrl(req)}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${getSiteBaseUrl(req)}/subscription/cancel`,
         metadata: {
           userId,
           tier
@@ -1504,9 +1499,17 @@ async function registerRoutes(app2) {
       }
       const sig = req.headers["stripe-signature"];
       const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
+      if (!endpointSecret) {
+        console.error("\u274C STRIPE_WEBHOOK_SECRET is not set \u2014 rejecting webhook");
+        return res.status(400).json({ error: "Webhook secret not configured" });
+      }
       let event;
       try {
-        event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret || "");
+        const rawBody = req.rawBody;
+        if (!rawBody) {
+          return res.status(400).json({ error: "Missing raw body" });
+        }
+        event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
       } catch (err) {
         console.log(`Webhook signature verification failed.`, err.message);
         return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -1609,7 +1612,7 @@ async function registerRoutes(app2) {
               results.push(updatedTask || { error: "Failed to update task" });
               break;
             case "get-checklists":
-              const userId = request.userId;
+              const userId = req.user?.uid;
               const checklists2 = await storage.getAllChecklists(userId);
               results.push(checklists2);
               break;
@@ -2760,7 +2763,7 @@ function serveStatic(app2) {
 
 // server/validateEnv.ts
 function validateEnv() {
-  const required = ["DATABASE_URL", "STRIPE_SECRET_KEY"];
+  const required = ["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"];
   const optional = [
     "SENDGRID_API_KEY",
     "TWILIO_ACCOUNT_SID",
@@ -2819,7 +2822,11 @@ console.log("Twilio Phone:", process.env.TWILIO_PHONE_NUMBER);
 console.log("================================");
 var app = express2();
 app.set("trust proxy", 1);
-app.use(express2.json());
+app.use(express2.json({
+  verify: (req, _res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express2.urlencoded({ extended: false }));
 app.use((req, res, next) => {
   const host = req.headers.host || "";
