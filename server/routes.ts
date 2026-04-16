@@ -33,8 +33,9 @@ import {
 import { ChecklistDTO, TIER_LIMITS, SubscriptionTier } from "../shared/schema";
 import Stripe from "stripe";
 
-// Initialize Stripe (conditional on API key availability)
+// Initialize Stripe
 let stripe: Stripe | null = null;
+
 const stripeKey = process.env.STRIPE_SECRET_KEY;
 
 if (stripeKey) {
@@ -42,7 +43,6 @@ if (stripeKey) {
   const isLiveMode = stripeKey.startsWith('sk_live_');
 
   console.log(`🔑 Stripe initialization: ${isLiveMode ? 'LIVE MODE' : isTestMode ? 'TEST MODE' : 'UNKNOWN MODE'}`);
-  console.log(`🔑 Key type detected: ${stripeKey.substring(0, 8)}...`);
 
   if (process.env.NODE_ENV === 'production' && isTestMode) {
     console.warn('⚠️  WARNING: Using Stripe test keys in production environment!');
@@ -223,8 +223,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         ],
         mode: 'subscription',
-        success_url: `${siteBaseUrl}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${siteBaseUrl}/subscription/cancel`,
+        success_url: `${getSiteBaseUrl(req)}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${getSiteBaseUrl(req)}/subscription/cancel`,
         metadata: {
           userId,
           tier
@@ -248,9 +248,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const sig = req.headers['stripe-signature'] as string;
       const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
+      if (!endpointSecret) {
+        console.error('❌ STRIPE_WEBHOOK_SECRET is not set — rejecting webhook');
+        return res.status(400).json({ error: 'Webhook secret not configured' });
+      }
+
       let event;
       try {
-        event = stripe.webhooks.constructEvent(req.body, sig, endpointSecret || '');
+        const rawBody = (req as any).rawBody;
+        if (!rawBody) {
+          return res.status(400).json({ error: 'Missing raw body' });
+        }
+        event = stripe.webhooks.constructEvent(rawBody, sig, endpointSecret);
       } catch (err: any) {
         console.log(`Webhook signature verification failed.`, err.message);
         return res.status(400).send(`Webhook Error: ${err.message}`);
@@ -381,7 +390,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
               break;
               
             case 'get-checklists':
-              const userId = request.userId;
+              const userId = (req as any).user?.uid;
               const checklists = await storage.getAllChecklists(userId);
               results.push(checklists);
               break;

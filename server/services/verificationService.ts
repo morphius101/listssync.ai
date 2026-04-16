@@ -146,8 +146,9 @@ export async function verifyCode(token: string, code: string): Promise<boolean> 
     console.log(`🔍 Verifying code for token: ${token}`);
 
     const record = await storage.getVerificationByToken(token);
+
     if (!record) {
-      console.log(`❌ Verification token not found`);
+      console.log(`❌ Verification token not found: ${token}`);
       return false;
     }
 
@@ -156,21 +157,17 @@ export async function verifyCode(token: string, code: string): Promise<boolean> 
       return false;
     }
 
-    console.log(`Verification details:
-    - Token: ${token}
-    - Provided code: ${code}
-    - Stored code: ${record.code}
-    - Codes match: ${record.code === code}
-    - Created at: ${record.createdAt}
-    - Expires at: ${record.expiresAt}
-    - Currently expired: ${record.expiresAt < new Date()}`);
-
-    if (record.code !== code) {
-      console.log(`❌ Verification failed - code mismatch`);
+    if (record.verified) {
+      console.log(`⚠️ Verification token already used`);
       return false;
     }
 
-    console.log(`✅ Verification successful - marking as verified in database`);
+    if (record.code !== code) {
+      console.log(`❌ Verification failed — code mismatch`);
+      return false;
+    }
+
+    console.log(`✅ Code matched — marking as verified`);
     return await storage.markVerificationAsVerified(token);
   } catch (error) {
     console.error("❌ Error verifying code:", error);

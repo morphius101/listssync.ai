@@ -53,7 +53,7 @@ export async function translateText(
 
     const result = await genAI.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: prompt,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
     const translatedText = result.text || text;
 
@@ -103,7 +103,7 @@ ${JSON.stringify(checklist)}`;
 
     const result = await genAI.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: prompt,
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
     });
 
     const translatedText = result.text?.trim();

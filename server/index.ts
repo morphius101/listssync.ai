@@ -46,7 +46,12 @@ const app = express();
 // work correctly behind the platform edge/load balancer.
 app.set('trust proxy', 1);
 
-app.use(express.json());
+// Save raw body buffer before JSON parsing — required for Stripe webhook signature verification
+app.use(express.json({
+  verify: (req: any, _res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express.urlencoded({ extended: false }));
 
 // Middleware to redirect from root domain to www
