@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useLocation } from 'wouter';
 import { Button } from '@/components/ui/button';
 import {
@@ -13,7 +13,9 @@ const LandingPage = () => {
   const [location, navigate] = useLocation();
   const { isAuthenticated, isLoading } = useAuth();
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const oneTapInitialized = useRef(false);
 
   useEffect(() => {
     document.title = 'ListsSync.ai — Smart Checklists with Photo Verification';
@@ -25,25 +27,67 @@ const LandingPage = () => {
     }
   }, [isAuthenticated, isLoading, location, navigate]);
 
+  // Google One Tap — auto-prompts returning Google users on the landing page
+  useEffect(() => {
+    if (isLoading || isAuthenticated || oneTapInitialized.current) return;
+
+    const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
+    if (!clientId) return;
+
+    const google = (window as any).google;
+    if (!google?.accounts?.id) return;
+
+    oneTapInitialized.current = true;
+
+    const handleOneTapResponse = async (response: { credential: string }) => {
+      try {
+        const { GoogleAuthProvider, signInWithCredential, getAuth } = await import('firebase/auth');
+        const auth = getAuth();
+        const firebaseCredential = GoogleAuthProvider.credential(response.credential);
+        await signInWithCredential(auth, firebaseCredential);
+        navigate('/dashboard');
+      } catch (error) {
+        console.error('One Tap sign-in failed:', error);
+      }
+    };
+
+    google.accounts.id.initialize({
+      client_id: clientId,
+      callback: handleOneTapResponse,
+      auto_select: true,
+      cancel_on_tap_outside: false,
+    });
+    google.accounts.id.prompt();
+  }, [isLoading, isAuthenticated]);
+
   const handleGetStarted = async () => {
     if (isAuthenticated) {
       navigate('/dashboard');
       return;
     }
     setIsLoggingIn(true);
+    setAuthError(null);
+
+    // 6-second safety net — if auth hasn't resolved, unblock the button
+    const timeoutId = setTimeout(() => {
+      setIsLoggingIn(false);
+      setAuthError('Sign-in failed — try again');
+    }, 6000);
+
     try {
       const result = await signInWithGoogle();
-      // On mobile, signInWithRedirect returns undefined and navigates away — no result here
-      // On desktop, signInWithPopup returns a UserCredential
+      clearTimeout(timeoutId);
       if (result) {
         navigate('/dashboard');
       }
-      // Mobile: navigation will happen after redirect returns and onAuthStateChanged fires
     } catch (error: any) {
+      clearTimeout(timeoutId);
       console.error('Login failed:', error);
       setIsLoggingIn(false);
+      if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
+        setAuthError('Sign-in failed — try again');
+      }
     }
-    // Note: don't set isLoggingIn=false on mobile redirect path — page will reload
   };
 
   const features = [
@@ -192,8 +236,11 @@ const LandingPage = () => {
             {isLoggingIn ? 'Signing in...' : (isAuthenticated ? 'Go to Dashboard' : 'Get Started')}
             {!isLoggingIn && !isLoading && <ArrowRight className="ml-2 h-5 w-5" />}
           </Button>
-          {!isAuthenticated && (
+          {!isAuthenticated && !authError && (
             <p className="mt-3 text-sm text-gray-500">Free plan available — no credit card required</p>
+          )}
+          {authError && (
+            <p className="mt-3 text-sm text-red-500">{authError}</p>
           )}
         </div>
       </div>

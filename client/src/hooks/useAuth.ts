@@ -1,9 +1,14 @@
 import { useState, useEffect } from 'react';
 import { getApps } from 'firebase/app';
-import { getAuth, onAuthStateChanged, getRedirectResult, User } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, User } from 'firebase/auth';
 
 const APP_ORIGIN = import.meta.env.PROD ? 'https://www.listssync.ai' : window.location.origin;
 const DASHBOARD_URL = `${APP_ORIGIN}/dashboard`;
+
+// Module-level guard: track which UIDs have been registered this session.
+// useAuth() is instantiated in multiple components simultaneously; without this
+// each instance fires its own onAuthStateChanged → registerUserInDatabase called N times.
+const registeredUids = new Set<string>();
 
 function getFirebaseAuthSafe() {
   if (getApps().length === 0) {
@@ -70,26 +75,16 @@ export function useAuth() {
       return;
     }
 
-    // Handle redirect result on mobile after Google sign-in redirect.
-    // Always bounce back to the canonical app domain after successful auth so we never
-    // strand users on the Firebase-hosted auth domain.
-    getRedirectResult(auth).then(async (result) => {
-      if (result?.user) {
-        await registerUserInDatabase(result.user);
-
-        if (window.location.origin !== APP_ORIGIN || window.location.pathname === '/') {
-          window.location.replace(DASHBOARD_URL);
-        }
-      }
-    }).catch((error) => {
-      console.error('Redirect sign-in error:', error);
-    });
-
     const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
 
       if (currentUser) {
-        await registerUserInDatabase(currentUser);
+        // Register exactly once per UID per session, regardless of how many
+        // useAuth() instances are mounted simultaneously.
+        if (!registeredUids.has(currentUser.uid)) {
+          registeredUids.add(currentUser.uid);
+          await registerUserInDatabase(currentUser);
+        }
 
         if (window.location.origin !== APP_ORIGIN && window.location.pathname !== '/shared') {
           window.location.replace(DASHBOARD_URL);

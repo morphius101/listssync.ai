@@ -80,29 +80,16 @@ export function getFirebase() {
 export function signInWithGoogle() {
   const auth = getAuth();
   const provider = new GoogleAuthProvider();
-  
+
   provider.setCustomParameters({
     prompt: 'select_account',
   });
 
-  // Use redirect on mobile (popup is blocked), popup on desktop
-  const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
-  
-  if (isMobile) {
-    // Redirect flow — returns a promise that resolves immediately (result comes back after redirect)
-    return signInWithRedirect(auth, provider);
-  }
-
-  // Desktop popup flow with error handling
+  // Always use popup — redirect leaves isLoggingIn stuck if the page doesn't navigate away
   return signInWithPopup(auth, provider)
     .catch((error) => {
       console.error("Login failed:", error);
-      
-      if (error.code === 'auth/popup-blocked') {
-        console.error("Unable to verify that the app domain is authorized");
-      }
-      
-      throw error; // Rethrow for upstream handling
+      throw error; // rethrow so callers can reset loading state
     });
 }
 
