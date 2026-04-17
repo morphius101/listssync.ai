@@ -2,83 +2,63 @@ import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Check, Crown, Zap, Building } from 'lucide-react';
-import { apiRequest } from '@/lib/queryClient';
+import { Check } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { trackStripeEvent, trackUserAction } from '@/lib/analytics';
 import { getAuth } from 'firebase/auth';
 
 interface PricingTier {
-  id: 'free' | 'professional' | 'enterprise';
+  id: 'host' | 'manager';
+  apiTier: 'professional' | 'enterprise';
   name: string;
-  price: string;
-  description: string;
+  subtitle: string;
+  yearlyPrice: number;
+  monthlyEquiv: string;
   features: string[];
   popular?: boolean;
-  icon: React.ComponentType<any>;
   buttonText: string;
-  yearlyDiscount?: string;
+  underButton: string;
 }
 
 const pricingTiers: PricingTier[] = [
   {
-    id: 'free',
-    name: 'Free',
-    price: '$0',
-    description: 'Perfect for individuals',
-    icon: Check,
-    buttonText: 'Sign Up Free',
-    features: [
-      'Up to 5 checklists',
-      '1 user',
-      'Manual sync every 6 hours',
-      'English and Spanish translation',
-      '1GB storage',
-      'Community support',
-      'Mobile and web access'
-    ]
-  },
-
-  {
-    id: 'professional',
-    name: 'Professional',
-    price: '$9',
-    description: 'For growing businesses',
-    icon: Crown,
-    popular: true,
-    buttonText: 'Start Professional',
-    features: [
-      'Up to 100 checklists',
-      '10 team members',
-      'Real-time sync',
-      '15 language translations',
-      '50GB storage',
-      'Advanced analytics',
-      'API access',
-      'Workflow automation',
-      'Integrations (Slack, Teams, etc)'
-    ]
-  },
-
-  {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: '$29',
-    description: 'For enterprise needs',
-    icon: Building,
-    buttonText: 'Start Enterprise',
+    id: 'host',
+    apiTier: 'professional',
+    name: 'Host',
+    subtitle: 'For Airbnb hosts & vacation rentals',
+    yearlyPrice: 50,
+    monthlyEquiv: '$4.17/month, billed annually',
+    buttonText: 'Start 14-Day Free Trial',
+    underButton: '$0 today · $50 charged after 14 days · Cancel anytime',
     features: [
       'Unlimited checklists',
-      'Unlimited users',
-      'Real-time sync',
-      'All languages supported',
-      'Unlimited storage',
-      'Custom deployment',
-      'Enterprise SLA',
-      'Custom integrations',
-      'Dedicated onboarding'
-    ]
-  }
+      'Up to 5 properties',
+      'Photo proof on every task',
+      'Auto-translation (12 languages)',
+      'Native SMS & WhatsApp share',
+      'No app download for cleaners',
+      'Push notifications',
+    ],
+  },
+  {
+    id: 'manager',
+    apiTier: 'enterprise',
+    name: 'Manager',
+    subtitle: 'For property managers & contractors',
+    yearlyPrice: 120,
+    monthlyEquiv: '$10/month, billed annually',
+    popular: true,
+    buttonText: 'Start 14-Day Free Trial',
+    underButton: '$0 today · $120 charged after 14 days · Cancel anytime',
+    features: [
+      'Everything in Host',
+      'Unlimited properties',
+      'Contractor → subcontractor chain',
+      'Bulk assign to multiple cleaners',
+      'Priority support',
+      'Full audit trail',
+    ],
+  },
 ];
 
 interface PricingProps {
@@ -87,7 +67,7 @@ interface PricingProps {
   currentTier?: string;
 }
 
-export default function Pricing({ userId, userEmail, currentTier = 'free' }: PricingProps) {
+export default function Pricing({ userId, userEmail, currentTier }: PricingProps) {
   const [loading, setLoading] = useState<string | null>(null);
   const { toast } = useToast();
 
@@ -99,27 +79,13 @@ export default function Pricing({ userId, userEmail, currentTier = 'free' }: Pri
     if (!userId || !userEmail) {
       toast({
         title: 'Authentication Required',
-        description: 'Please sign in to subscribe to a plan.',
-        variant: 'destructive'
+        description: 'Please sign in to start your free trial.',
+        variant: 'destructive',
       });
       return;
     }
 
-    // Track subscription attempt
     trackUserAction('subscription_attempt', tier.id);
-
-    if (tier.id === 'free') {
-      // Redirect to dashboard for free plan - user registration will create free account
-      trackUserAction('free_plan_selected');
-      window.location.href = '/dashboard';
-      return;
-    }
-
-    if (tier.id === 'enterprise') {
-      trackUserAction('enterprise_subscription_attempt');
-      // Continue with normal subscription flow for Enterprise
-    }
-
     setLoading(tier.id);
 
     try {
@@ -131,7 +97,7 @@ export default function Pricing({ userId, userEmail, currentTier = 'free' }: Pri
         toast({
           title: 'Authentication Required',
           description: 'Could not verify your session. Please sign in again.',
-          variant: 'destructive'
+          variant: 'destructive',
         });
         setLoading(null);
         return;
@@ -143,19 +109,12 @@ export default function Pricing({ userId, userEmail, currentTier = 'free' }: Pri
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${idToken}`,
         },
-        body: JSON.stringify({
-          userId,
-          tier: tier.id,
-          email: userEmail
-        })
+        body: JSON.stringify({ userId, tier: tier.apiTier, email: userEmail }),
       }).then(res => res.json());
 
       if (response.url) {
-        // Track Stripe checkout redirect
-        trackStripeEvent('checkout_redirect', undefined, tier.id);
-        trackUserAction('stripe_checkout_redirect', tier.id);
-        
-        // Redirect to Stripe checkout
+        trackStripeEvent('checkout_redirect', undefined, tier.apiTier);
+        trackUserAction('stripe_checkout_redirect', tier.apiTier);
         window.location.href = response.url;
       }
     } catch (error: any) {
@@ -163,8 +122,8 @@ export default function Pricing({ userId, userEmail, currentTier = 'free' }: Pri
       trackUserAction('subscription_error', tier.id);
       toast({
         title: 'Subscription Error',
-        description: error.message || 'Failed to create subscription. Please try again.',
-        variant: 'destructive'
+        description: error.message || 'Failed to start trial. Please try again.',
+        variant: 'destructive',
       });
     } finally {
       setLoading(null);
@@ -173,105 +132,102 @@ export default function Pricing({ userId, userEmail, currentTier = 'free' }: Pri
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-12 px-4">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-5xl mx-auto">
+
+        {/* Header */}
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Choose Your Plan
+            Simple pricing. No surprises.
           </h1>
-          <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Scale your checklist management with listssync.ai's flexible pricing plans.
-            Start free and upgrade as you grow.
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            14 days free, then $50 or $120 per year.{' '}
+            <span className="font-semibold text-blue-700">Your cleaners always use it free.</span>
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-          {pricingTiers.map((tier) => {
-            const Icon = tier.icon;
-            const isCurrentTier = currentTier === tier.id;
-            
-            return (
-              <Card 
-                key={tier.id} 
-                className={`relative ${tier.popular ? 'border-blue-500 shadow-lg scale-105' : 'border-gray-200'} ${isCurrentTier ? 'bg-blue-50' : 'bg-white'}`}
-              >
-                {tier.popular && (
-                  <Badge className="absolute -top-3 left-1/2 transform -translate-x-1/2 bg-blue-500">
-                    Most Popular
-                  </Badge>
-                )}
-                
-                <CardHeader className="text-center pb-6">
-                  <div className="flex justify-center mb-4">
-                    <div className={`p-3 rounded-full ${tier.popular ? 'bg-blue-500' : 'bg-gray-100'}`}>
-                      <Icon className={`w-6 h-6 ${tier.popular ? 'text-white' : 'text-gray-600'}`} />
-                    </div>
-                  </div>
-                  
-                  <CardTitle className="text-2xl font-bold">{tier.name}</CardTitle>
-                  <CardDescription className="text-gray-600">{tier.description}</CardDescription>
-                  
-                  <div className="mt-4">
-                    <span className="text-4xl font-bold text-gray-900">{tier.price}</span>
-                    {tier.id !== 'free' && <span className="text-gray-600">/month</span>}
-                    {tier.yearlyDiscount && (
-                      <div className="mt-2">
-                        <span className="text-sm text-green-600 font-medium">{tier.yearlyDiscount}</span>
-                      </div>
-                    )}
-                  </div>
-                </CardHeader>
+        {/* Cards */}
+        <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+          {pricingTiers.map((tier) => (
+            <Card
+              key={tier.id}
+              className={`relative flex flex-col ${
+                tier.popular
+                  ? 'border-2 border-blue-500 shadow-xl'
+                  : 'border border-gray-200'
+              } bg-white`}
+            >
+              {tier.popular && (
+                <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-blue-500 px-4">
+                  Most Popular
+                </Badge>
+              )}
 
-                <CardContent>
-                  <ul className="space-y-3">
-                    {tier.features.map((feature, index) => (
-                      <li key={index} className="flex items-center">
-                        <Check className="w-5 h-5 text-green-500 mr-3 flex-shrink-0" />
-                        <span className="text-gray-600">{feature}</span>
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
+              <CardHeader className="pb-4">
+                <CardTitle className="text-2xl font-bold">{tier.name}</CardTitle>
+                <CardDescription className="text-gray-500">{tier.subtitle}</CardDescription>
+                <div className="mt-4">
+                  <span className="text-5xl font-bold text-gray-900">${tier.yearlyPrice}</span>
+                  <span className="text-gray-500 ml-1">/year</span>
+                  <p className="text-sm text-gray-500 mt-1">{tier.monthlyEquiv}</p>
+                </div>
+              </CardHeader>
 
-                <CardFooter>
-                  <Button
-                    className={`w-full ${tier.popular ? 'bg-blue-500 hover:bg-blue-600' : ''}`}
-                    variant={tier.popular ? 'default' : 'outline'}
-                    onClick={() => handleSubscribe(tier)}
-                    disabled={loading === tier.id || isCurrentTier}
-                  >
-                    {loading === tier.id ? 'Processing...' : 
-                     isCurrentTier ? 'Current Plan' : tier.buttonText}
-                  </Button>
-                </CardFooter>
-              </Card>
-            );
-          })}
+              <CardContent className="flex-1">
+                <ul className="space-y-3">
+                  {tier.features.map((feature, i) => (
+                    <li key={i} className="flex items-start">
+                      <Check className="w-5 h-5 text-green-500 mr-3 flex-shrink-0 mt-0.5" />
+                      <span className="text-gray-600">{feature}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+
+              <CardFooter className="flex flex-col gap-2 pt-4">
+                <Button
+                  className={`w-full ${tier.popular ? 'bg-blue-500 hover:bg-blue-600' : ''}`}
+                  variant={tier.popular ? 'default' : 'outline'}
+                  onClick={() => handleSubscribe(tier)}
+                  disabled={loading === tier.id}
+                >
+                  {loading === tier.id ? 'Processing…' : tier.buttonText}
+                </Button>
+                <p className="text-xs text-gray-400 text-center">{tier.underButton}</p>
+              </CardFooter>
+            </Card>
+          ))}
         </div>
 
+        {/* FAQ */}
         <div className="mt-16 text-center">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6">
-            Frequently Asked Questions
-          </h2>
-          
-          <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-8 text-left">
+          <h2 className="text-2xl font-bold text-gray-900 mb-8">Frequently Asked Questions</h2>
+          <div className="max-w-3xl mx-auto grid md:grid-cols-2 gap-8 text-left">
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">Do my cleaners pay anything?</h3>
+              <p className="text-gray-600">
+                Never. Only the host or manager pays. Your cleaners, subcontractors, and field
+                workers use ListsSync completely free, forever, with no limits.
+              </p>
+            </div>
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">Can I change plans anytime?</h3>
-              <p className="text-gray-600">Yes, you can upgrade or downgrade your plan at any time. Changes take effect immediately.</p>
+              <p className="text-gray-600">
+                Yes, you can upgrade or downgrade at any time. Changes take effect immediately.
+              </p>
             </div>
-            
             <div>
-              <h3 className="font-semibold text-gray-900 mb-2">What happens to my data if I downgrade?</h3>
-              <p className="text-gray-600">Your data is always safe. If you exceed plan limits, you'll need to upgrade or remove some checklists.</p>
+              <h3 className="font-semibold text-gray-900 mb-2">What happens after the trial?</h3>
+              <p className="text-gray-600">
+                After 14 days your card is charged the annual amount. You can cancel before then
+                and you won't be charged anything.
+              </p>
             </div>
-            
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">Do you offer refunds?</h3>
-              <p className="text-gray-600">If you have billing or refund questions, please contact support.</p>
-            </div>
-            
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">Is my payment information secure?</h3>
-              <p className="text-gray-600">Yes, all payments are processed securely through Stripe. We never store your payment information.</p>
+              <p className="text-gray-600">
+                Yes, all payments are processed securely through Stripe. We never store your
+                payment details.
+              </p>
             </div>
           </div>
         </div>

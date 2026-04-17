@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Crown, Zap, Building } from 'lucide-react';
+import { Zap, Crown, Building } from 'lucide-react';
 import { trackUserAction } from '@/lib/analytics';
 import { getAuthHeaders } from '@/hooks/useAuth';
 
@@ -24,24 +24,6 @@ interface MinimalistSubscriptionStatusProps {
   userId: string;
   onUpgrade: () => void;
 }
-
-const tierConfig = {
-  free: {
-    name: 'Free',
-    icon: Zap,
-    color: 'bg-slate-100 text-slate-700',
-  },
-  professional: {
-    name: 'Pro',
-    icon: Crown,
-    color: 'bg-blue-100 text-blue-700',
-  },
-  enterprise: {
-    name: 'Enterprise',
-    icon: Building,
-    color: 'bg-purple-100 text-purple-700',
-  },
-};
 
 const MinimalistSubscriptionStatus = ({ userId, onUpgrade }: MinimalistSubscriptionStatusProps) => {
   const [subscription, setSubscription] = useState<SubscriptionData | null>(null);
@@ -87,34 +69,48 @@ const MinimalistSubscriptionStatus = ({ userId, onUpgrade }: MinimalistSubscript
 
   if (!subscription) return null;
 
-  const config = tierConfig[subscription.tier];
-  const Icon = config.icon;
+  const isTrial = subscription.tier === 'free';
+  const isPro = subscription.tier === 'professional';
 
   return (
     <Card className="mb-4 border-l-4 border-l-blue-500">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            <Icon className="h-5 w-5 text-blue-500" />
+            {isTrial ? (
+              <Zap className="h-5 w-5 text-blue-500" />
+            ) : isPro ? (
+              <Crown className="h-5 w-5 text-blue-500" />
+            ) : (
+              <Building className="h-5 w-5 text-blue-500" />
+            )}
             <div>
               <div className="flex items-center space-x-2">
-                <Badge variant="secondary" className={config.color}>
-                  {config.name}
-                </Badge>
-                <span className="text-sm text-gray-600">
-                  {subscription.usage.listSyncCount} / {subscription.limits.maxLists === Infinity ? '∞' : subscription.limits.maxLists} lists
-                </span>
+                {isTrial ? (
+                  <>
+                    <Badge variant="secondary" className="bg-amber-100 text-amber-700">
+                      Trial
+                    </Badge>
+                    <span className="text-sm text-gray-600">14 days remaining</span>
+                  </>
+                ) : isPro ? (
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">Host</Badge>
+                ) : (
+                  <Badge variant="secondary" className="bg-purple-100 text-purple-700">Manager</Badge>
+                )}
               </div>
               <div className="text-xs text-gray-500 mt-1">
-                {subscription.allowedLanguages.length} languages available
+                {isTrial
+                  ? 'Full access · All features unlocked'
+                  : isPro ? 'Host plan · Up to 5 properties' : 'Manager plan · Unlimited properties'}
               </div>
             </div>
           </div>
-          
-          {subscription.tier === 'free' && (
-            <Button 
-              onClick={handleUpgrade} 
-              size="sm" 
+
+          {isTrial && (
+            <Button
+              onClick={handleUpgrade}
+              size="sm"
               className="bg-blue-600 hover:bg-blue-700"
             >
               Upgrade
