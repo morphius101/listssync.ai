@@ -202,13 +202,21 @@ export const updateTaskStatus = async (checklistId: string, taskId: string, upda
   }
 };
 
-// Generate share link (stub - this is handled by the verification system)
+// Generate a pre-verified share link for manual sharing (Phone tab / WhatsApp)
 export const generateShareLink = async (checklistId: string): Promise<string> => {
-  console.log('🔍 Generating share link for checklist:', checklistId);
-  
-  // This function is deprecated in favor of the verification system
-  // Return a placeholder that indicates the new flow
-  return `${window.location.origin}/verify?checklist=${checklistId}`;
+  const headers = await getAuthHeaders();
+  const res = await fetch(`${API_BASE}/verification/generate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    credentials: 'include',
+    body: JSON.stringify({
+      checklistId,
+      recipientId: `link_${Date.now()}`,
+    }),
+  });
+  if (!res.ok) throw new Error('Failed to generate share link');
+  const data = await res.json();
+  return data.shareUrl;
 };
 
 // Subscribe to checklist updates (stub - real-time updates handled differently)

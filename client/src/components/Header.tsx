@@ -5,6 +5,10 @@ import { signInWithGoogle, signOutUser } from "@/lib/firebase";
 import { Logo } from "./Logo";
 import { User, Clipboard, LogOut } from "lucide-react";
 
+const BETA_MODE = import.meta.env.VITE_BETA_MODE === 'true';
+const BETA_ALLOWLIST: string[] = (import.meta.env.VITE_BETA_ALLOWLIST_EMAILS || '')
+  .split(',').map((e: string) => e.trim().toLowerCase()).filter(Boolean);
+
 const Header = () => {
   const { user, isAuthenticated } = useAuth();
 
@@ -41,6 +45,11 @@ const Header = () => {
               </Link>
               
               <div className="flex items-center space-x-2">
+                {BETA_MODE && user?.email && BETA_ALLOWLIST.includes(user.email.toLowerCase()) && (
+                  <span className="hidden sm:inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-indigo-100 text-indigo-700">
+                    Beta Tester
+                  </span>
+                )}
                 <div className="hidden md:flex flex-col items-end">
                   <span className="text-sm font-medium text-gray-900">
                     {user?.displayName || user?.email?.split('@')[0]}

@@ -16,7 +16,8 @@ import {
   mailingListSubscriptions,
   users,
   smsConsents,
-  leads
+  leads,
+  waitlist
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -67,6 +68,9 @@ export interface IStorage {
   // Lead capture methods
   upsertLead(email: string, source?: string): Promise<void>;
   convertLead(email: string): Promise<void>;
+
+  // Waitlist methods
+  upsertWaitlist(email: string, source?: string, userAgent?: string, ipHash?: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -759,6 +763,17 @@ export class DatabaseStorage implements IStorage {
         .where(eq(leads.email, email));
     } catch (error) {
       console.error('Error converting lead:', error);
+    }
+  }
+
+  async upsertWaitlist(email: string, source?: string, userAgent?: string, ipHash?: string): Promise<void> {
+    try {
+      await db
+        .insert(waitlist)
+        .values({ email, source: source || 'beta_gate', userAgent, ipHash })
+        .onConflictDoNothing();
+    } catch (error) {
+      console.error('Error upserting waitlist:', error);
     }
   }
 }

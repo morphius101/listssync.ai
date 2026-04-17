@@ -322,3 +322,17 @@ export const leads = pgTable("leads", {
 }));
 
 export type Lead = typeof leads.$inferSelect;
+
+// Waitlist table — beta mode email capture
+export const waitlist = pgTable("waitlist", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  source: varchar("source", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  userAgent: text("user_agent"),
+  ipHash: varchar("ip_hash", { length: 64 }),
+}, (table) => ({
+  emailIdx: index("waitlist_email_idx").on(table.email),
+}));
+
+export type Waitlist = typeof waitlist.$inferSelect;

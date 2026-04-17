@@ -2,12 +2,21 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { requireAuth } from "./middleware/auth";
+import { betaModeGuard } from "./middleware/betaMode";
 import rateLimit from "express-rate-limit";
 
 const verificationRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 3,
   message: { error: "Too many verification attempts. Please wait 15 minutes before trying again." },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+const waitlistRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1000, // 1 hour
+  max: 5,
+  message: { error: "Too many requests. Please try again later." },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -200,8 +209,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Waitlist — beta gate email capture (public, rate-limited)
+  app.post(`${API_BASE}/waitlist`, waitlistRateLimit, async (req, res) => {
+    try {
+      const { email, source } = req.body;
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: 'Valid email required' });
+      }
+      const userAgent = req.headers['user-agent'] || undefined;
+      const ip = (req.ip || '').replace(/::ffff:/, '');
+      const crypto = await import('crypto');
+      const ipHash = crypto.createHash('sha256').update(ip).digest('hex');
+      await storage.upsertWaitlist(email, source || 'beta_gate', userAgent, ipHash);
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error adding to waitlist:', error);
+      res.status(500).json({ error: 'Failed to add to waitlist' });
+    }
+  });
+
   // Create Stripe checkout session for subscriptions
-  app.post(`${API_BASE}/create-subscription`, requireAuth, async (req, res) => {
+  app.post(`${API_BASE}/create-subscription`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       if (!stripe) {
         return res.status(400).json({ error: 'Payment processing not available. Please configure Stripe API keys.' });
@@ -366,7 +394,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get all checklists — requires auth, scoped to the authenticated user
-  app.get(`${API_BASE}/checklists`, requireAuth, async (req, res) => {
+  app.get(`${API_BASE}/checklists`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const userId = (req as any).user?.uid;
       if (!userId) {
@@ -380,7 +408,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
   
   // Batch API endpoint for optimizing multiple requests
-  app.post(`${API_BASE}/batch`, requireAuth, async (req, res) => {
+  app.post(`${API_BASE}/batch`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       // Validate batch request structure
       if (!req.body.batch || !Array.isArray(req.body.batch)) {
@@ -447,7 +475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Get checklist by ID - GUARANTEED to return a valid response
-  app.get(`${API_BASE}/checklists/:id`, requireAuth, async (req, res) => {
+  app.get(`${API_BASE}/checklists/:id`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       console.log(`🔍 Getting checklist by ID: ${req.params.id}`);
       
@@ -516,7 +544,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Create new checklist with tier limits enforcement
-  app.post(`${API_BASE}/checklists`, requireAuth, async (req, res) => {
+  app.post(`${API_BASE}/checklists`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const validatedData = checklistSchema.parse(req.body);
       const authenticatedUserId = (req as any).user?.uid;
@@ -559,7 +587,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update checklist
-  app.put(`${API_BASE}/checklists/:id`, requireAuth, async (req, res) => {
+  app.put(`${API_BASE}/checklists/:id`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const authenticatedUserId = (req as any).user?.uid;
 
@@ -604,7 +632,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Delete checklist
-  app.delete(`${API_BASE}/checklists/:id`, requireAuth, async (req, res) => {
+  app.delete(`${API_BASE}/checklists/:id`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const authenticatedUserId = (req as any).user?.uid;
 
@@ -631,7 +659,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Update task status
-  app.patch(`${API_BASE}/checklists/:checklistId/tasks/:taskId`, requireAuth, async (req, res) => {
+  app.patch(`${API_BASE}/checklists/:checklistId/tasks/:taskId`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const { checklistId, taskId } = req.params;
       const authenticatedUserId = (req as any).user?.uid;
@@ -687,7 +715,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post(`${API_BASE}/translate/checklist/:id`, requireAuth, async (req, res) => {
+  app.post(`${API_BASE}/translate/checklist/:id`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const { targetLanguage, sourceLanguage, userId } = req.body;
       const authenticatedUserId = (req as any).user?.uid;
@@ -751,6 +779,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Verification system routes
+
+  // Generate a pre-verified share link without sending email/SMS (for manual Phone/WhatsApp sharing)
+  app.post(`${API_BASE}/verification/generate`, requireAuth, betaModeGuard, async (req, res) => {
+    try {
+      const { checklistId, recipientId, targetLanguage } = req.body;
+      if (!checklistId) return res.status(400).json({ error: 'checklistId required' });
+
+      const rid = recipientId || `link_${Date.now()}`;
+      const { token } = await createVerification(rid, undefined, undefined, checklistId, targetLanguage || 'en');
+
+      // Mark pre-verified so recipient can open without entering a code
+      await storage.markVerificationAsVerified(token);
+
+      const isProduction = process.env.NODE_ENV === 'production';
+      const protocol = isProduction ? 'https' : (req.protocol || 'http');
+      const host = isProduction ? 'www.listssync.ai' : (req.get('host') || 'localhost:5000');
+      let shareUrl = `${protocol}://${host}/shared/${token}`;
+      if (targetLanguage && targetLanguage !== 'en') shareUrl += `?lang=${targetLanguage}`;
+
+      res.json({ token, shareUrl });
+    } catch (error) {
+      console.error('Error generating share link:', error);
+      res.status(500).json({ error: 'Failed to generate share link' });
+    }
+  });
+
   app.post(`${API_BASE}/verification/send`, verificationRateLimit, async (req, res) => {
     console.log('================================================');
     console.log('📨 VERIFICATION REQUEST RECEIVED');
@@ -1421,7 +1475,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Share checklist route with mobile-friendly options
-  app.post(`${API_BASE}/checklists/:id/share`, requireAuth, async (req, res) => {
+  app.post(`${API_BASE}/checklists/:id/share`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const { id } = req.params;
       const { recipientEmail, recipientPhone, recipientName, targetLanguage } = req.body;

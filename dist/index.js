@@ -305,7 +305,8 @@ __export(schema_exports, {
   smsConsents: () => smsConsents,
   tasks: () => tasks,
   users: () => users,
-  verifications: () => verifications
+  verifications: () => verifications,
+  waitlist: () => waitlist
 });
 import { pgTable, index, text, serial, integer, boolean, timestamp, jsonb, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -511,6 +512,16 @@ var leads = pgTable("leads", {
   converted: boolean("converted").notNull().default(false)
 }, (table) => ({
   emailIdx: index("leads_email_idx").on(table.email)
+}));
+var waitlist = pgTable("waitlist", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  source: varchar("source", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  userAgent: text("user_agent"),
+  ipHash: varchar("ip_hash", { length: 64 })
+}, (table) => ({
+  emailIdx: index("waitlist_email_idx").on(table.email)
 }));
 
 // server/db.ts
@@ -1054,6 +1065,13 @@ var DatabaseStorage = class {
       console.error("Error converting lead:", error);
     }
   }
+  async upsertWaitlist(email, source, userAgent, ipHash) {
+    try {
+      await db.insert(waitlist).values({ email, source: source || "beta_gate", userAgent, ipHash }).onConflictDoNothing();
+    } catch (error) {
+      console.error("Error upserting waitlist:", error);
+    }
+  }
 };
 var storage = new DatabaseStorage();
 
@@ -1100,6 +1118,22 @@ async function requireAuth(req, res, next) {
     return res.status(401).json({ error: "Unauthorized: invalid token" });
   }
 }
+
+// server/middleware/betaMode.ts
+function getAllowlist() {
+  return (process.env.BETA_ALLOWLIST_EMAILS || "").split(",").map((e) => e.trim().toLowerCase()).filter(Boolean);
+}
+function isBetaActive() {
+  return process.env.BETA_MODE === "true";
+}
+var betaModeGuard = (req, res, next) => {
+  if (!isBetaActive()) return next();
+  const allowlist = getAllowlist();
+  if (allowlist.length === 0) return next();
+  const userEmail = (req.user?.email || "").toLowerCase();
+  if (userEmail && allowlist.includes(userEmail)) return next();
+  return res.status(403).json({ error: "Private beta", code: "BETA_MODE_ACTIVE" });
+};
 
 // server/routes.ts
 init_geminiTranslationService();
@@ -1369,6 +1403,14 @@ var verificationRateLimit = rateLimit({
   standardHeaders: true,
   legacyHeaders: false
 });
+var waitlistRateLimit = rateLimit({
+  windowMs: 60 * 60 * 1e3,
+  // 1 hour
+  max: 5,
+  message: { error: "Too many requests. Please try again later." },
+  standardHeaders: true,
+  legacyHeaders: false
+});
 var stripe = null;
 var stripeKey = process.env.STRIPE_SECRET_KEY;
 if (stripeKey) {
@@ -1509,7 +1551,24 @@ async function registerRoutes(app2) {
       res.status(500).json({ error: "Failed to capture lead" });
     }
   });
-  app2.post(`${API_BASE}/create-subscription`, requireAuth, async (req, res) => {
+  app2.post(`${API_BASE}/waitlist`, waitlistRateLimit, async (req, res) => {
+    try {
+      const { email, source } = req.body;
+      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        return res.status(400).json({ error: "Valid email required" });
+      }
+      const userAgent = req.headers["user-agent"] || void 0;
+      const ip = (req.ip || "").replace(/::ffff:/, "");
+      const crypto = await import("crypto");
+      const ipHash = crypto.createHash("sha256").update(ip).digest("hex");
+      await storage.upsertWaitlist(email, source || "beta_gate", userAgent, ipHash);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error adding to waitlist:", error);
+      res.status(500).json({ error: "Failed to add to waitlist" });
+    }
+  });
+  app2.post(`${API_BASE}/create-subscription`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       if (!stripe) {
         return res.status(400).json({ error: "Payment processing not available. Please configure Stripe API keys." });
@@ -1641,7 +1700,7 @@ async function registerRoutes(app2) {
     remarks: z.string().optional(),
     userId: z.string().optional()
   });
-  app2.get(`${API_BASE}/checklists`, requireAuth, async (req, res) => {
+  app2.get(`${API_BASE}/checklists`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const userId = req.user?.uid;
       if (!userId) {
@@ -1653,7 +1712,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: error.message });
     }
   });
-  app2.post(`${API_BASE}/batch`, requireAuth, async (req, res) => {
+  app2.post(`${API_BASE}/batch`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       if (!req.body.batch || !Array.isArray(req.body.batch)) {
         return res.status(400).json({ message: "Invalid batch request format" });
@@ -1704,7 +1763,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: error.message });
     }
   });
-  app2.get(`${API_BASE}/checklists/:id`, requireAuth, async (req, res) => {
+  app2.get(`${API_BASE}/checklists/:id`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       console.log(`\u{1F50D} Getting checklist by ID: ${req.params.id}`);
       const createDefaultChecklist = (id) => {
@@ -1761,7 +1820,7 @@ async function registerRoutes(app2) {
       return res.status(500).json({ error: "Failed to fetch checklist" });
     }
   });
-  app2.post(`${API_BASE}/checklists`, requireAuth, async (req, res) => {
+  app2.post(`${API_BASE}/checklists`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const validatedData = checklistSchema.parse(req.body);
       const authenticatedUserId = req.user?.uid;
@@ -1796,7 +1855,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: error.message });
     }
   });
-  app2.put(`${API_BASE}/checklists/:id`, requireAuth, async (req, res) => {
+  app2.put(`${API_BASE}/checklists/:id`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const authenticatedUserId = req.user?.uid;
       const existingChecklist = await storage.getChecklistById(req.params.id);
@@ -1829,7 +1888,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: error.message });
     }
   });
-  app2.delete(`${API_BASE}/checklists/:id`, requireAuth, async (req, res) => {
+  app2.delete(`${API_BASE}/checklists/:id`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const authenticatedUserId = req.user?.uid;
       const existingChecklist = await storage.getChecklistById(req.params.id);
@@ -1848,7 +1907,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: error.message });
     }
   });
-  app2.patch(`${API_BASE}/checklists/:checklistId/tasks/:taskId`, requireAuth, async (req, res) => {
+  app2.patch(`${API_BASE}/checklists/:checklistId/tasks/:taskId`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const { checklistId, taskId } = req.params;
       const authenticatedUserId = req.user?.uid;
@@ -1890,7 +1949,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: error.message });
     }
   });
-  app2.post(`${API_BASE}/translate/checklist/:id`, requireAuth, async (req, res) => {
+  app2.post(`${API_BASE}/translate/checklist/:id`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const { targetLanguage, sourceLanguage, userId } = req.body;
       const authenticatedUserId = req.user?.uid;
@@ -1938,6 +1997,24 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error("Translation endpoint error:", error);
       res.status(500).json({ message: error.message });
+    }
+  });
+  app2.post(`${API_BASE}/verification/generate`, requireAuth, betaModeGuard, async (req, res) => {
+    try {
+      const { checklistId, recipientId, targetLanguage } = req.body;
+      if (!checklistId) return res.status(400).json({ error: "checklistId required" });
+      const rid = recipientId || `link_${Date.now()}`;
+      const { token } = await createVerification(rid, void 0, void 0, checklistId, targetLanguage || "en");
+      await storage.markVerificationAsVerified(token);
+      const isProduction = process.env.NODE_ENV === "production";
+      const protocol = isProduction ? "https" : req.protocol || "http";
+      const host = isProduction ? "www.listssync.ai" : req.get("host") || "localhost:5000";
+      let shareUrl = `${protocol}://${host}/shared/${token}`;
+      if (targetLanguage && targetLanguage !== "en") shareUrl += `?lang=${targetLanguage}`;
+      res.json({ token, shareUrl });
+    } catch (error) {
+      console.error("Error generating share link:", error);
+      res.status(500).json({ error: "Failed to generate share link" });
     }
   });
   app2.post(`${API_BASE}/verification/send`, verificationRateLimit, async (req, res) => {
@@ -2459,7 +2536,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: error.message });
     }
   });
-  app2.post(`${API_BASE}/checklists/:id/share`, requireAuth, async (req, res) => {
+  app2.post(`${API_BASE}/checklists/:id/share`, requireAuth, betaModeGuard, async (req, res) => {
     try {
       const { id } = req.params;
       const { recipientEmail, recipientPhone, recipientName, targetLanguage } = req.body;

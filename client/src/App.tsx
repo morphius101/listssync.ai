@@ -9,6 +9,7 @@ import ChecklistView from "@/pages/ChecklistView";
 import SharedChecklist from "@/pages/SharedChecklist";
 import Pricing from "@/pages/Pricing";
 import SmsConsent from "@/pages/SmsConsent";
+import BetaGate from "@/pages/BetaGate";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import LandingPage from "@/components/LandingPage";
@@ -16,9 +17,32 @@ import ProtectedRoute from "@/components/ProtectedRoute";
 import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { useEffect, useState } from "react";
 import { useAuth, getAuthHeaders } from "@/hooks/useAuth";
-import { initializeFirebase } from "./lib/firebase";
+import { initializeFirebase, signOutUser } from "./lib/firebase";
 import { initGA, trackStripeEvent, trackUserAction } from "@/lib/analytics";
 import { useAnalytics } from "@/hooks/use-analytics";
+
+const BETA_MODE = import.meta.env.VITE_BETA_MODE === 'true';
+const BETA_ALLOWLIST: string[] = (import.meta.env.VITE_BETA_ALLOWLIST_EMAILS || '')
+  .split(',').map((e: string) => e.trim().toLowerCase()).filter(Boolean);
+
+function BetaGateWrapper({ children }: { children: React.ReactNode }) {
+  const { user, isLoading } = useAuth();
+  const [notOnList, setNotOnList] = useState(false);
+
+  useEffect(() => {
+    if (!BETA_MODE || isLoading || !user) return;
+    const email = user.email?.toLowerCase() || '';
+    if (BETA_ALLOWLIST.length > 0 && !BETA_ALLOWLIST.includes(email)) {
+      setNotOnList(true);
+      signOutUser();
+    }
+  }, [user, isLoading]);
+
+  if (!BETA_MODE) return <>{children}</>;
+  if (isLoading) return null;
+  if (!user || notOnList) return <BetaGate notOnList={notOnList} />;
+  return <>{children}</>;
+}
 
 // Initialize Firebase with error handling
 try {
@@ -171,7 +195,9 @@ function App() {
           {showHeader && <Header />}
           {/* <Toaster /> */}
           <div className="flex-grow">
-            <Router />
+            <BetaGateWrapper>
+              <Router />
+            </BetaGateWrapper>
           </div>
           <Footer />
           <PWAInstallBanner />

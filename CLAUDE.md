@@ -148,3 +148,31 @@ No automated tests exist in this project.
 | `GEMINI_API_KEY` | Runtime optional |
 | `STRIPE_WEBHOOK_SECRET` | Runtime (required — enforced at startup by `validateEnv`) |
 | `VITE_GOOGLE_CLIENT_ID` | **Build time** — required for Google One Tap on landing page |
+| `BETA_MODE` | Runtime — set to `true` to enable beta gating on the server |
+| `BETA_ALLOWLIST_EMAILS` | Runtime — comma-separated emails allowed through in beta mode |
+| `VITE_BETA_MODE` | **Build time** — mirrors `BETA_MODE` for the client gate UI |
+| `VITE_BETA_ALLOWLIST_EMAILS` | **Build time** — mirrors `BETA_ALLOWLIST_EMAILS` for the client |
+
+---
+
+## Private Beta Mode
+
+When `BETA_MODE=true`, the app is locked down:
+
+**Server (`server/middleware/betaMode.ts`):** `betaModeGuard` middleware returns `403 {error:'Private beta', code:'BETA_MODE_ACTIVE'}` on any guarded route for users not in `BETA_ALLOWLIST_EMAILS`. Applied to all checklist CRUD, share, translate, subscription, and verification/generate endpoints.
+
+**Client (`client/src/App.tsx` → `BetaGateWrapper`):** Reads `VITE_BETA_MODE`. If true and user is not in `VITE_BETA_ALLOWLIST_EMAILS`, signs them out and renders `<BetaGate>`. Shows waitlist form for new visitors, "not on list" variant for rejected users.
+
+**Header badge:** Allowlisted users see a purple "Beta Tester" badge in the nav.
+
+**Waitlist:** POST `/api/waitlist` (public, rate-limited 5/hr/IP) — saves to `waitlist` table in Neon.
+
+### Deploy order when enabling beta
+1. Set `VITE_BETA_MODE=true` and `VITE_BETA_ALLOWLIST_EMAILS=email1,email2` in GitHub Actions secrets
+2. Rebuild dist/ locally: `npm run build` with those vars set
+3. Commit dist/, push to `github main`
+4. In Railway: set `BETA_MODE=true` and `BETA_ALLOWLIST_EMAILS=email1,email2`, then redeploy
+
+### Adding / removing testers
+- Update `BETA_ALLOWLIST_EMAILS` in both Railway env vars (runtime) and GitHub Actions secrets (build time)
+- Rebuild and push — client bundle must be rebuilt to reflect changes in the badge/gate logic
