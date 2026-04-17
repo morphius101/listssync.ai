@@ -8,6 +8,7 @@ import {
 import { Logo } from './Logo';
 import { useAuth } from '@/hooks/useAuth';
 import { signInWithGoogle } from '@/lib/firebase';
+import { AuthModal } from './AuthModal';
 
 const LandingPage = () => {
   const [location, navigate] = useLocation();
@@ -15,6 +16,7 @@ const LandingPage = () => {
   const [isLoggingIn, setIsLoggingIn] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [showAuthModal, setShowAuthModal] = useState(false);
   const oneTapInitialized = useRef(false);
   const [gsiReady, setGsiReady] = useState(!!(window as any).google?.accounts?.id);
 
@@ -87,34 +89,12 @@ const LandingPage = () => {
     });
   }, [isAuthenticated, isLoading, gsiReady]);
 
-  const handleGetStarted = async () => {
+  const handleGetStarted = () => {
     if (isAuthenticated) {
       navigate('/dashboard');
       return;
     }
-    setIsLoggingIn(true);
-    setAuthError(null);
-
-    // 6-second safety net — if auth hasn't resolved, unblock the button
-    const timeoutId = setTimeout(() => {
-      setIsLoggingIn(false);
-      setAuthError('Sign-in failed — try again');
-    }, 6000);
-
-    try {
-      const result = await signInWithGoogle();
-      clearTimeout(timeoutId);
-      if (result) {
-        navigate('/dashboard');
-      }
-    } catch (error: any) {
-      clearTimeout(timeoutId);
-      console.error('Login failed:', error);
-      setIsLoggingIn(false);
-      if (error.code !== 'auth/popup-closed-by-user' && error.code !== 'auth/cancelled-popup-request') {
-        setAuthError('Sign-in failed — try again');
-      }
-    }
+    setShowAuthModal(true);
   };
 
   const features = [
@@ -404,6 +384,7 @@ const LandingPage = () => {
           </div>
         </div>
       </footer>
+      <AuthModal isOpen={showAuthModal} onClose={() => setShowAuthModal(false)} />
     </div>
   );
 };

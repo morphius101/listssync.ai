@@ -15,7 +15,8 @@ import {
   verifications,
   mailingListSubscriptions,
   users,
-  smsConsents
+  smsConsents,
+  leads
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -62,6 +63,10 @@ export interface IStorage {
   recordSmsConsent(consent: SmsConsentDTO): Promise<SmsConsentDTO>;
   getSmsConsent(phoneNumber: string): Promise<SmsConsentDTO | undefined>;
   revokeSmsConsent(phoneNumber: string): Promise<boolean>;
+
+  // Lead capture methods
+  upsertLead(email: string, source?: string): Promise<void>;
+  convertLead(email: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -732,6 +737,28 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error revoking SMS consent:', error);
       return false;
+    }
+  }
+
+  async upsertLead(email: string, source?: string): Promise<void> {
+    try {
+      await db
+        .insert(leads)
+        .values({ email, source: source || 'landing_page' })
+        .onConflictDoNothing();
+    } catch (error) {
+      console.error('Error upserting lead:', error);
+    }
+  }
+
+  async convertLead(email: string): Promise<void> {
+    try {
+      await db
+        .update(leads)
+        .set({ converted: true })
+        .where(eq(leads.email, email));
+    } catch (error) {
+      console.error('Error converting lead:', error);
     }
   }
 }

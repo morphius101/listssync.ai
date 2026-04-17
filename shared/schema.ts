@@ -23,6 +23,14 @@ export const users = pgTable("users", {
   lastSyncAt: timestamp("last_sync_at"),
   // Feature flags
   allowedLanguages: jsonb("allowed_languages").default(['en', 'es']), // JSON array of language codes
+  // CRM / onboarding profile
+  useCase: varchar("use_case", { length: 100 }),
+  teamSize: varchar("team_size", { length: 50 }),
+  phone: varchar("phone", { length: 30 }),
+  signupMethod: varchar("signup_method", { length: 20 }), // 'google' | 'email'
+  signupSource: varchar("signup_source", { length: 50 }),
+  trialStartedAt: timestamp("trial_started_at"),
+  marketingOptIn: boolean("marketing_opt_in").default(false),
 }, (table) => [
   index("users_stripe_customer_idx").on(table.stripeCustomerId),
   index("users_subscription_tier_idx").on(table.subscriptionTier),
@@ -301,3 +309,16 @@ export interface SmsConsentDTO {
 }
 
 export type SubscriptionTier = 'free' | 'professional' | 'enterprise';
+
+// Leads table — captures partial signups for abandonment recovery
+export const leads = pgTable("leads", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  source: varchar("source", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  converted: boolean("converted").notNull().default(false),
+}, (table) => ({
+  emailIdx: index("leads_email_idx").on(table.email),
+}));
+
+export type Lead = typeof leads.$inferSelect;

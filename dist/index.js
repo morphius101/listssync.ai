@@ -299,6 +299,7 @@ __export(schema_exports, {
   insertTaskSchema: () => insertTaskSchema,
   insertUserSchema: () => insertUserSchema,
   insertVerificationSchema: () => insertVerificationSchema,
+  leads: () => leads,
   mailingListSubscriptions: () => mailingListSubscriptions,
   sessions: () => sessions,
   smsConsents: () => smsConsents,
@@ -330,8 +331,17 @@ var users = pgTable("users", {
   languageUseCount: integer("language_use_count").notNull().default(0),
   lastSyncAt: timestamp("last_sync_at"),
   // Feature flags
-  allowedLanguages: jsonb("allowed_languages").default(["en", "es"])
+  allowedLanguages: jsonb("allowed_languages").default(["en", "es"]),
   // JSON array of language codes
+  // CRM / onboarding profile
+  useCase: varchar("use_case", { length: 100 }),
+  teamSize: varchar("team_size", { length: 50 }),
+  phone: varchar("phone", { length: 30 }),
+  signupMethod: varchar("signup_method", { length: 20 }),
+  // 'google' | 'email'
+  signupSource: varchar("signup_source", { length: 50 }),
+  trialStartedAt: timestamp("trial_started_at"),
+  marketingOptIn: boolean("marketing_opt_in").default(false)
 }, (table) => [
   index("users_stripe_customer_idx").on(table.stripeCustomerId),
   index("users_subscription_tier_idx").on(table.subscriptionTier),
@@ -493,6 +503,15 @@ var insertSmsConsentSchema = createInsertSchema(smsConsents).omit({
   createdAt: true,
   updatedAt: true
 });
+var leads = pgTable("leads", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull(),
+  source: varchar("source", { length: 100 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  converted: boolean("converted").notNull().default(false)
+}, (table) => ({
+  emailIdx: index("leads_email_idx").on(table.email)
+}));
 
 // server/db.ts
 import { Pool, neonConfig } from "@neondatabase/serverless";
@@ -1021,6 +1040,20 @@ var DatabaseStorage = class {
       return false;
     }
   }
+  async upsertLead(email, source) {
+    try {
+      await db.insert(leads).values({ email, source: source || "landing_page" }).onConflictDoNothing();
+    } catch (error) {
+      console.error("Error upserting lead:", error);
+    }
+  }
+  async convertLead(email) {
+    try {
+      await db.update(leads).set({ converted: true }).where(eq(leads.email, email));
+    } catch (error) {
+      console.error("Error converting lead:", error);
+    }
+  }
 };
 var storage = new DatabaseStorage();
 
@@ -1398,7 +1431,21 @@ async function registerRoutes(app2) {
   });
   app2.post(`${API_BASE}/user/register`, requireAuth, async (req, res) => {
     try {
-      const { userId, email, firstName, lastName, profileImageUrl } = req.body;
+      const {
+        userId,
+        email,
+        firstName,
+        lastName,
+        profileImageUrl,
+        useCase,
+        teamSize,
+        phone,
+        signupMethod,
+        signupSource,
+        trialStartedAt,
+        marketingOptIn,
+        displayName
+      } = req.body;
       const authenticatedUserId = req.user?.uid;
       if (!userId || !email) {
         return res.status(400).json({ error: "Missing required fields: userId and email" });
@@ -1406,16 +1453,34 @@ async function registerRoutes(app2) {
       if (!authenticatedUserId || authenticatedUserId !== userId) {
         return res.status(403).json({ error: "Forbidden" });
       }
+      let first = firstName;
+      let last = lastName;
+      if (!first && displayName) {
+        const parts = displayName.trim().split(" ");
+        first = parts[0];
+        last = parts.slice(1).join(" ") || void 0;
+      }
       const user = await storage.upsertUser({
         id: userId,
         email,
-        firstName,
-        lastName,
+        firstName: first,
+        lastName: last,
         profileImageUrl,
         subscriptionTier: "free",
         subscriptionStatus: "active",
-        allowedLanguages: TIER_LIMITS.free.allowedLanguages
+        allowedLanguages: TIER_LIMITS.free.allowedLanguages,
+        useCase: useCase || null,
+        teamSize: teamSize || null,
+        phone: phone || null,
+        signupMethod: signupMethod || "google",
+        signupSource: signupSource || "google_oauth",
+        trialStartedAt: trialStartedAt ? new Date(trialStartedAt) : /* @__PURE__ */ new Date(),
+        marketingOptIn: marketingOptIn ?? false
       });
+      if (email) {
+        await storage.convertLead(email).catch(() => {
+        });
+      }
       res.json({
         success: true,
         user: {
@@ -1431,6 +1496,17 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error("Error registering user:", error);
       res.status(500).json({ error: "Failed to register user" });
+    }
+  });
+  app2.post(`${API_BASE}/leads`, async (req, res) => {
+    try {
+      const { email, source } = req.body;
+      if (!email) return res.status(400).json({ error: "email required" });
+      await storage.upsertLead(email, source || "landing_page");
+      res.json({ success: true });
+    } catch (error) {
+      console.error("Error capturing lead:", error);
+      res.status(500).json({ error: "Failed to capture lead" });
     }
   });
   app2.post(`${API_BASE}/create-subscription`, requireAuth, async (req, res) => {

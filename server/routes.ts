@@ -122,9 +122,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Create or update user with automatic free tier enrollment
   app.post(`${API_BASE}/user/register`, requireAuth, async (req, res) => {
     try {
-      const { userId, email, firstName, lastName, profileImageUrl } = req.body;
+      const {
+        userId, email, firstName, lastName, profileImageUrl,
+        useCase, teamSize, phone, signupMethod, signupSource,
+        trialStartedAt, marketingOptIn, displayName
+      } = req.body;
       const authenticatedUserId = (req as any).user?.uid;
-      
+
       if (!userId || !email) {
         return res.status(400).json({ error: 'Missing required fields: userId and email' });
       }
@@ -133,17 +137,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: 'Forbidden' });
       }
 
-      // Create or update user with free tier by default
+      // Split displayName into first/last if firstName not provided
+      let first = firstName;
+      let last = lastName;
+      if (!first && displayName) {
+        const parts = displayName.trim().split(' ');
+        first = parts[0];
+        last = parts.slice(1).join(' ') || undefined;
+      }
+
       const user = await storage.upsertUser({
         id: userId,
         email,
-        firstName,
-        lastName,
+        firstName: first,
+        lastName: last,
         profileImageUrl,
         subscriptionTier: 'free',
         subscriptionStatus: 'active',
-        allowedLanguages: TIER_LIMITS.free.allowedLanguages
+        allowedLanguages: TIER_LIMITS.free.allowedLanguages,
+        useCase: useCase || null,
+        teamSize: teamSize || null,
+        phone: phone || null,
+        signupMethod: signupMethod || 'google',
+        signupSource: signupSource || 'google_oauth',
+        trialStartedAt: trialStartedAt ? new Date(trialStartedAt) : new Date(),
+        marketingOptIn: marketingOptIn ?? false,
       });
+
+      // Mark any lead as converted
+      if (email) {
+        await storage.convertLead(email).catch(() => {});
+      }
 
       res.json({
         success: true,
@@ -160,6 +184,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error registering user:', error);
       res.status(500).json({ error: 'Failed to register user' });
+    }
+  });
+
+  // Lead capture — email collected before form completion
+  app.post(`${API_BASE}/leads`, async (req, res) => {
+    try {
+      const { email, source } = req.body;
+      if (!email) return res.status(400).json({ error: 'email required' });
+      await storage.upsertLead(email, source || 'landing_page');
+      res.json({ success: true });
+    } catch (error) {
+      console.error('Error capturing lead:', error);
+      res.status(500).json({ error: 'Failed to capture lead' });
     }
   });
 
