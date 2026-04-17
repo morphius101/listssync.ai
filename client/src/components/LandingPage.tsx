@@ -16,10 +16,23 @@ const LandingPage = () => {
   const [authError, setAuthError] = useState<string | null>(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const oneTapInitialized = useRef(false);
+  const [gsiReady, setGsiReady] = useState(!!(window as any).google?.accounts?.id);
 
   useEffect(() => {
     document.title = 'ListsSync.ai — Smart Checklists with Photo Verification';
   }, []);
+
+  // Poll until GSI script is ready, then set flag so One Tap effect can re-run
+  useEffect(() => {
+    if (gsiReady) return;
+    const interval = setInterval(() => {
+      if ((window as any).google?.accounts?.id) {
+        setGsiReady(true);
+        clearInterval(interval);
+      }
+    }, 100);
+    return () => clearInterval(interval);
+  }, [gsiReady]);
 
   useEffect(() => {
     if (!isLoading && isAuthenticated && location === '/') {
@@ -29,14 +42,26 @@ const LandingPage = () => {
 
   // Google One Tap — auto-prompts returning Google users on the landing page
   useEffect(() => {
-    if (isLoading || isAuthenticated || oneTapInitialized.current) return;
+    console.log('OneTap effect:', { isAuthenticated, isLoading, googleLoaded: !!(window as any).google?.accounts?.id });
+
+    // Don't run while Firebase is still resolving auth state
+    if (isLoading) return;
+    // Only show One Tap if definitely not signed in
+    if (isAuthenticated) return;
 
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-    if (!clientId) return;
+    if (!clientId) {
+      console.warn('OneTap: VITE_GOOGLE_CLIENT_ID not set');
+      return;
+    }
 
     const google = (window as any).google;
-    if (!google?.accounts?.id) return;
+    if (!google?.accounts?.id) {
+      console.warn('OneTap: GSI not loaded yet');
+      return;
+    }
 
+    if (oneTapInitialized.current) return;
     oneTapInitialized.current = true;
 
     const handleOneTapResponse = async (response: { credential: string }) => {
@@ -57,8 +82,10 @@ const LandingPage = () => {
       auto_select: true,
       cancel_on_tap_outside: false,
     });
-    google.accounts.id.prompt();
-  }, [isLoading, isAuthenticated]);
+    google.accounts.id.prompt((notification: any) => {
+      console.log('One Tap prompt:', notification.getMomentType(), notification.getNotDisplayedReason?.());
+    });
+  }, [isAuthenticated, isLoading, gsiReady]);
 
   const handleGetStarted = async () => {
     if (isAuthenticated) {
