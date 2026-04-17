@@ -13,6 +13,7 @@ import Header from "@/components/Header";
 import Footer from "@/components/Footer";
 import LandingPage from "@/components/LandingPage";
 import ProtectedRoute from "@/components/ProtectedRoute";
+import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { useEffect, useState } from "react";
 import { useAuth, getAuthHeaders } from "@/hooks/useAuth";
 import { initializeFirebase } from "./lib/firebase";
@@ -173,6 +174,7 @@ function App() {
             <Router />
           </div>
           <Footer />
+          <PWAInstallBanner />
         </div>
       </TooltipProvider>
     </QueryClientProvider>

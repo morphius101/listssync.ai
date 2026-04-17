@@ -2,7 +2,7 @@
   "name": "ListsSync.ai",
   "short_name": "ListsSync",
   "description": "Sync real-time checklists with instant photo proof",
-  "start_url": "/",
+  "start_url": "/dashboard",
   "display": "standalone",
   "background_color": "#ffffff",
   "theme_color": "#3b82f6",
