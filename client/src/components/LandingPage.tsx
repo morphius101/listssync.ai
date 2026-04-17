@@ -247,11 +247,11 @@ const LandingPage = () => {
           </div>
           
           <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold text-gray-900 mb-6">
-            ListsSync<span className="text-primary">.ai</span>
+            Your cleaner doesn't need an app. Just send a link.
           </h1>
           
           <p className="text-xl md:text-2xl text-gray-600 mb-8 max-w-3xl">
-            Create smart checklists, assign them to your team, and get photo proof of completion — all in real time, no app downloads required.
+            Build a checklist, send it to any phone via text or email, and get photo proof back the moment the job is done. No app download, no account, no tech support calls for your cleaners. Just works.
           </p>
           
           <Button
@@ -264,7 +264,7 @@ const LandingPage = () => {
             {!isLoggingIn && !isLoading && <ArrowRight className="ml-2 h-5 w-5" />}
           </Button>
           {!isAuthenticated && !authError && (
-            <p className="mt-3 text-sm text-gray-500">Free plan available — no credit card required</p>
+            <p className="mt-3 text-sm text-gray-500">14-day free trial · Works on any phone · No app for your cleaners</p>
           )}
           {authError && (
             <p className="mt-3 text-sm text-red-500">{authError}</p>
