@@ -175,6 +175,7 @@ export function ShareChecklistModal({
           }}
           checklistId={checklist.id}
           checklist={checklist}
+          onGenerateNewLink={() => generateShareLink(checklist.id)}
         />
       )}
     </>
