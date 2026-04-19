@@ -2476,8 +2476,9 @@ function serveStatic(app2) {
 
 // server/validateEnv.ts
 function validateEnv() {
-  const required = ["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID", "SHARE_ACCESS_SALT"];
+  const required = ["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID"];
   const optional = [
+    "SHARE_ACCESS_SALT",
     "SENDGRID_API_KEY",
     "TWILIO_ACCOUNT_SID",
     "TWILIO_AUTH_TOKEN",
