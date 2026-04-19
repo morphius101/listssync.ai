@@ -139,7 +139,7 @@ export interface ChecklistSummaryDTO {
 export const verifications = pgTable("verifications", {
   id: serial("id").primaryKey(),
   token: varchar("token", { length: 128 }).notNull().unique(),
-  code: varchar("code", { length: 10 }).notNull(),
+  code: varchar("code", { length: 10 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   expiresAt: timestamp("expires_at").notNull(),
   verified: boolean("verified").notNull().default(false),
@@ -159,6 +159,20 @@ export const verifications = pgTable("verifications", {
   contactIdx: index("verification_contact_idx").on(table.recipientEmail, table.recipientPhone)
 }));
 
+export const shareAccesses = pgTable("share_accesses", {
+  id: serial("id").primaryKey(),
+  shareToken: varchar("share_token", { length: 128 }).notNull().references(() => verifications.token),
+  firstAccessedAt: timestamp("first_accessed_at").notNull().defaultNow(),
+  lastAccessedAt: timestamp("last_accessed_at").notNull().defaultNow(),
+  ipHash: varchar("ip_hash", { length: 64 }),
+  userAgent: text("user_agent"),
+  accessCount: integer("access_count").notNull().default(1),
+  visitorId: varchar("visitor_id", { length: 36 }),
+}, (table) => ({
+  tokenIdx: index("share_access_token_idx").on(table.shareToken),
+  visitorIdx: index("share_access_visitor_idx").on(table.visitorId),
+}));
+
 export const insertVerificationSchema = createInsertSchema(verifications).omit({
   id: true,
   createdAt: true,
@@ -169,7 +183,7 @@ export type Verification = typeof verifications.$inferSelect;
 
 export interface VerificationDTO {
   token: string;
-  code: string;
+  code?: string;
   createdAt: Date;
   expiresAt: Date;
   verified: boolean;

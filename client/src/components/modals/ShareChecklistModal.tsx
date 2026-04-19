@@ -150,15 +150,15 @@ export function ShareChecklistModal({
             <TabsContent value="email" className="py-4">
               <div className="flex flex-col space-y-4">
                 <p className="text-sm text-gray-500">
-                  Send this checklist to someone via email or text message with a verification code
+                  Send a direct link to this checklist via email or SMS. Recipients can open it immediately — no app download needed.
                 </p>
-                
+
                 <Button onClick={handleOpenLinkModal} className="mt-2">
-                  Send with Verification
+                  Send Link
                 </Button>
-                
+
                 <p className="text-xs text-gray-400 mt-2">
-                  Recipients will need to verify their identity before accessing the checklist.
+                  Links expire after 72 hours.
                 </p>
               </div>
             </TabsContent>

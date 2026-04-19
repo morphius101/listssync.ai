@@ -1,5 +1,4 @@
 import { useState } from 'react';
-import { apiRequest } from '@/lib/queryClient';
 
 export interface SendVerificationParams {
   checklistId: string;
@@ -8,25 +7,13 @@ export interface SendVerificationParams {
   recipientName?: string;
   recipientId?: string;
   targetLanguage?: string;
-}
-
-export interface VerifyCodeParams {
-  token: string;
-  code: string;
+  checklistName?: string;
+  ownerName?: string;
 }
 
 export interface ShareChecklistResponse {
   token: string;
-  maskedEmail?: string;
-  maskedPhone?: string;
   shareUrl: string;
-}
-
-export interface VerifyCodeResponse {
-  verified: boolean;
-  recipientId?: string;
-  checklistId?: string;
-  message?: string;
 }
 
 interface VerificationStatus {
@@ -39,18 +26,11 @@ interface VerificationStatus {
   maskedPhone?: string;
 }
 
-interface VerificationMaskedContact {
-  email?: string;
-  phone?: string;
-}
-
 export function useVerification() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [token, setToken] = useState<string>('');
-  const [maskedContact, setMaskedContact] = useState<VerificationMaskedContact>({});
 
-  // Send a verification code to a recipient
   const shareChecklist = async ({
     checklistId,
     email,
@@ -58,163 +38,69 @@ export function useVerification() {
     recipientName,
     recipientId,
     targetLanguage,
+    checklistName,
+    ownerName,
   }: SendVerificationParams): Promise<ShareChecklistResponse | null> => {
     setIsLoading(true);
     setError(null);
-    
-    console.log("useVerification.shareChecklist called with:", {
-      checklistId,
-      email,
-      phone,
-      recipientName,
-      recipientId
-    });
-    
+
     if (!checklistId) {
-      console.error("Missing checklistId in shareChecklist!");
-      setError("Missing checklist ID");
+      setError('Missing checklist ID');
       setIsLoading(false);
       return null;
     }
-    
-    // Only one of email or phone should be provided
+
     if (!email && !phone) {
-      console.error("Either email or phone must be provided");
-      setError("Please provide either an email address or phone number");
+      setError('Please provide either an email address or phone number');
       setIsLoading(false);
       return null;
     }
-    
+
     try {
-      // Ensure we have a valid checklist ID
-      if (!checklistId || checklistId.trim() === '') {
-        console.error("Invalid or empty checklistId!");
-        setError("Invalid checklist ID");
-        setIsLoading(false);
-        return null;
-      }
-      
-      // Prepare API request data with detailed validation
-      const requestData: SendVerificationParams = {
-        checklistId: checklistId.trim(),
-        recipientId: recipientId || `recipient_${Date.now()}`
-      };
-      
-      // Only add valid values to the request
-      if (recipientName && recipientName.trim()) {
-        requestData.recipientName = recipientName.trim();
-      }
-      
-      if (email && email.trim()) {
-        console.log("Adding email to request:", email.trim());
-        requestData.email = email.trim();
-      }
-      
-      if (phone && phone.trim()) {
-        console.log("Adding phone to request:", phone.trim());
-        requestData.phone = phone.trim();
-      }
-      
-      console.log("🚀 Making verification API request with data:", requestData);
-      
-      console.log("📤 Sending verification request to /api/verification/send");
-      
-      if (targetLanguage) {
-        requestData.targetLanguage = targetLanguage;
-      }
-
-      const response = await fetch('/api/verification/send', {
+      const response = await fetch('/api/verification/generate', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
-        body: JSON.stringify(requestData),
+        body: JSON.stringify({
+          checklistId: checklistId.trim(),
+          recipientId: recipientId || `recipient_${Date.now()}`,
+          email: email?.trim(),
+          phone: phone?.trim(),
+          targetLanguage,
+          checklistName,
+          ownerName,
+        }),
       });
-
-      console.log("📥 Received verification API response status:", response.status);
 
       const data = await response.json().catch(() => ({}));
-
       if (!response.ok) {
-        console.error("❌ Verification API request failed with status:", response.status, data);
-        throw new Error(data?.message || `Verification request failed with status: ${response.status}`);
+        throw new Error(data?.message || `Request failed: ${response.status}`);
       }
-      console.log("📦 Verification response data:", data);
-      
-      if (data.token) {
-        setToken(data.token);
-        setMaskedContact({
-          email: data.maskedEmail,
-          phone: data.maskedPhone
-        });
-      }
-      
+
+      if (data.token) setToken(data.token);
       return data;
     } catch (err) {
-      setError('Failed to send verification code');
-      console.error('Send verification error:', err);
+      setError('Failed to send share link');
+      console.error('shareChecklist error:', err);
       return null;
     } finally {
       setIsLoading(false);
     }
   };
-  
-  // Verify a code against a token
-  const verifyCode = async ({
-    token,
-    code
-  }: VerifyCodeParams): Promise<VerifyCodeResponse | null> => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const response = await fetch('/api/verification/verify', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({ token, code }),
-      });
 
-      const data = await response.json().catch(() => ({ verified: false }));
-      if (!response.ok) {
-        throw new Error(data?.message || 'Failed to verify code');
-      }
-
-      return data;
-    } catch (err) {
-      setError('Failed to verify code');
-      console.error('Verify code error:', err);
-      return null;
-    } finally {
-      setIsLoading(false);
-    }
-  };
-  
-  // Check if a token is verified
   const checkVerificationStatus = async (token: string): Promise<VerificationStatus | null> => {
     setIsLoading(true);
     setError(null);
-    
+
     try {
       const response = await fetch(`/api/verification/status/${encodeURIComponent(token)}`, {
         method: 'GET',
-        credentials: 'include'
+        credentials: 'include',
       });
 
-      if (!response.ok) {
-        return null;
-      }
-
-      const data = await response.json();
-      setMaskedContact({
-        email: data.maskedEmail,
-        phone: data.maskedPhone,
-      });
-      return data;
-    } catch (err) {
+      if (!response.ok) return null;
+      return await response.json();
+    } catch {
       return null;
     } finally {
       setIsLoading(false);
@@ -225,9 +111,7 @@ export function useVerification() {
     isLoading,
     error,
     token,
-    maskedContact,
     shareChecklist,
-    verifyCode,
-    checkVerificationStatus
+    checkVerificationStatus,
   };
 }

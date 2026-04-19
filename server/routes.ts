@@ -4,6 +4,7 @@ import { storage } from "./storage";
 import { requireAuth } from "./middleware/auth";
 import { betaModeGuard } from "./middleware/betaMode";
 import rateLimit from "express-rate-limit";
+import { v4 as uuidv4 } from "uuid";
 
 const verificationRateLimit = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
@@ -31,14 +32,12 @@ import {
 } from "./services/geminiTranslationService";
 import {
   createVerification,
-  verifyCode,
   isVerified,
   getVerification,
   formatPhoneForDisplay,
   formatEmailForDisplay,
-  sendVerificationSMS,
-  sendVerificationEmail
 } from "./services/verificationService";
+import crypto from "crypto";
 import { ChecklistDTO, TIER_LIMITS, SubscriptionTier } from "../shared/schema";
 import Stripe from "stripe";
 
@@ -74,6 +73,31 @@ function getSiteBaseUrl(req: Request): string {
   const protocol = SITE_CONFIG.protocol || req.protocol;
   const host = SITE_CONFIG.host || req.get('host');
   return `${protocol}://${host}`;
+}
+
+function hashIp(ip: string): string {
+  const salt = process.env.SHARE_ACCESS_SALT || '';
+  return crypto.createHash('sha256').update(ip + salt).digest('hex');
+}
+
+function getVisitorId(req: Request, res: Response): string {
+  const existing = req.cookies?.visitor_id;
+  if (existing) return existing;
+  const id = uuidv4();
+  res.cookie('visitor_id', id, {
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 365 * 24 * 60 * 60 * 1000,
+  });
+  return id;
+}
+
+function captureShareAccess(req: Request, res: Response, token: string): void {
+  const rawIp = (req.headers['x-forwarded-for'] as string || req.ip || '').split(',')[0].trim();
+  const ipHash = hashIp(rawIp);
+  const visitorId = getVisitorId(req, res);
+  const ua = req.headers['user-agent'] || '';
+  setImmediate(() => storage.upsertShareAccess(token, ipHash, ua, visitorId));
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -804,21 +828,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Verification system routes
 
-  // Generate a pre-verified share link without sending email/SMS (for manual Phone/WhatsApp sharing)
+  // Generate a pre-verified share token and optionally send it via email or SMS
   app.post(`${API_BASE}/verification/generate`, requireAuth, betaModeGuard, async (req, res) => {
     try {
-      const { checklistId, recipientId, targetLanguage } = req.body;
+      const { checklistId, recipientId, targetLanguage, email, phone, checklistName, ownerName } = req.body;
       if (!checklistId) return res.status(400).json({ error: 'checklistId required' });
 
       const rid = recipientId || `link_${Date.now()}`;
-      const { token } = await createVerification(rid, undefined, undefined, checklistId, targetLanguage || 'en');
-
-      // Mark pre-verified so recipient can open without entering a code
-      await storage.markVerificationAsVerified(token);
 
       const isProduction = process.env.NODE_ENV === 'production';
       const protocol = isProduction ? 'https' : (req.protocol || 'http');
       const host = isProduction ? 'www.listssync.ai' : (req.get('host') || 'localhost:5000');
+
+      const { token } = await createVerification(
+        rid,
+        email || undefined,
+        phone || undefined,
+        checklistId,
+        targetLanguage || 'en',
+        checklistName || undefined,
+        ownerName || undefined,
+      );
+
       let shareUrl = `${protocol}://${host}/shared/${token}`;
       if (targetLanguage && targetLanguage !== 'en') shareUrl += `?lang=${targetLanguage}`;
 
@@ -829,339 +860,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post(`${API_BASE}/verification/send`, verificationRateLimit, async (req, res) => {
-    console.log('================================================');
-    console.log('📨 VERIFICATION REQUEST RECEIVED');
-    console.log('================================================');
-    
-    try {
-      let { recipientId, email, phone, checklistId, recipientName, targetLanguage } = req.body;
-
-      const isProduction = process.env.NODE_ENV === 'production';
-      const maskedEmail = email ? formatEmailForDisplay(email) : undefined;
-      const maskedPhone = phone ? formatPhoneForDisplay(phone) : undefined;
-
-      if (isProduction) {
-        console.log('📨 verification/send request:', {
-          checklistId,
-          recipientId,
-          recipientName: recipientName || null,
-          targetLanguage: targetLanguage || 'en',
-          hasEmail: !!email,
-          hasPhone: !!phone,
-          maskedEmail,
-          maskedPhone,
-        });
-      } else {
-        console.log('📝 verification/send raw request body:', req.body);
-        console.log('📝 verification/send request headers:', req.headers);
-        console.log('📝 Environment:', process.env.NODE_ENV || 'not set');
-        console.log('📋 verification/send parsed fields:', { 
-          recipientId, 
-          email, 
-          phone, 
-          checklistId, 
-          recipientName,
-          targetLanguage 
-        });
-        console.log('🔑 SENDGRID_API_KEY available:', !!process.env.SENDGRID_API_KEY);
-        console.log('🔑 TWILIO_ACCOUNT_SID available:', !!process.env.TWILIO_ACCOUNT_SID);
-      }
-      
-      // Input validation with more detailed logging
-      if (!email && !phone) {
-        console.error("❌ Verification request missing both email and phone");
-        return res.status(400).json({ 
-          message: "Missing required fields: either email or phone must be provided" 
-        });
-      }
-      
-      if (!checklistId) {
-        console.error("❌ Verification request missing checklistId");
-        return res.status(400).json({ 
-          message: "Missing required field: checklistId" 
-        });
-      }
-      
-      // For phone numbers, ensure they're in the proper format
-      if (phone) {
-        // Sanitize phone number - keep only digits
-        const cleanedPhone = phone.replace(/\D/g, '');
-        if (cleanedPhone !== phone) {
-          console.log(`📱 Cleaned phone number from ${phone} to ${cleanedPhone}`);
-          phone = cleanedPhone;
-        }
-        
-        // Format to E.164 if needed
-        if (!phone.startsWith('+')) {
-          // For US numbers (10 digits)
-          if (phone.length === 10) {
-            phone = `+1${phone}`;
-            console.log(`📱 Formatted US phone number to E.164: ${phone}`);
-          } else {
-            // For other numbers, just add +
-            phone = `+${phone}`;
-            console.log(`📱 Added + prefix to phone: ${phone}`);
-          }
-        }
-      }
-      
-      // Generate a recipientId if not provided
-      if (!recipientId) {
-        recipientId = `recipient_${Date.now()}`;
-        console.log(`📌 Generated recipientId: ${recipientId}`);
-      }
-      
-      // Clean phone number if provided (remove any non-numeric characters)
-      if (phone) {
-        // Keep only digits
-        const cleanedPhone = phone.replace(/\D/g, '');
-        if (cleanedPhone !== phone) {
-          console.log(`Cleaned phone number from ${phone} to ${cleanedPhone}`);
-          phone = cleanedPhone;
-        }
-      }
-      
-      console.log(`Creating verification for recipient: ${recipientId}, contact: ${email || phone}`);
-      
-      const { token, code } = await createVerification(
-        recipientId,
-        email,
-        phone,
-        checklistId,
-        targetLanguage
-      );
-
-      console.log(`✅ Verification created with token: ${token}, code: ${code}`);
-      
-      const requiresCode = Boolean(phone && !email);
-      
-      // Send verification code
-      let sendSuccess = false;
-      
-      if (email) {
-        console.log('================================================');
-        console.log(`📧 Attempting to send verification email to: ${email}`);
-        console.log(`📧 Code: ${code}`);
-        console.log(`📧 SENDGRID_API_KEY status: ${!!process.env.SENDGRID_API_KEY ? 'Present' : 'Missing'}`);
-        console.log(`📧 SENDER_EMAIL: greyson@listssync.ai`);
-        console.log('================================================');
-        
-        try {
-          // Add extra timeout to ensure SendGrid has enough time to process
-          const emailSuccess = await Promise.race([
-            sendVerificationEmail(email, code, token),
-            new Promise<boolean>((resolve) => setTimeout(() => {
-              console.log('📧 Email send operation timed out after 10 seconds');
-              resolve(false);
-            }, 10000))
-          ]);
-          
-          if (emailSuccess) {
-            console.log(`✅ Successfully sent verification email to: ${email}`);
-            sendSuccess = true;
-            await storage.markVerificationAsVerified(token);
-          } else {
-            console.error(`❌ Failed to send verification email to ${email}`);
-            console.error(`📧 Verification email failure details:`);
-            console.error(`- Email: ${email.substring(0, 3)}...${email.substring(email.indexOf('@'))}`);
-            console.error(`- Environment: ${process.env.NODE_ENV}`);
-
-            if (process.env.NODE_ENV === 'development') {
-              console.log(`ℹ️ Continuing verification flow despite email failure (development only)`);
-              sendSuccess = true;
-            } else {
-              return res.status(500).json({ message: "Failed to send verification email. Please try again or use phone verification." });
-            }
-          }
-        } catch (emailError: any) {
-          console.error(`❌ Exception during verification email sending:`, emailError.message);
-          console.error(`❌ Stack trace: ${emailError.stack}`);
-          
-          return res.status(500).json({ 
-            message: `Email verification error: ${emailError.message}` 
-          });
-        }
-      }
-      
-      if (phone) {
-        console.log(`Attempting to send verification SMS to: ${phone}`);
-        
-        // Debug output for Twilio environment vars at route level
-        console.log('TWILIO CONFIG CHECK (ROUTES LEVEL):');
-        console.log('TWILIO_ACCOUNT_SID status:', process.env.TWILIO_ACCOUNT_SID ? 'Present' : 'Missing');
-        console.log('TWILIO_AUTH_TOKEN status:', process.env.TWILIO_AUTH_TOKEN ? 'Present' : 'Missing');
-        console.log('TWILIO_PHONE_NUMBER:', process.env.TWILIO_PHONE_NUMBER || 'Missing');
-        console.log('NODE_ENV:', process.env.NODE_ENV || 'not set');
-        
-        try {
-          // Attempt to send SMS via Twilio
-          const smsSuccess = await sendVerificationSMS(phone, code, token);
-          
-          if (smsSuccess) {
-            console.log(`Successfully sent verification SMS to: ${phone}`);
-            sendSuccess = true;
-          } else {
-            console.error(`Failed to send verification SMS to ${phone}`);
-            
-            // Special handling for when credentials are missing
-            if (!process.env.TWILIO_ACCOUNT_SID || !process.env.TWILIO_AUTH_TOKEN || !process.env.TWILIO_PHONE_NUMBER) {
-              console.log('⚠️ Twilio credentials missing or not properly configured');
-              
-              if (process.env.NODE_ENV === 'production') {
-                // In production, provide professional error response
-                return res.status(500).json({ 
-                  message: "SMS verification is currently unavailable. Please try email verification instead.",
-                  type: "error" 
-                });
-              } else {
-                // Only log verification code in development mode
-                console.log(`📱 Verification code for ${phone}: ${code}`);
-                sendSuccess = true; // Allow flow to continue in development
-              }
-            }
-          }
-        } catch (smsError) {
-          console.error('SMS SENDING ERROR (CAUGHT AT ROUTES LEVEL):', smsError);
-          
-          // Different behavior based on environment
-          if (process.env.NODE_ENV === 'development') {
-            // In development, log more details and allow flow to continue
-            console.log('⚠️ SMS sending failed, but allowing verification flow to continue');
-            console.log(`📱 Verification code in development: ${code}`);
-            sendSuccess = true; // Allow flow to continue without actual SMS
-          } else {
-            // In production, handle more professionally
-            console.error('⚠️ SMS verification failed in production environment');
-            // Return a professional error message immediately
-            return res.status(500).json({ 
-              message: "SMS verification is currently unavailable. Please try email verification instead.",
-              type: "error" 
-            });
-          }
-        }
-      }
-      
-      if (!sendSuccess) {
-        return res.status(500).json({ 
-          message: "Failed to send verification code. Please try again." 
-        });
-      }
-      
-      // Create share URL with token, using custom domain in production
-      // Ensure we have valid values for protocol and host regardless of environment
-      let protocol = 'https';
-      let host = 'www.listssync.ai';
-      
-      // In development, use server values
-      if (process.env.NODE_ENV === 'development') {
-        protocol = req.protocol || 'http';
-        host = req.get('host') || 'localhost:5000';
-      }
-      
-      console.log(`DEBUG URL GENERATION:
-- Protocol: ${protocol}
-- Host: ${host}
-- Token: ${token}
-- Environment: ${process.env.NODE_ENV || 'unknown'}`);
-      
-      // Final token validation before building URL
-      if (!token) {
-        console.error('❌ Failed to generate verification token');
-        return res.status(500).json({ message: "Failed to generate share link. Please try again." });
-      }
-      
-      // Create the final share URL with language parameter if specified
-      let shareUrl = `${protocol}://${host}/shared/${token}`;
-      if (targetLanguage && targetLanguage !== 'en') {
-        shareUrl += `?lang=${targetLanguage}`;
-      }
-      console.log(`✅ Generated share URL: ${shareUrl}`);
-      
-      // Return masked contact info, token, and share URL
-      const response: any = { 
-        token,
-        shareUrl,
-        requiresCode,
-        message: requiresCode ? "Verification code sent to recipient" : "Checklist link sent to recipient"
-      };
-      
-      if (email) {
-        response.maskedEmail = formatEmailForDisplay(email);
-      }
-      
-      if (phone) {
-        response.maskedPhone = formatPhoneForDisplay(phone);
-      }
-      
-      // Show verification code in response in the following cases:
-      // 1. In development mode (for easier testing)
-      // 2. When Twilio credentials are missing in production (for testing without SMS)
-      const isMissingTwilioCredentials = !process.env.TWILIO_ACCOUNT_SID || 
-                                         !process.env.TWILIO_AUTH_TOKEN || 
-                                         !process.env.TWILIO_PHONE_NUMBER;
-      
-      // Only include verification code in development environment
-      if (process.env.NODE_ENV === 'development') {
-        response.verificationCode = code;
-        response.debug = {
-          environment: 'development',
-          twilioStatus: isMissingTwilioCredentials ? 'missing credentials' : 'configured'
-        };
-      }
-      
-      res.json(response);
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  app.post(`${API_BASE}/verification/verify`, async (req, res) => {
-    try {
-      const { token, code } = req.body;
-
-      if (!token || !code) {
-        return res.status(400).json({
-          verified: false,
-          message: "Missing required fields: token, code"
-        });
-      }
-
-      const verification = await storage.getVerificationByToken(token);
-      if (!verification) {
-        return res.status(404).json({ verified: false, message: "Invalid or expired verification token" });
-      }
-
-      if (!verification.checklistId) {
-        return res.status(400).json({ verified: false, message: "Verification is not linked to a checklist" });
-      }
-
-      if (verification.expiresAt < new Date()) {
-        return res.status(410).json({ verified: false, message: "Verification token has expired" });
-      }
-
-      const verified = await verifyCode(token, code);
-      if (!verified) {
-        return res.status(400).json({ verified: false, message: "Invalid verification code" });
-      }
-
-      const checklist = await storage.getChecklistById(verification.checklistId);
-      if (!checklist) {
-        return res.status(404).json({ verified: false, message: "Shared checklist is no longer available" });
-      }
-
-      return res.json({
-        verified: true,
-        recipientId: verification.recipientId,
-        checklistId: verification.checklistId,
-        targetLanguage: verification.targetLanguage || 'en',
-        message: "Verification successful"
-      });
-    } catch (error: any) {
-      console.error("Unexpected error in verification endpoint:", error);
-      return res.status(500).json({ verified: false, message: "Internal server error" });
-    }
-  });
 
   // Test email endpoint for debugging SendGrid issues - DEVELOPMENT ONLY
   if (process.env.NODE_ENV === 'development') {
@@ -1286,18 +984,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
         
         console.log(`🧪 Attempting to send a test email to ${email}`);
         
-        // Generate a test code
-        const testCode = Math.floor(100000 + Math.random() * 900000).toString();
-        
-        // Try to send email via our service
-        const result = await sendVerificationEmail(email, testCode);
-        
+        const { sendVerificationEmail: sendEmail } = await import('./services/emailService');
+        const testToken = uuidv4();
+        const result = await sendEmail(email, testToken, 'Test Checklist');
+
         console.log(`🧪 Test email sending result: ${result ? 'SUCCESS' : 'FAILED'}`);
-        
+
         return res.json({
           success: true,
-          message: `Test email ${result ? 'sent' : 'attempted'} with code: ${testCode}`,
-          code: testCode
+          message: `Test email ${result ? 'sent' : 'attempted'}`,
         });
       } catch (error: any) {
         console.error('🧪 Test email error:', error);
@@ -1337,14 +1032,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      if (!verification.verified) {
-        return res.status(403).json({ success: false, message: 'Verification required' });
+      if (verification.expiresAt < new Date()) {
+        return res.status(410).json({ success: false, message: 'Share link has expired' });
       }
 
-      if (verification.expiresAt < new Date()) {
-        return res.status(410).json({ success: false, message: 'Verification token has expired' });
-      }
-      
+      captureShareAccess(req, res, token as string);
+
       console.log(`Found verification record for token: ${token}, checklist: ${verification.checklistId}, language: ${verification.targetLanguage}`);
       
       // Get the checklist
@@ -1412,13 +1105,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ success: false, message: 'Invalid or expired token' });
       }
 
-      if (!verification.verified) {
-        return res.status(403).json({ success: false, message: 'Verification required' });
+      if (verification.expiresAt < new Date()) {
+        return res.status(410).json({ success: false, message: 'Share link has expired' });
       }
 
-      if (verification.expiresAt < new Date()) {
-        return res.status(410).json({ success: false, message: 'Verification token has expired' });
-      }
+      captureShareAccess(req, res, token);
 
       if (verification.checklistId !== checklistId) {
         return res.status(403).json({ success: false, message: 'Token does not match requested checklist' });
@@ -1494,72 +1185,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       });
     } catch (error: any) {
       console.error("Error in verification status check:", error);
-      res.status(500).json({ message: error.message });
-    }
-  });
-
-  // Share checklist route with mobile-friendly options
-  app.post(`${API_BASE}/checklists/:id/share`, requireAuth, betaModeGuard, async (req, res) => {
-    try {
-      const { id } = req.params;
-      const { recipientEmail, recipientPhone, recipientName, targetLanguage } = req.body;
-      const authenticatedUserId = (req as any).user?.uid;
-      
-      const checklist = await storage.getChecklistById(id);
-      
-      if (!checklist) {
-        return res.status(404).json({ message: "Checklist not found" });
-      }
-
-      if (!authenticatedUserId || checklist.userId !== authenticatedUserId) {
-        return res.status(403).json({ error: 'Forbidden' });
-      }
-      
-      if (!recipientEmail && !recipientPhone) {
-        return res.status(400).json({ 
-          message: "Missing recipient contact information: email or phone required" 
-        });
-      }
-      
-      // Generate random recipientId if not provided
-      const recipientId = Math.random().toString(36).substring(2, 15);
-      
-      // Create verification for recipient access
-      const { token, code } = await createVerification(
-        recipientId,
-        recipientEmail,
-        recipientPhone,
-        id,
-        targetLanguage
-      );
-      
-      // Create share URL with token, using custom domain in production
-      const protocol = SITE_CONFIG.protocol || req.protocol;
-      const host = SITE_CONFIG.host || req.get('host');
-      const shareUrl = `${protocol}://${host}/shared/${token}`;
-      
-      // Send verification via email or SMS and fail honestly if delivery fails
-      if (recipientEmail) {
-        const emailSent = await sendVerificationEmail(recipientEmail, code, token);
-        if (!emailSent) {
-          return res.status(502).json({ message: 'Failed to send verification email' });
-        }
-      }
-      
-      if (recipientPhone) {
-        const smsSent = await sendVerificationSMS(recipientPhone, code, token);
-        if (!smsSent) {
-          return res.status(502).json({ message: 'Failed to send verification SMS' });
-        }
-      }
-      
-      res.json({
-        shareUrl,
-        token,
-        recipientId,
-        message: "Verification code sent to recipient"
-      });
-    } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
   });
