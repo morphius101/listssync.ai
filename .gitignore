@@ -9,3 +9,6 @@ vite.config.ts.*
 .config/
 replit.md
 .env
+
+# Local design/scratch files
+/scratch/

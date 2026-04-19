@@ -246,7 +246,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(403).json({ error: 'Forbidden' });
       }
 
-      if (!['professional', 'enterprise'].includes(tier)) {
+      if (!['professional'].includes(tier)) {
         return res.status(400).json({ error: 'Invalid subscription tier' });
       }
 
@@ -267,27 +267,28 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Define price IDs for each tier (configured in Stripe dashboard)
-      const priceIds = {
-        professional: process.env.STRIPE_PRICE_PROFESSIONAL || "price_1RikHtARacWLsYzMi1CWbouU",
-        enterprise: process.env.STRIPE_PRICE_ENTERPRISE || "price_1RikInARacWLsYzMLMt2mL4x"
-      };
-      
-      console.log(`🔑 Using price IDs: Professional=${priceIds.professional}, Enterprise=${priceIds.enterprise}`);
-      console.log(`🔑 Stripe key type: ${stripeKey?.substring(0, 8) ?? 'unknown'}...`);
+      const priceId = process.env.STRIPE_PRICE_ID;
+      if (!priceId) {
+        console.error('❌ STRIPE_PRICE_ID is not set');
+        return res.status(500).json({ error: 'Stripe price not configured' });
+      }
 
-      const siteBaseUrl = getSiteBaseUrl(req);
+      console.log(`🔑 Using price ID: ${priceId}`);
+      console.log(`🔑 Stripe key type: ${stripeKey?.substring(0, 8) ?? 'unknown'}...`);
 
       const session = await stripe.checkout.sessions.create({
         customer: customer.id,
         payment_method_types: ['card'],
         line_items: [
           {
-            price: priceIds[tier as keyof typeof priceIds],
+            price: priceId,
             quantity: 1,
           },
         ],
         mode: 'subscription',
+        subscription_data: {
+          trial_period_days: 14,
+        },
         success_url: `${getSiteBaseUrl(req)}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${getSiteBaseUrl(req)}/subscription/cancel`,
         metadata: {
@@ -300,6 +301,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error('Error creating subscription:', error);
       res.status(500).json({ error: 'Failed to create subscription' });
+    }
+  });
+
+  // Returns trial_end and charge date for a completed Stripe checkout session
+  app.get(`${API_BASE}/subscription/session/:sessionId`, requireAuth, async (req, res) => {
+    try {
+      if (!stripe) {
+        return res.status(400).json({ error: 'Stripe not configured' });
+      }
+      const { sessionId } = req.params;
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ['subscription'],
+      });
+      const sub = session.subscription as Stripe.Subscription | null;
+      const trialEnd = sub?.trial_end ?? null;
+      res.json({
+        trialEnd,                          // Unix timestamp or null
+        amount: 99,                        // cents-free dollar amount for display
+        currency: 'usd',
+      });
+    } catch (error) {
+      console.error('Error retrieving checkout session:', error);
+      res.status(500).json({ error: 'Failed to retrieve session' });
     }
   });
 

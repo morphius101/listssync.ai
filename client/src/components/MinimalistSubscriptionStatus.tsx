@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Zap, Crown, Building } from 'lucide-react';
+import { Zap, Crown } from 'lucide-react';
 import { trackUserAction } from '@/lib/analytics';
 import { getAuthHeaders } from '@/hooks/useAuth';
 
@@ -69,51 +69,47 @@ const MinimalistSubscriptionStatus = ({ userId, onUpgrade }: MinimalistSubscript
 
   if (!subscription) return null;
 
-  const isTrial = subscription.tier === 'free';
-  const isPro = subscription.tier === 'professional';
+  const isFree = subscription.tier === 'free';
+  const isPaid = subscription.tier === 'professional' || subscription.tier === 'enterprise';
 
   return (
     <Card className="mb-4 border-l-4 border-l-blue-500">
       <CardContent className="p-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-3">
-            {isTrial ? (
+            {isFree ? (
               <Zap className="h-5 w-5 text-blue-500" />
-            ) : isPro ? (
-              <Crown className="h-5 w-5 text-blue-500" />
             ) : (
-              <Building className="h-5 w-5 text-blue-500" />
+              <Crown className="h-5 w-5 text-blue-500" />
             )}
             <div>
               <div className="flex items-center space-x-2">
-                {isTrial ? (
+                {isFree ? (
                   <>
                     <Badge variant="secondary" className="bg-amber-100 text-amber-700">
                       Trial
                     </Badge>
-                    <span className="text-sm text-gray-600">14 days remaining</span>
+                    <span className="text-sm text-gray-600">14-day free trial</span>
                   </>
-                ) : isPro ? (
-                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">Host</Badge>
                 ) : (
-                  <Badge variant="secondary" className="bg-purple-100 text-purple-700">Manager</Badge>
+                  <Badge variant="secondary" className="bg-blue-100 text-blue-700">Pro</Badge>
                 )}
               </div>
               <div className="text-xs text-gray-500 mt-1">
-                {isTrial
-                  ? 'Full access · All features unlocked'
-                  : isPro ? 'Host plan · Up to 5 properties' : 'Manager plan · Unlimited properties'}
+                {isFree
+                  ? 'Start your 14-day free trial — $99/year after'
+                  : 'Pro plan · Unlimited checklists & properties'}
               </div>
             </div>
           </div>
 
-          {isTrial && (
+          {isFree && (
             <Button
               onClick={handleUpgrade}
               size="sm"
               className="bg-blue-600 hover:bg-blue-700"
             >
-              Upgrade
+              Start Trial
             </Button>
           )}
         </div>

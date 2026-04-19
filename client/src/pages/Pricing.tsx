@@ -8,8 +8,8 @@ import { trackStripeEvent, trackUserAction } from '@/lib/analytics';
 import { getAuth } from 'firebase/auth';
 
 interface PricingTier {
-  id: 'host' | 'manager';
-  apiTier: 'professional' | 'enterprise';
+  id: 'pro';
+  apiTier: 'professional';
   name: string;
   subtitle: string;
   yearlyPrice: number;
@@ -22,41 +22,26 @@ interface PricingTier {
 
 const pricingTiers: PricingTier[] = [
   {
-    id: 'host',
+    id: 'pro',
     apiTier: 'professional',
-    name: 'Host',
-    subtitle: 'For Airbnb hosts & vacation rentals',
-    yearlyPrice: 50,
-    monthlyEquiv: '$4.17/month, billed annually',
+    name: 'Pro',
+    subtitle: 'For hosts, property managers & cleaning teams',
+    yearlyPrice: 99,
+    monthlyEquiv: '$8.25/month, billed annually',
+    popular: true,
     buttonText: 'Start 14-Day Free Trial',
-    underButton: '$0 today · $50 charged after 14 days · Cancel anytime',
+    underButton: '$0 today · $99 charged after 14 days · Cancel anytime',
     features: [
-      'Unlimited checklists',
-      'Up to 5 properties',
+      'Unlimited checklists & properties',
       'Photo proof on every task',
       'Auto-translation (12 languages)',
       'Native SMS & WhatsApp share',
       'No app download for cleaners',
-      'Push notifications',
-    ],
-  },
-  {
-    id: 'manager',
-    apiTier: 'enterprise',
-    name: 'Manager',
-    subtitle: 'For property managers & contractors',
-    yearlyPrice: 120,
-    monthlyEquiv: '$10/month, billed annually',
-    popular: true,
-    buttonText: 'Start 14-Day Free Trial',
-    underButton: '$0 today · $120 charged after 14 days · Cancel anytime',
-    features: [
-      'Everything in Host',
-      'Unlimited properties',
       'Contractor → subcontractor chain',
       'Bulk assign to multiple cleaners',
-      'Priority support',
+      'Push notifications',
       'Full audit trail',
+      'Priority support',
     ],
   },
 ];
@@ -140,13 +125,13 @@ export default function Pricing({ userId, userEmail, currentTier }: PricingProps
             Simple pricing. No surprises.
           </h1>
           <p className="text-xl text-gray-600 max-w-2xl mx-auto">
-            14 days free, then $50 or $120 per year.{' '}
+            14 days free, then $99 per year.{' '}
             <span className="font-semibold text-blue-700">Your cleaners always use it free.</span>
           </p>
         </div>
 
         {/* Cards */}
-        <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
+        <div className="flex justify-center">
           {pricingTiers.map((tier) => (
             <Card
               key={tier.id}
@@ -218,7 +203,7 @@ export default function Pricing({ userId, userEmail, currentTier }: PricingProps
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">What happens after the trial?</h3>
               <p className="text-gray-600">
-                After 14 days your card is charged the annual amount. You can cancel before then
+                After 14 days your card is charged $99 for the year. You can cancel before then
                 and you won't be charged anything.
               </p>
             </div>

@@ -83,6 +83,51 @@ function PricingWithAuth() {
   );
 }
 
+function SubscriptionSuccess() {
+  const [trialEnd, setTrialEnd] = useState<Date | null>(null);
+  const [loadError, setLoadError] = useState(false);
+
+  useEffect(() => {
+    trackStripeEvent('subscription_success');
+    trackUserAction('subscription_completed');
+
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('session_id');
+    if (!sessionId) return;
+
+    fetch(`/api/subscription/session/${sessionId}`, {
+      headers: { 'Content-Type': 'application/json' },
+    })
+      .then(r => r.json())
+      .then(data => {
+        if (data.trialEnd) setTrialEnd(new Date(data.trialEnd * 1000));
+      })
+      .catch(() => setLoadError(true));
+  }, []);
+
+  const fmt = (d: Date) =>
+    d.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+
+  return (
+    <div className="min-h-screen flex items-center justify-center bg-green-50">
+      <div className="text-center max-w-md px-6">
+        <h1 className="text-2xl font-bold text-green-800 mb-4">Your 14-day trial has started!</h1>
+        {trialEnd && !loadError ? (
+          <p className="text-green-700 mb-4">
+            Trial ends <strong>{fmt(trialEnd)}</strong>. You'll be charged <strong>$99</strong> on{' '}
+            <strong>{fmt(trialEnd)}</strong> unless you cancel before then.
+          </p>
+        ) : (
+          <p className="text-green-600 mb-4">
+            You have 14 days free. After that you'll be charged $99/year unless you cancel.
+          </p>
+        )}
+        <a href="/dashboard" className="text-blue-600 hover:underline">Go to Dashboard</a>
+      </div>
+    </div>
+  );
+}
+
 function Router() {
   // Track page views when routes change
   useAnalytics();
@@ -123,21 +168,7 @@ function Router() {
       
       {/* Subscription success/cancel pages */}
       <Route path="/subscription/success">
-        {() => {
-          // Track successful subscription
-          trackStripeEvent('subscription_success');
-          trackUserAction('subscription_completed');
-          
-          return (
-            <div className="min-h-screen flex items-center justify-center bg-green-50">
-              <div className="text-center">
-                <h1 className="text-2xl font-bold text-green-800 mb-4">Subscription Successful!</h1>
-                <p className="text-green-600 mb-4">Welcome to listssync.ai Pro. Your subscription is now active.</p>
-                <a href="/dashboard" className="text-blue-600 hover:underline">Go to Dashboard</a>
-              </div>
-            </div>
-          );
-        }}
+        {() => <SubscriptionSuccess />}
       </Route>
       
       <Route path="/subscription/cancel">
