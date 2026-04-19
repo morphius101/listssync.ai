@@ -1581,7 +1581,7 @@ async function registerRoutes(app2) {
       if (!authenticatedUserId || authenticatedUserId !== userId) {
         return res.status(403).json({ error: "Forbidden" });
       }
-      if (!["professional", "enterprise"].includes(tier)) {
+      if (!["professional"].includes(tier)) {
         return res.status(400).json({ error: "Invalid subscription tier" });
       }
       let customer;
@@ -1597,23 +1597,26 @@ async function registerRoutes(app2) {
           customerId: customer.id
         });
       }
-      const priceIds = {
-        professional: process.env.STRIPE_PRICE_PROFESSIONAL || "price_1RikHtARacWLsYzMi1CWbouU",
-        enterprise: process.env.STRIPE_PRICE_ENTERPRISE || "price_1RikInARacWLsYzMLMt2mL4x"
-      };
-      console.log(`\u{1F511} Using price IDs: Professional=${priceIds.professional}, Enterprise=${priceIds.enterprise}`);
+      const priceId = process.env.STRIPE_PRICE_ID;
+      if (!priceId) {
+        console.error("\u274C STRIPE_PRICE_ID is not set");
+        return res.status(500).json({ error: "Stripe price not configured" });
+      }
+      console.log(`\u{1F511} Using price ID: ${priceId}`);
       console.log(`\u{1F511} Stripe key type: ${stripeKey?.substring(0, 8) ?? "unknown"}...`);
-      const siteBaseUrl = getSiteBaseUrl(req);
       const session = await stripe.checkout.sessions.create({
         customer: customer.id,
         payment_method_types: ["card"],
         line_items: [
           {
-            price: priceIds[tier],
+            price: priceId,
             quantity: 1
           }
         ],
         mode: "subscription",
+        subscription_data: {
+          trial_period_days: 14
+        },
         success_url: `${getSiteBaseUrl(req)}/subscription/success?session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${getSiteBaseUrl(req)}/subscription/cancel`,
         metadata: {
@@ -1625,6 +1628,29 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error("Error creating subscription:", error);
       res.status(500).json({ error: "Failed to create subscription" });
+    }
+  });
+  app2.get(`${API_BASE}/subscription/session/:sessionId`, requireAuth, async (req, res) => {
+    try {
+      if (!stripe) {
+        return res.status(400).json({ error: "Stripe not configured" });
+      }
+      const { sessionId } = req.params;
+      const session = await stripe.checkout.sessions.retrieve(sessionId, {
+        expand: ["subscription"]
+      });
+      const sub = session.subscription;
+      const trialEnd = sub?.trial_end ?? null;
+      res.json({
+        trialEnd,
+        // Unix timestamp or null
+        amount: 99,
+        // cents-free dollar amount for display
+        currency: "usd"
+      });
+    } catch (error) {
+      console.error("Error retrieving checkout session:", error);
+      res.status(500).json({ error: "Failed to retrieve session" });
     }
   });
   app2.post(`${API_BASE}/stripe/webhook`, async (req, res) => {
@@ -2916,7 +2942,7 @@ function serveStatic(app2) {
 
 // server/validateEnv.ts
 function validateEnv() {
-  const required = ["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET"];
+  const required = ["DATABASE_URL", "STRIPE_SECRET_KEY", "STRIPE_WEBHOOK_SECRET", "STRIPE_PRICE_ID"];
   const optional = [
     "SENDGRID_API_KEY",
     "TWILIO_ACCOUNT_SID",
