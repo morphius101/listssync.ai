@@ -226,6 +226,7 @@ var init_emailService = __esm({
 
 // server/index.ts
 import express2 from "express";
+import cookieParser from "cookie-parser";
 
 // server/routes.ts
 import { createServer } from "http";
@@ -2534,6 +2535,7 @@ console.log("Twilio Phone:", process.env.TWILIO_PHONE_NUMBER);
 console.log("================================");
 var app = express2();
 app.set("trust proxy", 1);
+app.use(cookieParser());
 app.use(express2.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;

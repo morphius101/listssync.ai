@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import cookieParser from "cookie-parser";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { validateEnv } from "./validateEnv";
@@ -47,6 +48,7 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Save raw body buffer before JSON parsing — required for Stripe webhook signature verification
+app.use(cookieParser());
 app.use(express.json({
   verify: (req: any, _res, buf) => {
     req.rawBody = buf;
