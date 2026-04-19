@@ -17,7 +17,8 @@ import {
   users,
   smsConsents,
   leads,
-  waitlist
+  waitlist,
+  shareAccesses
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -71,6 +72,9 @@ export interface IStorage {
 
   // Waitlist methods
   upsertWaitlist(email: string, source?: string, userAgent?: string, ipHash?: string): Promise<void>;
+
+  // Share access audit trail
+  upsertShareAccess(token: string, ipHash: string, userAgent: string, visitorId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -335,7 +339,7 @@ export class DatabaseStorage implements IStorage {
       
       return {
         token: insertedVerification.token,
-        code: insertedVerification.code,
+        code: insertedVerification.code ?? undefined,
         createdAt: insertedVerification.createdAt,
         expiresAt: insertedVerification.expiresAt,
         verified: insertedVerification.verified,
@@ -362,7 +366,7 @@ export class DatabaseStorage implements IStorage {
       
       return {
         token: foundVerification.token,
-        code: foundVerification.code,
+        code: foundVerification.code ?? undefined,
         createdAt: foundVerification.createdAt,
         expiresAt: foundVerification.expiresAt,
         verified: foundVerification.verified,
@@ -432,7 +436,7 @@ export class DatabaseStorage implements IStorage {
       // Map database records to DTOs
       return allVerifications.map(v => ({
         token: v.token,
-        code: v.code,
+        code: v.code ?? undefined,
         createdAt: v.createdAt,
         expiresAt: v.expiresAt,
         verified: v.verified,
@@ -774,6 +778,35 @@ export class DatabaseStorage implements IStorage {
         .onConflictDoNothing();
     } catch (error) {
       console.error('Error upserting waitlist:', error);
+    }
+  }
+
+  async upsertShareAccess(token: string, ipHash: string, userAgent: string, visitorId: string): Promise<void> {
+    try {
+      const existing = await db
+        .select()
+        .from(shareAccesses)
+        .where(eq(shareAccesses.shareToken, token))
+        .limit(1);
+
+      if (existing.length > 0) {
+        await db
+          .update(shareAccesses)
+          .set({
+            lastAccessedAt: new Date(),
+            accessCount: existing[0].accessCount + 1,
+            ipHash,
+            userAgent,
+            visitorId,
+          })
+          .where(eq(shareAccesses.shareToken, token));
+      } else {
+        await db
+          .insert(shareAccesses)
+          .values({ shareToken: token, ipHash, userAgent, visitorId });
+      }
+    } catch (error) {
+      console.error('Error upserting share access:', error);
     }
   }
 }
