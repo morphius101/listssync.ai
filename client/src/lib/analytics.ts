@@ -61,6 +61,17 @@ export const trackPageView = (url: string) => {
   window.gtag('config', measurementId, { page_path: url });
 };
 
+export interface DebugEvent {
+  timestamp: Date;
+  name: string;
+  params: Record<string, unknown>;
+}
+
+// Populated only in dev builds — capped at 20 entries, newest first.
+const debugBuffer: DebugEvent[] = [];
+
+export const getDebugEvents = (): DebugEvent[] => [...debugBuffer];
+
 export const trackEvent = (
   action: string,
   category?: string,
@@ -73,6 +84,15 @@ export const trackEvent = (
     event_label: label,
     value,
   });
+
+  if (import.meta.env.DEV) {
+    const params: Record<string, unknown> = {};
+    if (category !== undefined) params.event_category = category;
+    if (label !== undefined) params.event_label = label;
+    if (value !== undefined) params.value = value;
+    debugBuffer.unshift({ timestamp: new Date(), name: action, params });
+    if (debugBuffer.length > 20) debugBuffer.pop();
+  }
 };
 
 // Attach userId and UTM attribution as GA4 user properties.

@@ -19,6 +19,7 @@ import { useEffect, useState } from "react";
 import { useAuth, getAuthHeaders } from "@/hooks/useAuth";
 import { initializeFirebase, signOutUser } from "./lib/firebase";
 import { initGA, captureUTM, trackStripeEvent, trackUserAction } from "@/lib/analytics";
+import DebugAnalytics from "@/pages/DebugAnalytics";
 import { useAnalytics } from "@/hooks/use-analytics";
 
 const BETA_MODE = import.meta.env.VITE_BETA_MODE === 'true';
@@ -190,6 +191,7 @@ function Router() {
       </Route>
       
       {/* 404 page */}
+      {import.meta.env.DEV && <Route path="/debug/analytics" component={DebugAnalytics} />}
       <Route component={NotFound} />
     </Switch>
   );
