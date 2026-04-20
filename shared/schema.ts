@@ -77,6 +77,8 @@ export const checklists = pgTable("checklists", {
   tasksData: jsonb("tasks_data"), // Store tasks as JSON for Firebase compatibility
   shareToken: text("share_token"),
   userId: text("user_id"), // Firebase user ID
+  submittedAt: timestamp("submitted_at"),
+  submittedByToken: varchar("submitted_by_token", { length: 128 }),
 }, (table) => ({
   // Index for faster lookup by user
   userIdIdx: index("checklist_user_id_idx").on(table.userId),
@@ -123,6 +125,8 @@ export interface ChecklistDTO {
   updatedAt: Date;
   remarks: string;
   userId?: string;
+  submittedAt?: Date;
+  submittedByToken?: string;
 }
 
 export interface ChecklistSummaryDTO {
@@ -350,3 +354,19 @@ export const waitlist = pgTable("waitlist", {
 }));
 
 export type Waitlist = typeof waitlist.$inferSelect;
+
+// Share writes audit table — recipient write actions on shared checklists
+export const shareWrites = pgTable("share_writes", {
+  id: serial("id").primaryKey(),
+  shareToken: varchar("share_token", { length: 128 }).notNull(),
+  taskId: text("task_id"),
+  action: varchar("action", { length: 20 }).notNull(), // 'task_toggle' | 'photo_upload' | 'submit'
+  ipHash: varchar("ip_hash", { length: 64 }),
+  visitorId: varchar("visitor_id", { length: 36 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  tokenIdx: index("share_writes_token_idx").on(table.shareToken),
+  createdAtIdx: index("share_writes_created_at_idx").on(table.createdAt),
+}));
+
+export type ShareWrite = typeof shareWrites.$inferSelect;
