@@ -3,6 +3,7 @@ import { Task } from '@/types';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { PhotoUploadModal } from '@/components/modals/PhotoUploadModal';
+import { PhotoViewerModal } from '@/components/modals/PhotoViewerModal';
 import { Camera, ChevronDown, ChevronUp, Info } from 'lucide-react';
 
 interface TasksListProps {
@@ -18,6 +19,9 @@ const TasksList = ({ tasks, onTaskUpdate, onUpdate, disabled = false, checklistI
   const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
   const [photoUploadModalOpen, setPhotoUploadModalOpen] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
+  const [photoViewerOpen, setPhotoViewerOpen] = useState(false);
+  const [viewerPhotoUrl, setViewerPhotoUrl] = useState<string>('');
+  const [viewerTaskTitle, setViewerTaskTitle] = useState<string | undefined>(undefined);
 
   const toggleTaskDetails = (taskId: string) => {
     setExpandedTasks(prev => ({
@@ -52,8 +56,14 @@ const TasksList = ({ tasks, onTaskUpdate, onUpdate, disabled = false, checklistI
   };
   
   const handlePhotoClick = (task: Task) => {
-    setCurrentTaskId(task.id);
-    setPhotoUploadModalOpen(true);
+    if (task.photoUrl) {
+      setViewerPhotoUrl(task.photoUrl);
+      setViewerTaskTitle(task.description);
+      setPhotoViewerOpen(true);
+    } else {
+      setCurrentTaskId(task.id);
+      setPhotoUploadModalOpen(true);
+    }
   };
 
   return (
@@ -165,6 +175,13 @@ const TasksList = ({ tasks, onTaskUpdate, onUpdate, disabled = false, checklistI
         onSave={handlePhotoUpload}
         taskId={currentTaskId ?? undefined}
         checklistId={checklistId}
+      />
+
+      <PhotoViewerModal
+        isOpen={photoViewerOpen}
+        onClose={() => setPhotoViewerOpen(false)}
+        photoUrl={viewerPhotoUrl}
+        taskTitle={viewerTaskTitle}
       />
     </div>
   );
