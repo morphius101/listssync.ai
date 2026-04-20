@@ -73,24 +73,14 @@ const debugBuffer: DebugEvent[] = [];
 export const getDebugEvents = (): DebugEvent[] => [...debugBuffer];
 
 export const trackEvent = (
-  action: string,
-  category?: string,
-  label?: string,
-  value?: number
+  name: string,
+  params: Record<string, unknown> = {}
 ) => {
   if (DNT || typeof window === 'undefined' || !window.gtag) return;
-  window.gtag('event', action, {
-    event_category: category,
-    event_label: label,
-    value,
-  });
+  window.gtag('event', name, params);
 
   if (import.meta.env.DEV) {
-    const params: Record<string, unknown> = {};
-    if (category !== undefined) params.event_category = category;
-    if (label !== undefined) params.event_label = label;
-    if (value !== undefined) params.value = value;
-    debugBuffer.unshift({ timestamp: new Date(), name: action, params });
+    debugBuffer.unshift({ timestamp: new Date(), name, params });
     if (debugBuffer.length > 20) debugBuffer.pop();
   }
 };
@@ -127,9 +117,14 @@ export const identifyUser = (userId: string, traits?: Record<string, unknown>): 
 };
 
 export const trackStripeEvent = (event: string, amount?: number, currency?: string) => {
-  trackEvent(event, 'stripe', currency, amount);
+  const params: Record<string, unknown> = { event_category: 'stripe' };
+  if (currency !== undefined) params.currency = currency;
+  if (amount !== undefined) params.value = amount;
+  trackEvent(event, params);
 };
 
 export const trackUserAction = (action: string, details?: string) => {
-  trackEvent(action, 'user_action', details);
+  const params: Record<string, unknown> = { event_category: 'user_action' };
+  if (details !== undefined) params.details = details;
+  trackEvent(action, params);
 };

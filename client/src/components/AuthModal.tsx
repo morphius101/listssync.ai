@@ -6,6 +6,7 @@ import {
   signInWithEmailAndPassword,
   updateProfile,
   sendPasswordResetEmail,
+  getAdditionalUserInfo,
 } from 'firebase/auth';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -13,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { signInWithGoogle } from '@/lib/firebase';
-import { identifyUser } from '@/lib/analytics';
+import { identifyUser, trackEvent } from '@/lib/analytics';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -109,6 +110,11 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         marketingOptIn: false,
       });
       identifyUser(user.uid, { signup_method: 'google' });
+      if (getAdditionalUserInfo(result)?.isNewUser) {
+        trackEvent('sign_up', { method: 'google' }); // GA4 KEY EVENT
+      } else {
+        trackEvent('login', { method: 'google' });
+      }
       onClose();
       navigate('/dashboard');
     } catch (err: any) {
@@ -152,6 +158,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         marketingOptIn: true,
       });
       identifyUser(cred.user.uid, { signup_method: 'email', use_case: useCase, team_size: teamSize });
+      trackEvent('sign_up', { method: 'email' }); // GA4 KEY EVENT
       onClose();
       navigate('/dashboard');
     } catch (err: any) {
@@ -180,6 +187,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
     try {
       const auth = getAuth();
       await signInWithEmailAndPassword(auth, signInEmail, signInPassword);
+      trackEvent('login', { method: 'email' });
       onClose();
       navigate('/dashboard');
     } catch (err: any) {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRoute } from 'wouter';
 import { Button } from '@/components/ui/button';
 import { Checklist, Task } from '@/types';
@@ -8,6 +8,7 @@ import TasksList from '@/components/checklist/TasksList';
 import { useToast } from '@/hooks/use-toast';
 import { getLanguageName } from '@/hooks/useTranslation';
 import { Loader2, AlertTriangle, Globe, CheckCircle2 } from 'lucide-react';
+import { trackEvent } from '@/lib/analytics';
 
 export default function SharedChecklist() {
   const [match1, params1] = useRoute("/shared/:token");
@@ -29,6 +30,8 @@ export default function SharedChecklist() {
   const [error, setError] = useState<string | null>(null);
   const [targetLanguage, setTargetLanguage] = useState<string>(langFromUrl);
   const [translationApplied, setTranslationApplied] = useState(false);
+
+  const loadedAtRef = useRef<number>(0); // ms timestamp when checklist first loaded
 
   const { toast } = useToast();
   const { checkVerificationStatus } = useVerification();
@@ -104,6 +107,11 @@ export default function SharedChecklist() {
 
         const loaded: Checklist = result.checklist;
         setChecklist(loaded);
+        loadedAtRef.current = Date.now();
+        trackEvent('checklist_opened', {
+          checklist_id: loaded.id,
+          offline: navigator.onLine === false,
+        });
 
         // If already submitted, show confirmation immediately
         if (loaded.submittedAt) {
@@ -157,6 +165,20 @@ export default function SharedChecklist() {
         const err = await res.json().catch(() => ({}));
         throw new Error(err.message || 'Failed to save');
       }
+
+      // Fire after server confirms — never optimistically
+      if (updates.photoUrl !== undefined) {
+        trackEvent('photo_uploaded', {
+          checklist_id: checklist.id,
+          was_offline: navigator.onLine === false,
+          action_ts: Date.now(), // for offline-queued uploads this will equal sync time
+        });
+      } else if (updates.completed === true) {
+        trackEvent('item_completed', {
+          checklist_id: checklist.id,
+          has_photo: !!(checklist.tasks.find(t => t.id === taskId)?.photoUrl),
+        });
+      }
     } catch (e: any) {
       // Revert
       setChecklist(prevChecklist);
@@ -175,7 +197,8 @@ export default function SharedChecklist() {
   })();
 
   const handleSubmit = async () => {
-    if (!token || !canSubmit) return;
+    if (!token || !canSubmit || !checklist) return;
+    const snap = checklist; // stable reference for analytics after async ops
     setIsSubmitting(true);
     try {
       const res = await fetch('/api/shared/submit', {
@@ -189,6 +212,13 @@ export default function SharedChecklist() {
       }
       setSubmittedAt(new Date(result.submittedAt));
       setIsSubmitted(true);
+      trackEvent('checklist_completed', { // GA4 KEY EVENT
+        checklist_id: snap.id,
+        duration_seconds: loadedAtRef.current
+          ? Math.round((Date.now() - loadedAtRef.current) / 1000)
+          : null,
+        photo_count: snap.tasks.filter(t => t.photoUrl).length,
+      });
     } catch (e: any) {
       toast({
         title: 'Submit failed',

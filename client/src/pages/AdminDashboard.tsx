@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth, getAuthHeaders } from "@/hooks/useAuth";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { getChecklists, getChecklistById, createChecklist, updateChecklist, deleteChecklist, generateShareLink } from "@/services/checklistService";
-import { trackUserAction } from "@/lib/analytics";
+import { trackUserAction, trackEvent } from "@/lib/analytics";
 
 const AdminDashboard = () => {
   const [checklists, setChecklists] = useState<ChecklistSummary[]>([]);
@@ -178,7 +178,10 @@ const AdminDashboard = () => {
         // Create new checklist
         const newChecklist = await createChecklist(checklist);
         setChecklists([...checklists, newChecklist]);
-        trackUserAction('checklist_created', newChecklist.id);
+        trackEvent('checklist_created', {
+          item_count: checklist.tasks.length,
+          has_photo_required: checklist.tasks.some(t => t.photoRequired),
+        });
       }
       setIsEditing(false);
       return Promise.resolve();

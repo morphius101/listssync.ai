@@ -24,6 +24,7 @@ import { useVerification, SendVerificationParams } from '@/hooks/useVerification
 import { useTranslation, LanguageCode } from '@/hooks/useTranslation';
 import { Checklist } from '@/types';
 import { AlertTriangle, Loader2, ClipboardCopy, Mail, Phone, Smartphone, Globe, Shield, MessageSquare } from 'lucide-react';
+import { trackEvent } from '@/lib/analytics';
 
 interface ShareLinkModalProps {
   isOpen: boolean;
@@ -170,6 +171,7 @@ export default function ShareLinkModal({
       if (response?.shareUrl) {
         setShareLink(response.shareUrl);
         setResponse(response);
+        trackEvent('checklist_sent', { recipient_count: 1, checklist_id: checklistId });
       } else {
         setError('Failed to deliver the share link. Please try again.');
       }
