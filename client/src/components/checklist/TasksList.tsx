@@ -10,9 +10,10 @@ interface TasksListProps {
   onTaskUpdate?: (taskId: string, updates: Partial<Task>) => Promise<void>;
   onUpdate?: (taskId: string, updates: Partial<Task>) => Promise<void>;
   disabled?: boolean;
+  checklistId?: string;
 }
 
-const TasksList = ({ tasks, onTaskUpdate, onUpdate, disabled = false }: TasksListProps) => {
+const TasksList = ({ tasks, onTaskUpdate, onUpdate, disabled = false, checklistId }: TasksListProps) => {
   const handleUpdateTask = onUpdate || onTaskUpdate || (async () => { console.log("Task update not implemented"); });
   const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
   const [photoUploadModalOpen, setPhotoUploadModalOpen] = useState(false);
@@ -42,11 +43,10 @@ const TasksList = ({ tasks, onTaskUpdate, onUpdate, disabled = false }: TasksLis
   
   const handlePhotoUpload = async (photoUrl: string) => {
     if (currentTaskId && !disabled) {
-      await handleUpdateTask(currentTaskId, { 
+      await handleUpdateTask(currentTaskId, {
         photoUrl,
-        completed: true 
+        completed: true
       });
-      setPhotoUploadModalOpen(false);
       setCurrentTaskId(null);
     }
   };
@@ -163,6 +163,8 @@ const TasksList = ({ tasks, onTaskUpdate, onUpdate, disabled = false }: TasksLis
         isOpen={photoUploadModalOpen}
         onClose={() => setPhotoUploadModalOpen(false)}
         onSave={handlePhotoUpload}
+        taskId={currentTaskId ?? undefined}
+        checklistId={checklistId}
       />
     </div>
   );

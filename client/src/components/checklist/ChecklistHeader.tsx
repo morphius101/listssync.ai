@@ -2,6 +2,7 @@ import { Checklist } from '@/types';
 import { Badge } from '@/components/ui/badge';
 import { Calendar, CheckCircle2, Clock, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
+import { toDate } from '@/lib/date';
 
 interface ChecklistHeaderProps {
   checklist?: Checklist;
@@ -39,14 +40,9 @@ const ChecklistHeader = ({ checklist, name: propName, status: propStatus, progre
     }
   };
   
-  const formattedDate = (date: Date | any) => {
-    try {
-      // Handle both Date objects and Firestore timestamps
-      const dateObj = date instanceof Date ? date : new Date(date.seconds * 1000);
-      return format(dateObj, 'MMM d, yyyy');
-    } catch (error) {
-      return 'Unknown date';
-    }
+  const formattedDate = (date: unknown) => {
+    const d = toDate(date);
+    return d ? format(d, 'MMM d, yyyy') : '—';
   };
 
   const submittedAt = checklist?.submittedAt;

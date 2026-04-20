@@ -15,7 +15,7 @@ import { initializeFirebase, ref, uploadBytes, getDownloadURL } from '@/lib/fire
 interface PhotoUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: (photoUrl: string) => void;
+  onSave: (photoUrl: string) => Promise<void>;
   taskId?: string;
   checklistId?: string;
 }
@@ -60,17 +60,6 @@ export const PhotoUploadModal = ({ isOpen, onClose, onSave, taskId, checklistId 
     try {
       const { storage } = initializeFirebase();
 
-      if (!storage || typeof storage.ref !== 'function' && !storage._delegate) {
-        // Firebase storage not available — fall back to base64 data URL
-        // This works for demo but won't persist across sessions
-        console.warn('Firebase Storage not available, using data URL fallback');
-        onSave(previewUrl!);
-        setSelectedFile(null);
-        setPreviewUrl(null);
-        toast({ title: 'Photo saved', description: 'Photo attached to task.' });
-        return;
-      }
-
       // Build a unique path: task-photos/{checklistId}/{taskId}/{timestamp}-{filename}
       const timestamp = Date.now();
       const safeName = selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -80,22 +69,15 @@ export const PhotoUploadModal = ({ isOpen, onClose, onSave, taskId, checklistId 
       await uploadBytes(storageRef, selectedFile);
       const downloadUrl = await getDownloadURL(storageRef);
 
-      onSave(downloadUrl);
+      await onSave(downloadUrl);
+
       setSelectedFile(null);
       setPreviewUrl(null);
-
       toast({ title: 'Photo uploaded', description: 'Photo proof saved successfully.' });
+      onClose();
     } catch (error: any) {
       console.error('Photo upload error:', error);
-      // If storage fails (e.g. CORS, rules), fall back to data URL
-      if (previewUrl) {
-        onSave(previewUrl);
-        setSelectedFile(null);
-        setPreviewUrl(null);
-        toast({ title: 'Photo saved locally', description: 'Cloud upload failed — photo attached as local preview.' });
-      } else {
-        toast({ title: 'Upload failed', description: error.message || 'Please try again.', variant: 'destructive' });
-      }
+      toast({ title: 'Photo upload failed', description: error.message || 'Please try again.', variant: 'destructive' });
     } finally {
       setIsUploading(false);
     }

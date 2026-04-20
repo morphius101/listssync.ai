@@ -2183,7 +2183,7 @@ async function registerRoutes(app2) {
         return res.status(400).json({ success: false, message: "At least one of completed or photoUrl is required" });
       }
       if (photoUrl !== void 0) {
-        if (typeof photoUrl !== "string" || !photoUrl.startsWith("https://firebasestorage.googleapis.com/") || !photoUrl.includes("task-photos/")) {
+        if (typeof photoUrl !== "string" || !photoUrl.startsWith("https://firebasestorage.googleapis.com/") || !decodeURIComponent(photoUrl).includes("task-photos/")) {
           return res.status(400).json({ success: false, message: "Invalid photoUrl" });
         }
       }

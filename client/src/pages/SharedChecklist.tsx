@@ -290,7 +290,7 @@ export default function SharedChecklist() {
         )}
 
         <ChecklistHeader checklist={checklist} />
-        <TasksList tasks={checklist.tasks} onTaskUpdate={handleTaskToggle} disabled={false} />
+        <TasksList tasks={checklist.tasks} onTaskUpdate={handleTaskToggle} disabled={false} checklistId={checklist.id} />
 
         <div className="mt-8 flex justify-end">
           <Button

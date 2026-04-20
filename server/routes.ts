@@ -1181,7 +1181,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       if (photoUrl !== undefined) {
         if (typeof photoUrl !== 'string' ||
             !photoUrl.startsWith('https://firebasestorage.googleapis.com/') ||
-            !photoUrl.includes('task-photos/')) {
+            !decodeURIComponent(photoUrl).includes('task-photos/')) {
           return res.status(400).json({ success: false, message: 'Invalid photoUrl' });
         }
       }
