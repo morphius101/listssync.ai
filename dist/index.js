@@ -2286,7 +2286,7 @@ async function registerRoutes(app2) {
   });
   app2.post(`${API_BASE}/sms-consent`, async (req, res) => {
     try {
-      const { phoneNumber, firstName, lastName, consentedAt, ipAddress, userAgent } = req.body;
+      const { phoneNumber, firstName, lastName, consentedAt, ipAddress, userAgent, isActive } = req.body;
       if (!phoneNumber || !firstName || !lastName) {
         return res.status(400).json({ message: "Phone number, first name, and last name are required" });
       }
@@ -2310,7 +2310,7 @@ async function registerRoutes(app2) {
         consentedAt: consentedAt ? new Date(consentedAt) : /* @__PURE__ */ new Date(),
         ipAddress: ipAddress || req.ip,
         userAgent: userAgent || req.get("User-Agent"),
-        isActive: true
+        isActive: isActive === true
       };
       const savedConsent = await storage.recordSmsConsent(consentData);
       console.log(`\u2705 SMS consent recorded for ${phoneNumber}`);

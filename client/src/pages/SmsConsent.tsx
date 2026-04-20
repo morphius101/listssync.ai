@@ -36,7 +36,7 @@ export default function SmsConsent() {
           consentedAt: new Date(),
           ipAddress: window.location.hostname,
           userAgent: navigator.userAgent,
-          isActive: true
+          isActive: formData.consent
         }),
       });
 
@@ -53,7 +53,7 @@ export default function SmsConsent() {
     }
   };
 
-  const isFormValid = formData.firstName && formData.lastName && formData.phoneNumber && formData.consent;
+  const isFormValid = formData.firstName && formData.lastName && formData.phoneNumber;
 
   if (success) {
     return (
@@ -196,7 +196,7 @@ export default function SmsConsent() {
                   />
                   <div className="flex-1">
                     <Label htmlFor="consent" className="text-sm font-medium text-blue-900">
-                      Required SMS Consent *
+                      SMS Consent
                     </Label>
                     <p className="text-xs text-blue-800 mt-1">
                       I consent to receive SMS messages from ListsSync.ai at the phone number provided above. 

@@ -1313,8 +1313,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // SMS consent endpoint for Twilio compliance
   app.post(`${API_BASE}/sms-consent`, async (req, res) => {
     try {
-      const { phoneNumber, firstName, lastName, consentedAt, ipAddress, userAgent } = req.body;
-      
+      const { phoneNumber, firstName, lastName, consentedAt, ipAddress, userAgent, isActive } = req.body;
+
       if (!phoneNumber || !firstName || !lastName) {
         return res.status(400).json({ message: "Phone number, first name, and last name are required" });
       }
@@ -1326,7 +1326,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
       }
 
       console.log(`📱 Recording SMS consent for: ${phoneNumber}`);
-      
+
       // Check if consent already exists for this phone number
       const existing = await storage.getSmsConsent(phoneNumber);
       if (existing && existing.isActive) {
@@ -1337,7 +1337,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         });
       }
 
-      // Record the consent
+      // Record the consent — isActive strictly requires boolean true from client
       const consentData = {
         phoneNumber,
         firstName: firstName.trim(),
@@ -1345,7 +1345,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         consentedAt: consentedAt ? new Date(consentedAt) : new Date(),
         ipAddress: ipAddress || req.ip,
         userAgent: userAgent || req.get('User-Agent'),
-        isActive: true
+        isActive: isActive === true
       };
 
       const savedConsent = await storage.recordSmsConsent(consentData);
