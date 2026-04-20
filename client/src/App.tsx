@@ -18,7 +18,7 @@ import { PWAInstallBanner } from "@/components/PWAInstallBanner";
 import { useEffect, useState } from "react";
 import { useAuth, getAuthHeaders } from "@/hooks/useAuth";
 import { initializeFirebase, signOutUser } from "./lib/firebase";
-import { initGA, trackStripeEvent, trackUserAction } from "@/lib/analytics";
+import { initGA, captureUTM, trackStripeEvent, trackUserAction } from "@/lib/analytics";
 import { useAnalytics } from "@/hooks/use-analytics";
 
 const BETA_MODE = import.meta.env.VITE_BETA_MODE === 'true';
@@ -213,6 +213,7 @@ function App() {
       console.warn('Missing required Google Analytics key: VITE_GA_MEASUREMENT_ID');
     } else {
       initGA();
+      captureUTM();
     }
   }, []);
 

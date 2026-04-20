@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { signInWithGoogle } from '@/lib/firebase';
+import { identifyUser } from '@/lib/analytics';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
 
 interface AuthModalProps {
@@ -107,6 +108,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         trialStartedAt: new Date().toISOString(),
         marketingOptIn: false,
       });
+      identifyUser(user.uid, { signup_method: 'google' });
       onClose();
       navigate('/dashboard');
     } catch (err: any) {
@@ -149,6 +151,7 @@ export function AuthModal({ isOpen, onClose }: AuthModalProps) {
         trialStartedAt: new Date().toISOString(),
         marketingOptIn: true,
       });
+      identifyUser(cred.user.uid, { signup_method: 'email', use_case: useCase, team_size: teamSize });
       onClose();
       navigate('/dashboard');
     } catch (err: any) {
