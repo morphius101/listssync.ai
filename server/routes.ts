@@ -1162,6 +1162,127 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Recipient per-task write — toggle completion or attach photo
+  app.patch(`${API_BASE}/shared/task`, async (req, res) => {
+    try {
+      const { token, taskId, completed, photoUrl } = req.body;
+
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ success: false, message: 'Token is required' });
+      }
+      if (!taskId || typeof taskId !== 'string') {
+        return res.status(400).json({ success: false, message: 'taskId is required' });
+      }
+      if (completed === undefined && photoUrl === undefined) {
+        return res.status(400).json({ success: false, message: 'At least one of completed or photoUrl is required' });
+      }
+
+      // Validate photoUrl if provided
+      if (photoUrl !== undefined) {
+        if (typeof photoUrl !== 'string' ||
+            !photoUrl.startsWith('https://firebasestorage.googleapis.com/') ||
+            !photoUrl.includes('task-photos/')) {
+          return res.status(400).json({ success: false, message: 'Invalid photoUrl' });
+        }
+      }
+
+      const verification = await storage.getVerificationByToken(token);
+      if (!verification) {
+        return res.status(404).json({ success: false, message: 'Invalid or expired token' });
+      }
+      if (verification.expiresAt < new Date()) {
+        return res.status(410).json({ success: false, message: 'Share link has expired' });
+      }
+      if (!verification.checklistId) {
+        return res.status(400).json({ success: false, message: 'Token has no associated checklist' });
+      }
+
+      // Prevent writes after submission
+      const checklist = await storage.getChecklistById(verification.checklistId);
+      if (!checklist) {
+        return res.status(404).json({ success: false, message: 'Checklist not found' });
+      }
+      if (checklist.submittedAt) {
+        return res.status(409).json({ success: false, message: 'Checklist already submitted' });
+      }
+
+      // Scope check — taskId must exist in this checklist
+      const taskExists = checklist.tasks.some(t => t.id === taskId);
+      if (!taskExists) {
+        return res.status(403).json({ success: false, message: 'Task not found in this checklist' });
+      }
+
+      const updates: Partial<{ completed: boolean; photoUrl: string }> = {};
+      if (completed !== undefined) updates.completed = completed;
+      if (photoUrl !== undefined) updates.photoUrl = photoUrl;
+
+      const updatedTask = await storage.updateTask(verification.checklistId, taskId, updates);
+      if (!updatedTask) {
+        return res.status(500).json({ success: false, message: 'Failed to update task' });
+      }
+
+      // Audit log — photo_upload takes precedence when photoUrl is present
+      const action = photoUrl !== undefined ? 'photo_upload' : 'task_toggle';
+      const ipHash = req.headers['x-forwarded-for']
+        ? hashIp((req.headers['x-forwarded-for'] as string).split(',')[0].trim())
+        : undefined;
+      const visitorId = getVisitorId(req, res);
+      setImmediate(() => storage.logShareWrite(token, action, taskId, ipHash, visitorId));
+
+      res.json({ success: true, task: updatedTask });
+    } catch (error) {
+      console.error('Error updating shared task:', error);
+      res.status(500).json({ success: false, message: 'Failed to update task' });
+    }
+  });
+
+  // Recipient submit — finalize checklist
+  app.post(`${API_BASE}/shared/submit`, async (req, res) => {
+    try {
+      const { token, remarks } = req.body;
+
+      if (!token || typeof token !== 'string') {
+        return res.status(400).json({ success: false, message: 'Token is required' });
+      }
+
+      const verification = await storage.getVerificationByToken(token);
+      if (!verification) {
+        return res.status(404).json({ success: false, message: 'Invalid or expired token' });
+      }
+      if (verification.expiresAt < new Date()) {
+        return res.status(410).json({ success: false, message: 'Share link has expired' });
+      }
+      if (!verification.checklistId) {
+        return res.status(400).json({ success: false, message: 'Token has no associated checklist' });
+      }
+
+      // Idempotency — if already submitted, return success
+      const checklist = await storage.getChecklistById(verification.checklistId);
+      if (!checklist) {
+        return res.status(404).json({ success: false, message: 'Checklist not found' });
+      }
+      if (checklist.submittedAt) {
+        return res.json({ success: true, submittedAt: checklist.submittedAt });
+      }
+
+      const ok = await storage.submitChecklist(verification.checklistId, token, remarks);
+      if (!ok) {
+        return res.status(500).json({ success: false, message: 'Failed to submit checklist' });
+      }
+
+      const ipHash = req.headers['x-forwarded-for']
+        ? hashIp((req.headers['x-forwarded-for'] as string).split(',')[0].trim())
+        : undefined;
+      const visitorId = getVisitorId(req, res);
+      setImmediate(() => storage.logShareWrite(token, 'submit', undefined, ipHash, visitorId));
+
+      res.json({ success: true, submittedAt: new Date() });
+    } catch (error) {
+      console.error('Error submitting checklist:', error);
+      res.status(500).json({ success: false, message: 'Failed to submit checklist' });
+    }
+  });
+
   app.get(`${API_BASE}/verification/status/:token`, async (req, res) => {
     try {
       const rawToken = req.params.token;

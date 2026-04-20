@@ -1,7 +1,7 @@
-import { 
-  ChecklistDTO, 
-  TaskDTO, 
-  ChecklistSummaryDTO, 
+import {
+  ChecklistDTO,
+  TaskDTO,
+  ChecklistSummaryDTO,
   VerificationDTO,
   MailingListSubscriptionDTO,
   UserDTO,
@@ -10,7 +10,7 @@ import {
   SubscriptionTier,
   TIER_LIMITS,
   SmsConsentDTO,
-  checklists, 
+  checklists,
   tasks,
   verifications,
   mailingListSubscriptions,
@@ -18,7 +18,8 @@ import {
   smsConsents,
   leads,
   waitlist,
-  shareAccesses
+  shareAccesses,
+  shareWrites
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -75,6 +76,12 @@ export interface IStorage {
 
   // Share access audit trail
   upsertShareAccess(token: string, ipHash: string, userAgent: string, visitorId: string): Promise<void>;
+
+  // Share write audit trail
+  logShareWrite(token: string, action: 'task_toggle' | 'photo_upload' | 'submit', taskId?: string, ipHash?: string, visitorId?: string): Promise<void>;
+
+  // Submit a shared checklist (recipient finalizes)
+  submitChecklist(checklistId: string, token: string, remarks?: string): Promise<boolean>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -127,7 +134,9 @@ export class DatabaseStorage implements IStorage {
             createdAt: dbChecklist.createdAt,
             updatedAt: dbChecklist.updatedAt,
             remarks: dbChecklist.remarks || "",
-            userId: dbChecklist.userId || undefined
+            userId: dbChecklist.userId || undefined,
+            submittedAt: dbChecklist.submittedAt || undefined,
+            submittedByToken: dbChecklist.submittedByToken || undefined,
           };
         }
       } catch (directError: any) {
@@ -152,7 +161,9 @@ export class DatabaseStorage implements IStorage {
             createdAt: tokenChecklist.createdAt,
             updatedAt: tokenChecklist.updatedAt,
             remarks: tokenChecklist.remarks || "",
-            userId: tokenChecklist.userId || undefined
+            userId: tokenChecklist.userId || undefined,
+            submittedAt: tokenChecklist.submittedAt || undefined,
+            submittedByToken: tokenChecklist.submittedByToken || undefined,
           };
         }
       } catch (tokenError: any) {
@@ -188,7 +199,9 @@ export class DatabaseStorage implements IStorage {
                 createdAt: linkedChecklist.createdAt,
                 updatedAt: linkedChecklist.updatedAt,
                 remarks: linkedChecklist.remarks || "",
-                userId: linkedChecklist.userId || undefined
+                userId: linkedChecklist.userId || undefined,
+                submittedAt: linkedChecklist.submittedAt || undefined,
+                submittedByToken: linkedChecklist.submittedByToken || undefined,
               };
             }
           } catch (linkedError: any) {
@@ -262,7 +275,9 @@ export class DatabaseStorage implements IStorage {
         remarks: updatedChecklist.remarks || "",
         createdAt: updatedChecklist.createdAt,
         updatedAt: updatedChecklist.updatedAt,
-        userId: updatedChecklist.userId || undefined
+        userId: updatedChecklist.userId || undefined,
+        submittedAt: updatedChecklist.submittedAt || undefined,
+        submittedByToken: updatedChecklist.submittedByToken || undefined,
       };
     } catch (error) {
       console.error("Error updating checklist:", error);
@@ -807,6 +822,35 @@ export class DatabaseStorage implements IStorage {
       }
     } catch (error) {
       console.error('Error upserting share access:', error);
+    }
+  }
+
+  async logShareWrite(token: string, action: 'task_toggle' | 'photo_upload' | 'submit', taskId?: string, ipHash?: string, visitorId?: string): Promise<void> {
+    try {
+      await db.insert(shareWrites).values({ shareToken: token, action, taskId, ipHash, visitorId });
+    } catch (error) {
+      console.error('Error logging share write:', error);
+    }
+  }
+
+  async submitChecklist(checklistId: string, token: string, remarks?: string): Promise<boolean> {
+    try {
+      const result = await db
+        .update(checklists)
+        .set({
+          status: 'completed',
+          progress: 100,
+          remarks: remarks ?? undefined,
+          submittedAt: new Date(),
+          submittedByToken: token,
+          updatedAt: new Date(),
+        })
+        .where(eq(checklists.id, checklistId))
+        .returning();
+      return result.length > 0;
+    } catch (error) {
+      console.error('Error submitting checklist:', error);
+      return false;
     }
   }
 }
