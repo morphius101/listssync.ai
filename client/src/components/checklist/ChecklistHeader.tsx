@@ -49,26 +49,44 @@ const ChecklistHeader = ({ checklist, name: propName, status: propStatus, progre
     }
   };
 
+  const submittedAt = checklist?.submittedAt;
+  const submittedDateStr = (() => {
+    if (!submittedAt) return null;
+    try {
+      const d = submittedAt instanceof Date ? submittedAt : new Date(submittedAt as string);
+      return d.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    } catch {
+      return null;
+    }
+  })();
+
   return (
     <div className="mb-6">
+      {submittedDateStr && (
+        <div className="mb-4 flex items-center gap-2 rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm text-green-800">
+          <CheckCircle2 className="w-4 h-4 shrink-0" />
+          <span>Submitted by recipient on {submittedDateStr}</span>
+        </div>
+      )}
+
       <h1 className="text-2xl font-bold mb-2">{name}</h1>
-      
+
       <div className="flex flex-wrap items-center gap-2 mb-4">
         <Badge className={`flex items-center ${getStatusColor()}`}>
           {getStatusIcon()}
-          {status === 'not-started' ? 'Not Started' : 
+          {status === 'not-started' ? 'Not Started' :
             status === 'in-progress' ? 'In Progress' : 'Completed'}
         </Badge>
-        
+
         <Badge variant="outline" className="flex items-center">
           <span className="font-medium">{progress}%</span>
         </Badge>
       </div>
-      
+
       <div className="flex items-center text-sm text-gray-500">
         <Calendar className="w-3.5 h-3.5 mr-1" />
         <span>Created: {formattedDate(createdAt)}</span>
-        
+
         {updatedAt && updatedAt !== createdAt && (
           <span className="ml-4">
             Updated: {formattedDate(updatedAt)}

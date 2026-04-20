@@ -17,6 +17,8 @@ export interface Checklist {
   updatedAt: Date;
   remarks: string;
   userId?: string | null;
+  submittedAt?: Date | string | null;
+  submittedByToken?: string | null;
 }
 
 export interface ChecklistSummary {

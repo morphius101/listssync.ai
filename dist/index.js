@@ -246,6 +246,7 @@ __export(schema_exports, {
   mailingListSubscriptions: () => mailingListSubscriptions,
   sessions: () => sessions,
   shareAccesses: () => shareAccesses,
+  shareWrites: () => shareWrites,
   smsConsents: () => smsConsents,
   tasks: () => tasks,
   users: () => users,
@@ -328,8 +329,10 @@ var checklists = pgTable("checklists", {
   tasksData: jsonb("tasks_data"),
   // Store tasks as JSON for Firebase compatibility
   shareToken: text("share_token"),
-  userId: text("user_id")
+  userId: text("user_id"),
   // Firebase user ID
+  submittedAt: timestamp("submitted_at"),
+  submittedByToken: varchar("submitted_by_token", { length: 128 })
 }, (table) => ({
   // Index for faster lookup by user
   userIdIdx: index("checklist_user_id_idx").on(table.userId),
@@ -480,6 +483,19 @@ var waitlist = pgTable("waitlist", {
 }, (table) => ({
   emailIdx: index("waitlist_email_idx").on(table.email)
 }));
+var shareWrites = pgTable("share_writes", {
+  id: serial("id").primaryKey(),
+  shareToken: varchar("share_token", { length: 128 }).notNull(),
+  taskId: text("task_id"),
+  action: varchar("action", { length: 20 }).notNull(),
+  // 'task_toggle' | 'photo_upload' | 'submit'
+  ipHash: varchar("ip_hash", { length: 64 }),
+  visitorId: varchar("visitor_id", { length: 36 }),
+  createdAt: timestamp("created_at").notNull().defaultNow()
+}, (table) => ({
+  tokenIdx: index("share_writes_token_idx").on(table.shareToken),
+  createdAtIdx: index("share_writes_created_at_idx").on(table.createdAt)
+}));
 
 // server/db.ts
 import { Pool, neonConfig } from "@neondatabase/serverless";
@@ -536,7 +552,9 @@ var DatabaseStorage = class {
             createdAt: dbChecklist.createdAt,
             updatedAt: dbChecklist.updatedAt,
             remarks: dbChecklist.remarks || "",
-            userId: dbChecklist.userId || void 0
+            userId: dbChecklist.userId || void 0,
+            submittedAt: dbChecklist.submittedAt || void 0,
+            submittedByToken: dbChecklist.submittedByToken || void 0
           };
         }
       } catch (directError) {
@@ -558,7 +576,9 @@ var DatabaseStorage = class {
             createdAt: tokenChecklist.createdAt,
             updatedAt: tokenChecklist.updatedAt,
             remarks: tokenChecklist.remarks || "",
-            userId: tokenChecklist.userId || void 0
+            userId: tokenChecklist.userId || void 0,
+            submittedAt: tokenChecklist.submittedAt || void 0,
+            submittedByToken: tokenChecklist.submittedByToken || void 0
           };
         }
       } catch (tokenError) {
@@ -583,7 +603,9 @@ var DatabaseStorage = class {
                 createdAt: linkedChecklist.createdAt,
                 updatedAt: linkedChecklist.updatedAt,
                 remarks: linkedChecklist.remarks || "",
-                userId: linkedChecklist.userId || void 0
+                userId: linkedChecklist.userId || void 0,
+                submittedAt: linkedChecklist.submittedAt || void 0,
+                submittedByToken: linkedChecklist.submittedByToken || void 0
               };
             }
           } catch (linkedError) {
@@ -644,7 +666,9 @@ var DatabaseStorage = class {
         remarks: updatedChecklist.remarks || "",
         createdAt: updatedChecklist.createdAt,
         updatedAt: updatedChecklist.updatedAt,
-        userId: updatedChecklist.userId || void 0
+        userId: updatedChecklist.userId || void 0,
+        submittedAt: updatedChecklist.submittedAt || void 0,
+        submittedByToken: updatedChecklist.submittedByToken || void 0
       };
     } catch (error) {
       console.error("Error updating checklist:", error);
@@ -1045,6 +1069,29 @@ var DatabaseStorage = class {
       }
     } catch (error) {
       console.error("Error upserting share access:", error);
+    }
+  }
+  async logShareWrite(token, action, taskId, ipHash, visitorId) {
+    try {
+      await db.insert(shareWrites).values({ shareToken: token, action, taskId, ipHash, visitorId });
+    } catch (error) {
+      console.error("Error logging share write:", error);
+    }
+  }
+  async submitChecklist(checklistId, token, remarks) {
+    try {
+      const result = await db.update(checklists).set({
+        status: "completed",
+        progress: 100,
+        remarks: remarks ?? void 0,
+        submittedAt: /* @__PURE__ */ new Date(),
+        submittedByToken: token,
+        updatedAt: /* @__PURE__ */ new Date()
+      }).where(eq(checklists.id, checklistId)).returning();
+      return result.length > 0;
+    } catch (error) {
+      console.error("Error submitting checklist:", error);
+      return false;
     }
   }
 };
@@ -2121,6 +2168,97 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error("Error fetching shared checklist:", error);
       res.status(500).json({ success: false, message: "Failed to fetch checklist" });
+    }
+  });
+  app2.patch(`${API_BASE}/shared/task`, async (req, res) => {
+    try {
+      const { token, taskId, completed, photoUrl } = req.body;
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ success: false, message: "Token is required" });
+      }
+      if (!taskId || typeof taskId !== "string") {
+        return res.status(400).json({ success: false, message: "taskId is required" });
+      }
+      if (completed === void 0 && photoUrl === void 0) {
+        return res.status(400).json({ success: false, message: "At least one of completed or photoUrl is required" });
+      }
+      if (photoUrl !== void 0) {
+        if (typeof photoUrl !== "string" || !photoUrl.startsWith("https://firebasestorage.googleapis.com/") || !photoUrl.includes("task-photos/")) {
+          return res.status(400).json({ success: false, message: "Invalid photoUrl" });
+        }
+      }
+      const verification = await storage.getVerificationByToken(token);
+      if (!verification) {
+        return res.status(404).json({ success: false, message: "Invalid or expired token" });
+      }
+      if (verification.expiresAt < /* @__PURE__ */ new Date()) {
+        return res.status(410).json({ success: false, message: "Share link has expired" });
+      }
+      if (!verification.checklistId) {
+        return res.status(400).json({ success: false, message: "Token has no associated checklist" });
+      }
+      const checklist = await storage.getChecklistById(verification.checklistId);
+      if (!checklist) {
+        return res.status(404).json({ success: false, message: "Checklist not found" });
+      }
+      if (checklist.submittedAt) {
+        return res.status(409).json({ success: false, message: "Checklist already submitted" });
+      }
+      const taskExists = checklist.tasks.some((t) => t.id === taskId);
+      if (!taskExists) {
+        return res.status(403).json({ success: false, message: "Task not found in this checklist" });
+      }
+      const updates = {};
+      if (completed !== void 0) updates.completed = completed;
+      if (photoUrl !== void 0) updates.photoUrl = photoUrl;
+      const updatedTask = await storage.updateTask(verification.checklistId, taskId, updates);
+      if (!updatedTask) {
+        return res.status(500).json({ success: false, message: "Failed to update task" });
+      }
+      const action = photoUrl !== void 0 ? "photo_upload" : "task_toggle";
+      const ipHash = req.headers["x-forwarded-for"] ? hashIp(req.headers["x-forwarded-for"].split(",")[0].trim()) : void 0;
+      const visitorId = getVisitorId(req, res);
+      setImmediate(() => storage.logShareWrite(token, action, taskId, ipHash, visitorId));
+      res.json({ success: true, task: updatedTask });
+    } catch (error) {
+      console.error("Error updating shared task:", error);
+      res.status(500).json({ success: false, message: "Failed to update task" });
+    }
+  });
+  app2.post(`${API_BASE}/shared/submit`, async (req, res) => {
+    try {
+      const { token, remarks } = req.body;
+      if (!token || typeof token !== "string") {
+        return res.status(400).json({ success: false, message: "Token is required" });
+      }
+      const verification = await storage.getVerificationByToken(token);
+      if (!verification) {
+        return res.status(404).json({ success: false, message: "Invalid or expired token" });
+      }
+      if (verification.expiresAt < /* @__PURE__ */ new Date()) {
+        return res.status(410).json({ success: false, message: "Share link has expired" });
+      }
+      if (!verification.checklistId) {
+        return res.status(400).json({ success: false, message: "Token has no associated checklist" });
+      }
+      const checklist = await storage.getChecklistById(verification.checklistId);
+      if (!checklist) {
+        return res.status(404).json({ success: false, message: "Checklist not found" });
+      }
+      if (checklist.submittedAt) {
+        return res.json({ success: true, submittedAt: checklist.submittedAt });
+      }
+      const ok = await storage.submitChecklist(verification.checklistId, token, remarks);
+      if (!ok) {
+        return res.status(500).json({ success: false, message: "Failed to submit checklist" });
+      }
+      const ipHash = req.headers["x-forwarded-for"] ? hashIp(req.headers["x-forwarded-for"].split(",")[0].trim()) : void 0;
+      const visitorId = getVisitorId(req, res);
+      setImmediate(() => storage.logShareWrite(token, "submit", void 0, ipHash, visitorId));
+      res.json({ success: true, submittedAt: /* @__PURE__ */ new Date() });
+    } catch (error) {
+      console.error("Error submitting checklist:", error);
+      res.status(500).json({ success: false, message: "Failed to submit checklist" });
     }
   });
   app2.get(`${API_BASE}/verification/status/:token`, async (req, res) => {

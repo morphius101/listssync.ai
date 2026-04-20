@@ -1,22 +1,18 @@
 import { useState, useEffect } from 'react';
-import { useRoute, useLocation } from 'wouter';
+import { useRoute } from 'wouter';
 import { Button } from '@/components/ui/button';
-import { updateTaskStatus, updateChecklist } from '@/services/checklistService';
 import { Checklist, Task } from '@/types';
 import { useVerification } from '@/hooks/useVerification';
 import ChecklistHeader from '@/components/checklist/ChecklistHeader';
 import TasksList from '@/components/checklist/TasksList';
-import RemarksSection from '@/components/checklist/RemarksSection';
 import { useToast } from '@/hooks/use-toast';
 import { getLanguageName } from '@/hooks/useTranslation';
-import { Loader2, AlertTriangle, Globe } from 'lucide-react';
+import { Loader2, AlertTriangle, Globe, CheckCircle2 } from 'lucide-react';
 
 export default function SharedChecklist() {
   const [match1, params1] = useRoute("/shared/:token");
   const [match2, params2] = useRoute("/shared/checklist/:token");
-  const [, navigate] = useLocation();
 
-  const match = match1 || match2;
   const params = params1 || params2;
 
   const urlParams = new URLSearchParams(window.location.search);
@@ -26,11 +22,10 @@ export default function SharedChecklist() {
   const token = rawToken?.includes('?') ? rawToken.split('?')[0] : rawToken;
 
   const [checklist, setChecklist] = useState<Checklist | null>(null);
-  const [remarks, setRemarks] = useState("");
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [checklistId, setChecklistId] = useState<string | null>(null);
-  const [isExpired, setIsExpired] = useState(false);
+  const [isSubmitted, setIsSubmitted] = useState(false);
+  const [submittedAt, setSubmittedAt] = useState<Date | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [targetLanguage, setTargetLanguage] = useState<string>(langFromUrl);
   const [translationApplied, setTranslationApplied] = useState(false);
@@ -38,9 +33,9 @@ export default function SharedChecklist() {
   const { toast } = useToast();
   const { checkVerificationStatus } = useVerification();
 
-  // Poll for live updates once checklist is loaded
+  // Poll for live updates (owner-side changes) while the recipient is working
   useEffect(() => {
-    if (!token || !checklist) return;
+    if (!token || !checklist || isSubmitted) return;
     const interval = setInterval(async () => {
       if (document.hidden) return;
       try {
@@ -61,9 +56,9 @@ export default function SharedChecklist() {
       }
     }, 10000);
     return () => clearInterval(interval);
-  }, [token, checklist]);
+  }, [token, checklist, isSubmitted]);
 
-  // On mount: resolve checklistId from token, then load
+  // On mount: resolve checklistId from token, then load checklist
   useEffect(() => {
     if (!token) return;
     let cancelled = false;
@@ -81,18 +76,39 @@ export default function SharedChecklist() {
         }
 
         if (status.expired) {
-          setIsExpired(true);
           setError('This shared link has expired. Please ask the sender for a new one.');
           return;
         }
 
         if (status.targetLanguage) setTargetLanguage(status.targetLanguage);
-        setChecklistId(status.checklistId || null);
 
-        if (status.checklistId) {
-          await loadChecklist(status.checklistId);
-        } else {
+        if (!status.checklistId) {
           setError('This shared link is not linked to a checklist.');
+          return;
+        }
+
+        const url = new URL(`/api/shared/checklist`, window.location.origin);
+        url.searchParams.set('token', token);
+        const res = await fetch(url.toString());
+        const result = await res.json();
+
+        if (cancelled) return;
+
+        if (!result.success || !result.checklist) {
+          setError(result.message || 'Failed to load checklist');
+          return;
+        }
+
+        if (result.targetLanguage) setTargetLanguage(result.targetLanguage);
+        setTranslationApplied(Boolean(result.translationApplied));
+
+        const loaded: Checklist = result.checklist;
+        setChecklist(loaded);
+
+        // If already submitted, show confirmation immediately
+        if (loaded.submittedAt) {
+          setSubmittedAt(new Date(loaded.submittedAt as string));
+          setIsSubmitted(true);
         }
       } catch {
         if (!cancelled) setError('We could not load this shared link. Please try again.');
@@ -105,62 +121,80 @@ export default function SharedChecklist() {
     return () => { cancelled = true; };
   }, [token]);
 
-  const loadChecklist = async (id: string) => {
-    const url = new URL(`/api/shared/checklist`, window.location.origin);
-    if (token) url.searchParams.set('token', token);
-    const response = await fetch(url.toString());
-    const result = await response.json();
-
-    if (!result.success || !result.checklist) {
-      throw new Error(result.message || 'Failed to load checklist');
-    }
-
-    if (result.targetLanguage) setTargetLanguage(result.targetLanguage);
-    setTranslationApplied(Boolean(result.translationApplied));
-    setChecklist(result.checklist);
-    setRemarks(result.checklist.remarks || "");
-    return result.checklist;
-  };
-
+  // Optimistic per-task update — calls PATCH /api/shared/task
   const handleTaskToggle = async (taskId: string, updates: Partial<Task>) => {
-    if (!checklist) return;
+    if (!checklist || !token) return;
 
-    const updatedTasks = checklist.tasks.map(task =>
-      task.id === taskId ? { ...task, ...updates } : task
+    // Optimistic update
+    const prevChecklist = checklist;
+    const updatedTasks = checklist.tasks.map(t =>
+      t.id === taskId ? { ...t, ...updates } : t
     );
     const completedCount = updatedTasks.filter(t => t.completed).length;
     const progress = Math.round((completedCount / updatedTasks.length) * 100);
     const status = progress === 100 ? 'completed' : progress > 0 ? 'in-progress' : 'not-started';
 
-    const updatedChecklist = {
+    setChecklist({
       ...checklist,
       tasks: updatedTasks,
       progress,
-      status: status as 'completed' | 'in-progress' | 'not-started',
+      status: status as Checklist['status'],
       updatedAt: new Date(),
-    };
-    setChecklist(updatedChecklist);
+    });
 
     try {
-      const task = checklist.tasks.find(t => t.id === taskId);
-      if (checklist.id && task) {
-        await updateTaskStatus(checklist.id, taskId, { completed: !task.completed });
+      const body: Record<string, unknown> = { token, taskId };
+      if (updates.completed !== undefined) body.completed = updates.completed;
+      if (updates.photoUrl !== undefined) body.photoUrl = updates.photoUrl;
+
+      const res = await fetch('/api/shared/task', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        throw new Error(err.message || 'Failed to save');
       }
-    } catch {
-      console.error('Error updating task');
+    } catch (e: any) {
+      // Revert
+      setChecklist(prevChecklist);
+      toast({
+        title: 'Could not save change',
+        description: e.message || 'Please try again.',
+        variant: 'destructive',
+      });
     }
   };
 
-  const handleRemarksSubmit = async () => {
-    if (!checklist) return;
+  const canSubmit = (() => {
+    if (!checklist) return false;
+    if (checklist.progress < 100) return false;
+    return checklist.tasks.every(t => !t.photoRequired || t.photoUrl);
+  })();
+
+  const handleSubmit = async () => {
+    if (!token || !canSubmit) return;
     setIsSubmitting(true);
     try {
-      const updatedChecklist = { ...checklist, remarks, updatedAt: new Date() };
-      await updateChecklist(updatedChecklist);
-      setChecklist(updatedChecklist);
-      toast({ title: 'Success', description: 'Your remarks have been saved' });
-    } catch {
-      console.error('Error saving remarks');
+      const res = await fetch('/api/shared/submit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token }),
+      });
+      const result = await res.json();
+      if (!res.ok || !result.success) {
+        throw new Error(result.message || 'Submit failed');
+      }
+      setSubmittedAt(new Date(result.submittedAt));
+      setIsSubmitted(true);
+    } catch (e: any) {
+      toast({
+        title: 'Submit failed',
+        description: e.message || 'Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsSubmitting(false);
     }
@@ -191,12 +225,20 @@ export default function SharedChecklist() {
     );
   }
 
-  if (!checklist) {
+  if (!checklist) return null;
+
+  // Submitted confirmation screen
+  if (isSubmitted) {
+    const dateStr = submittedAt
+      ? submittedAt.toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' })
+      : '';
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full mx-auto mb-4"></div>
-          <p>Loading your shared checklist...</p>
+        <div className="max-w-md w-full mx-4 bg-white rounded-lg border p-8 text-center space-y-4">
+          <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
+          <h1 className="text-2xl font-semibold text-gray-900">Submitted</h1>
+          <p className="text-gray-600">Thanks! Your work has been recorded.</p>
+          {dateStr && <p className="text-sm text-gray-400">{dateStr}</p>}
         </div>
       </div>
     );
@@ -219,7 +261,28 @@ export default function SharedChecklist() {
 
         <ChecklistHeader checklist={checklist} />
         <TasksList tasks={checklist.tasks} onTaskUpdate={handleTaskToggle} disabled={false} />
-        <RemarksSection value={remarks} onChange={setRemarks} disabled={isSubmitting} />
+
+        <div className="mt-8 flex justify-end">
+          <Button
+            onClick={handleSubmit}
+            disabled={!canSubmit || isSubmitting}
+            size="lg"
+            className="min-w-[140px]"
+          >
+            {isSubmitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+            Submit
+          </Button>
+        </div>
+        {!canSubmit && checklist.progress < 100 && (
+          <p className="text-sm text-gray-500 text-right mt-2">
+            Complete all tasks to submit.
+          </p>
+        )}
+        {!canSubmit && checklist.progress === 100 && checklist.tasks.some(t => t.photoRequired && !t.photoUrl) && (
+          <p className="text-sm text-gray-500 text-right mt-2">
+            Upload required photos to submit.
+          </p>
+        )}
       </div>
     </div>
   );
