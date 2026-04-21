@@ -62,6 +62,7 @@ export default function ShareLinkModal({
   const [phoneTabLinkLoading, setPhoneTabLinkLoading] = useState(false);
   const [phoneTabLinkCopied, setPhoneTabLinkCopied] = useState(false);
   const [showSmsText, setShowSmsText] = useState(false);
+  const [phoneConsent, setPhoneConsent] = useState(false);
 
   // Reset state when modal opens
   useEffect(() => {
@@ -79,6 +80,7 @@ export default function ShareLinkModal({
       setPhoneTabLinkLoading(false);
       setPhoneTabLinkCopied(false);
       setShowSmsText(false);
+      setPhoneConsent(false);
     }
   }, [isOpen]);
 
@@ -337,8 +339,31 @@ export default function ShareLinkModal({
                       </Button>
                     </div>
 
+                    {/* Owner-attestation consent — mirrors email tab pattern */}
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                      <div className="flex items-start space-x-2">
+                        <Shield className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                        <div className="text-sm text-blue-800">
+                          <p className="font-medium mb-1">SMS Communication Consent</p>
+                          <p className="text-xs">
+                            The text will be sent from your own phone. Confirm that the recipient has given you permission to contact them via SMS about cleaning jobs.
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center space-x-2 mt-3">
+                        <Checkbox
+                          id="phone-consent"
+                          checked={phoneConsent}
+                          onCheckedChange={(checked) => setPhoneConsent(checked as boolean)}
+                        />
+                        <Label htmlFor="phone-consent" className="text-xs text-blue-800">
+                          I have this recipient's permission to contact them via SMS about jobs
+                        </Label>
+                      </div>
+                    </div>
+
                     {/* Text your cleaner — primary */}
-                    <Button type="button" onClick={handleSmsShare} className="w-full">
+                    <Button type="button" onClick={handleSmsShare} className="w-full" disabled={!phoneConsent}>
                       <MessageSquare className="w-4 h-4 mr-2" />
                       Text your cleaner
                     </Button>
@@ -358,7 +383,7 @@ export default function ShareLinkModal({
 
                     {/* WhatsApp — mobile only */}
                     {isMobile && (
-                      <Button type="button" variant="secondary" onClick={handleWhatsAppShare} className="w-full">
+                      <Button type="button" variant="secondary" onClick={handleWhatsAppShare} className="w-full" disabled={!phoneConsent}>
                         Send via WhatsApp
                       </Button>
                     )}
