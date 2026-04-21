@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { PhotoUploadModal } from '@/components/modals/PhotoUploadModal';
 import { PhotoViewerModal } from '@/components/modals/PhotoViewerModal';
 import { Camera, ChevronDown, ChevronUp, Info } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface TasksListProps {
   tasks: Task[];
@@ -16,6 +17,7 @@ interface TasksListProps {
 
 const TasksList = ({ tasks, onTaskUpdate, onUpdate, disabled = false, checklistId }: TasksListProps) => {
   const handleUpdateTask = onUpdate || onTaskUpdate || (async () => { console.log("Task update not implemented"); });
+  const { toast } = useToast();
   const [expandedTasks, setExpandedTasks] = useState<Record<string, boolean>>({});
   const [photoUploadModalOpen, setPhotoUploadModalOpen] = useState(false);
   const [currentTaskId, setCurrentTaskId] = useState<string | null>(null);
@@ -32,16 +34,22 @@ const TasksList = ({ tasks, onTaskUpdate, onUpdate, disabled = false, checklistI
   
   const handleTaskCompletionChange = async (taskId: string, completed: boolean) => {
     if (disabled) return;
-    
+
     const task = tasks.find(t => t.id === taskId);
-    
+
     if (task?.photoRequired && completed && !task.photoUrl) {
-      // If photo is required but not uploaded yet, open the photo upload modal
       setCurrentTaskId(taskId);
       setPhotoUploadModalOpen(true);
     } else {
-      // Otherwise, just mark the task as completed/uncompleted
-      await handleUpdateTask(taskId, { completed });
+      try {
+        await handleUpdateTask(taskId, { completed });
+      } catch (e: any) {
+        toast({
+          title: 'Could not save change',
+          description: e.message || 'Please try again.',
+          variant: 'destructive',
+        });
+      }
     }
   };
   

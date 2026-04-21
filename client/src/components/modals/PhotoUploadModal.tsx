@@ -60,7 +60,6 @@ export const PhotoUploadModal = ({ isOpen, onClose, onSave, taskId, checklistId 
     try {
       const { storage } = initializeFirebase();
 
-      // Build a unique path: task-photos/{checklistId}/{taskId}/{timestamp}-{filename}
       const timestamp = Date.now();
       const safeName = selectedFile.name.replace(/[^a-zA-Z0-9._-]/g, '_');
       const path = `task-photos/${checklistId || 'unknown'}/${taskId || 'unknown'}/${timestamp}-${safeName}`;
@@ -71,13 +70,19 @@ export const PhotoUploadModal = ({ isOpen, onClose, onSave, taskId, checklistId 
 
       await onSave(downloadUrl);
 
+      // Success path — only runs if onSave resolved (handleTaskToggle now re-throws)
       setSelectedFile(null);
       setPreviewUrl(null);
       toast({ title: 'Photo uploaded', description: 'Photo proof saved successfully.' });
       onClose();
     } catch (error: any) {
+      // Failure path — modal stays open, preview stays visible, user can retry
       console.error('Photo upload error:', error);
-      toast({ title: 'Photo upload failed', description: error.message || 'Please try again.', variant: 'destructive' });
+      toast({
+        title: 'Failed to save',
+        description: error.message || 'Please try again.',
+        variant: 'destructive',
+      });
     } finally {
       setIsUploading(false);
     }

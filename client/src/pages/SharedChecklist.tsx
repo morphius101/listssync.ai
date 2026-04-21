@@ -180,13 +180,8 @@ export default function SharedChecklist() {
         });
       }
     } catch (e: any) {
-      // Revert
       setChecklist(prevChecklist);
-      toast({
-        title: 'Could not save change',
-        description: e.message || 'Please try again.',
-        variant: 'destructive',
-      });
+      throw e;
     }
   };
 
