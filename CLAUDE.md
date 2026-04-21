@@ -11,7 +11,7 @@ You have full access to the GitHub codebase. Your default behavior is to deeply 
 ## Core Principles
 
 - Ship fast but maintain high quality and clean architecture
-- Prioritize making payments, listing automation, and core seller flows stable and reliable
+- Prioritize making payments and core checklist-sharing / photo-verification flows stable and reliable
 - Be proactive: suggest improvements, refactors, and next steps without waiting to be asked
 - Ask clarifying questions when a new feature or requirement needs more detail
 - Always keep future mobile app support in mind when making architectural decisions
@@ -33,7 +33,7 @@ You have full access to the GitHub codebase. Your default behavior is to deeply 
 
 | Key | Value |
 |-----|-------|
-| **Product** | Real-time checklist collaboration with photo verification — built for service businesses, property managers, cleaning crews |
+| **Product** | Real-time checklist collaboration and task-verification for service businesses — STR hosts, property managers, cleaning crews. Core differentiator: Gemini-powered translation for ESL crews. |
 | **Host** | Railway — single service (Express serves both API and React SPA via Docker) |
 | **Current status** | Live at www.listssync.ai |
 | **Priority** | Deployment stability, payments, core sharing/verification flows |
@@ -74,8 +74,8 @@ You have full access to the GitHub codebase. Your default behavior is to deeply 
 
 1. **Deployment stability** — app stays up, no crash loops
 2. **Payments** — checkout, webhooks, subscription state
-3. **Listing automation** — core sync flows work reliably
-4. **Seller UX** — onboarding, dashboard, error states
+3. **Sharing & verification** — recipient link flow, photo upload, submit all work reliably
+4. **Owner UX** — onboarding, dashboard, share modal, error states
 5. **Polish & performance** — after the above are solid
 
 ---
@@ -86,7 +86,7 @@ You have full access to the GitHub codebase. Your default behavior is to deeply 
 - All secrets via environment variables, never hardcoded
 - Design APIs with mobile clients in mind (RESTful, versioned if needed)
 - Prefer simple and boring infrastructure over clever and fragile
-- Every critical flow (payments, sync) should have error handling and logging
+- Every critical flow (payments, share-send, photo upload) should have error handling and logging
 
 ---
 
@@ -129,7 +129,7 @@ No automated tests exist in this project.
 
 - **Single entry point:** `server/index.ts` → `server/routes.ts` → `server/storage.ts` (Drizzle queries)
 - **Auth middleware:** `server/middleware/auth.ts` — uses Firebase Admin in prod, falls back to raw JWT decode in dev (when `FIREBASE_SERVICE_ACCOUNT_BASE64` is absent)
-- **Sharing flow:** owner shares checklist → `verifications` table row created with token + 6-digit code → recipient visits `/shared/:token` → enters code → sees translated checklist
+- **Sharing flow:** owner shares checklist → `verifications` table row created with a 72h share token (link-only, no 6-digit code — removed in `02972ca`) → recipient visits `/shared/:token` → sees translated checklist directly, can toggle tasks, upload photos, submit
 - **Stripe keys:** `STRIPE_SECRET_KEY` is required directly — the old `pk_live_ → sk_live_` derivation hack was removed in commit `7a75145`
 - **Pre-built Docker image:** `dist/` is built locally before deploying; `VITE_*` vars must be present at **build time**, not just runtime
 
@@ -176,3 +176,27 @@ When `BETA_MODE=true`, the app is locked down:
 ### Adding / removing testers
 - Update `BETA_ALLOWLIST_EMAILS` in both Railway env vars (runtime) and GitHub Actions secrets (build time)
 - Rebuild and push — client bundle must be rebuilt to reflect changes in the badge/gate logic
+
+---
+
+## Infrastructure Notes
+
+### Firebase Storage rules (as of 2026-04-21)
+
+Both read AND write for `task-photos/*` are relaxed to allow unauthenticated recipients. Recipients of a shared checklist are never Firebase-authenticated, so both `uploadBytes` (write) and `getDownloadURL` (read — hits the metadata endpoint which needs read permission) must work without auth. If either rule tightens, the shared-checklist upload flow hangs silently on mobile Safari rather than failing cleanly.
+
+Current rules should look roughly like:
+```
+allow read: if request.auth != null
+  || resource.name.matches('task-photos/.*');
+allow write: if request.auth != null
+  || (request.resource.size < 10 * 1024 * 1024
+    && request.resource.contentType.matches('image/.*')
+    && request.resource.name.matches('task-photos/.*'));
+```
+
+The URLs produced by `getDownloadURL` include a `?alt=media&token=<UUID>` download token that makes the file publicly readable without further auth. So relaxing the rule only affects the metadata fetch, not the object's access model.
+
+### Railway deploy model
+
+`Dockerfile` is `COPY dist ./dist` + `npm ci --omit=dev` — Railway does **not** run `npm run build` during deploy. It serves the pre-built `dist/` that was committed. Always rebuild and commit `dist/` locally before pushing, or rely on the CI bot's `ci: rebuild dist with latest source [skip ci]` commits to produce the deployed bundle.
