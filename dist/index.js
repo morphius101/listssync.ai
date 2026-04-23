@@ -890,6 +890,15 @@ var DatabaseStorage = class {
       throw error;
     }
   }
+  async getUserByStripeCustomerId(customerId) {
+    try {
+      const [user] = await db.select().from(users).where(eq(users.stripeCustomerId, customerId)).limit(1);
+      return user || void 0;
+    } catch (error) {
+      console.error("Error getting user by stripe customer id:", error);
+      return void 0;
+    }
+  }
   async updateUserSubscription(userId, tier, stripeData) {
     try {
       const updateData = {
@@ -1319,6 +1328,51 @@ function captureShareAccess(req, res, token) {
   const ua = req.headers["user-agent"] || "";
   setImmediate(() => storage.upsertShareAccess(token, ipHash, ua, visitorId));
 }
+var PAID_TIER_FALLBACK = process.env.STRIPE_PAID_TIER_NAME || "professional";
+function mapSubscriptionState(stripeStatus) {
+  switch (stripeStatus) {
+    case "trialing":
+      return { status: "trialing", isPaidTier: true };
+    case "active":
+      return { status: "active", isPaidTier: true };
+    case "past_due":
+      return { status: "past_due", isPaidTier: true };
+    case "unpaid":
+      return { status: "unpaid", isPaidTier: true };
+    // Stripe retries initial payment for ~23h before flipping to incomplete_expired.
+    // We grant paid access during retry window; trial signups ($0 upfront) rarely hit this.
+    case "incomplete":
+      return { status: "incomplete", isPaidTier: true };
+    // Stripe's pause_collection — keep access by default. Revisit if we enable pause features.
+    case "paused":
+      return { status: "paused", isPaidTier: true };
+    case "canceled":
+      return { status: "canceled", isPaidTier: false };
+    case "incomplete_expired":
+      return { status: "incomplete_expired", isPaidTier: false };
+    default:
+      return { status: "inactive", isPaidTier: false };
+  }
+}
+function resolveTier(opts) {
+  const fromSub = opts.subscription?.metadata?.tier;
+  if (fromSub) return fromSub;
+  const fromSession = opts.session?.metadata?.tier;
+  if (fromSession) return fromSession;
+  return PAID_TIER_FALLBACK;
+}
+async function resolveUserId(opts) {
+  const fromSub = opts.subscription?.metadata?.userId;
+  if (fromSub) return fromSub;
+  const customer = opts.customer;
+  if (customer && !customer.deleted) {
+    const fromCust = customer.metadata?.userId;
+    if (fromCust) return fromCust;
+    const user = await storage.getUserByStripeCustomerId(customer.id);
+    if (user) return user.id;
+  }
+  return void 0;
+}
 async function registerRoutes(app2) {
   const API_BASE = "/api";
   app2.get(`${API_BASE}/health`, (_req, res) => {
@@ -1559,32 +1613,125 @@ async function registerRoutes(app2) {
         return res.status(400).send(`Webhook Error: ${err.message}`);
       }
       switch (event.type) {
-        case "checkout.session.completed":
+        case "checkout.session.completed": {
           const session = event.data.object;
-          const { userId, tier } = session.metadata || {};
-          if (userId && tier) {
-            await storage.updateUserSubscription(userId, tier, {
-              customerId: session.customer,
-              subscriptionId: session.subscription,
-              status: "active"
-            });
+          if (!session.subscription) {
+            console.log(`WEBHOOK[${event.id}] checkout.session.completed: no subscription on session ${session.id}, ignoring`);
+            break;
           }
-          break;
-        case "customer.subscription.updated":
-        case "customer.subscription.deleted":
-          const subscription = event.data.object;
+          const subscription = await stripe.subscriptions.retrieve(session.subscription);
           const customer = await stripe.customers.retrieve(subscription.customer);
-          if (customer && !customer.deleted && customer.metadata?.userId) {
-            const status = subscription.status === "active" ? "active" : "inactive";
-            const tier2 = status === "active" ? "professional" : "free";
-            await storage.updateUserSubscription(customer.metadata.userId, tier2, {
-              subscriptionId: subscription.id,
-              status
-            });
+          const userId = await resolveUserId({ subscription, customer });
+          if (!userId) {
+            console.error(
+              `WEBHOOK[${event.id}] checkout.session.completed: UNRESOLVED userId customer=${subscription.customer} session=${session.id} subscription=${subscription.id}`
+            );
+            break;
           }
+          const tier = resolveTier({ subscription, session });
+          const { status, isPaidTier } = mapSubscriptionState(subscription.status);
+          await storage.updateUserSubscription(userId, isPaidTier ? tier : "free", {
+            customerId: subscription.customer,
+            subscriptionId: subscription.id,
+            status
+          });
+          console.log(
+            `WEBHOOK[${event.id}] checkout.session.completed: user=${userId} tier=${isPaidTier ? tier : "free"} status=${status}`
+          );
           break;
+        }
+        case "customer.subscription.created":
+        case "customer.subscription.updated":
+        case "customer.subscription.deleted": {
+          const eventSub = event.data.object;
+          const subscription = await stripe.subscriptions.retrieve(eventSub.id);
+          const customer = await stripe.customers.retrieve(subscription.customer);
+          const userId = await resolveUserId({ subscription, customer });
+          if (!userId) {
+            console.error(
+              `WEBHOOK[${event.id}] ${event.type}: UNRESOLVED userId customer=${subscription.customer} subscription=${subscription.id}`
+            );
+            break;
+          }
+          const tier = resolveTier({ subscription });
+          const { status, isPaidTier } = mapSubscriptionState(subscription.status);
+          await storage.updateUserSubscription(userId, isPaidTier ? tier : "free", {
+            customerId: subscription.customer,
+            subscriptionId: subscription.id,
+            status
+          });
+          console.log(
+            `WEBHOOK[${event.id}] ${event.type}: user=${userId} tier=${isPaidTier ? tier : "free"} status=${status}`
+          );
+          break;
+        }
+        case "customer.subscription.trial_will_end": {
+          const sub = event.data.object;
+          console.log(
+            `WEBHOOK[${event.id}] trial_will_end: subscription=${sub.id} customer=${sub.customer} trial_end=${sub.trial_end}`
+          );
+          break;
+        }
+        case "invoice.payment_succeeded": {
+          const invoice = event.data.object;
+          const invSubRaw = invoice.parent?.subscription_details?.subscription;
+          if (!invSubRaw) {
+            console.log(`WEBHOOK[${event.id}] invoice.payment_succeeded: no subscription on invoice ${invoice.id}, ignoring`);
+            break;
+          }
+          const invSubId = typeof invSubRaw === "string" ? invSubRaw : invSubRaw.id;
+          const subscription = await stripe.subscriptions.retrieve(invSubId);
+          const customer = await stripe.customers.retrieve(subscription.customer);
+          const userId = await resolveUserId({ subscription, customer });
+          if (!userId) {
+            console.error(
+              `WEBHOOK[${event.id}] invoice.payment_succeeded: UNRESOLVED userId customer=${subscription.customer} subscription=${subscription.id} invoice=${invoice.id}`
+            );
+            break;
+          }
+          const tier = resolveTier({ subscription });
+          const { status, isPaidTier } = mapSubscriptionState(subscription.status);
+          await storage.updateUserSubscription(userId, isPaidTier ? tier : "free", {
+            customerId: subscription.customer,
+            subscriptionId: subscription.id,
+            status
+          });
+          console.log(
+            `WEBHOOK[${event.id}] invoice.payment_succeeded: user=${userId} tier=${isPaidTier ? tier : "free"} status=${status} amount_paid=${invoice.amount_paid}`
+          );
+          break;
+        }
+        case "invoice.payment_failed": {
+          const invoice = event.data.object;
+          const invSubRaw = invoice.parent?.subscription_details?.subscription;
+          if (!invSubRaw) {
+            console.log(`WEBHOOK[${event.id}] invoice.payment_failed: no subscription on invoice ${invoice.id}, ignoring`);
+            break;
+          }
+          const invSubId = typeof invSubRaw === "string" ? invSubRaw : invSubRaw.id;
+          const subscription = await stripe.subscriptions.retrieve(invSubId);
+          const customer = await stripe.customers.retrieve(subscription.customer);
+          const userId = await resolveUserId({ subscription, customer });
+          if (!userId) {
+            console.error(
+              `WEBHOOK[${event.id}] invoice.payment_failed: UNRESOLVED userId customer=${subscription.customer} subscription=${subscription.id} invoice=${invoice.id}`
+            );
+            break;
+          }
+          const tier = resolveTier({ subscription });
+          const { status, isPaidTier } = mapSubscriptionState(subscription.status);
+          await storage.updateUserSubscription(userId, isPaidTier ? tier : "free", {
+            customerId: subscription.customer,
+            subscriptionId: subscription.id,
+            status
+          });
+          console.warn(
+            `WEBHOOK[${event.id}] invoice.payment_failed: user=${userId} tier=${isPaidTier ? tier : "free"} status=${status} amount_due=${invoice.amount_due}`
+          );
+          break;
+        }
         default:
-          console.log(`Unhandled event type ${event.type}`);
+          console.log(`WEBHOOK[${event.id}] unhandled event type: ${event.type}`);
       }
       res.json({ received: true });
     } catch (error) {
