@@ -173,11 +173,20 @@ export default function Pricing({ userId, userEmail, currentTier }: PricingProps
                   className={`w-full ${tier.popular ? 'bg-blue-500 hover:bg-blue-600' : ''}`}
                   variant={tier.popular ? 'default' : 'outline'}
                   onClick={() => handleSubscribe(tier)}
-                  disabled={loading === tier.id}
+                  disabled={loading === tier.id || !userId}
                 >
                   {loading === tier.id ? 'Processing…' : tier.buttonText}
                 </Button>
-                <p className="text-xs text-gray-400 text-center">{tier.underButton}</p>
+                {userId ? (
+                  <p className="text-xs text-gray-400 text-center">{tier.underButton}</p>
+                ) : (
+                  <a
+                    href="/"
+                    className="text-sm text-blue-600 hover:text-blue-700 text-center font-medium"
+                  >
+                    Sign in to start your trial →
+                  </a>
+                )}
               </CardFooter>
             </Card>
           ))}
