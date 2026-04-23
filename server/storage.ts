@@ -48,6 +48,7 @@ export interface IStorage {
   // User management methods for subscription tiers
   getUser(id: string): Promise<User | undefined>;
   upsertUser(user: UpsertUser): Promise<User>;
+  getUserByStripeCustomerId(customerId: string): Promise<User | undefined>;
   updateUserSubscription(userId: string, tier: SubscriptionTier, stripeData?: {
     customerId?: string;
     subscriptionId?: string;
@@ -565,6 +566,19 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error upserting user:', error);
       throw error;
+    }
+  }
+
+  async getUserByStripeCustomerId(customerId: string): Promise<User | undefined> {
+    try {
+      const [user] = await db.select()
+        .from(users)
+        .where(eq(users.stripeCustomerId, customerId))
+        .limit(1);
+      return user || undefined;
+    } catch (error) {
+      console.error('Error getting user by stripe customer id:', error);
+      return undefined;
     }
   }
 
