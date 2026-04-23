@@ -96,14 +96,17 @@ function SubscriptionSuccess() {
     const sessionId = params.get('session_id');
     if (!sessionId) return;
 
-    fetch(`/api/subscription/session/${sessionId}`, {
-      headers: { 'Content-Type': 'application/json' },
-    })
-      .then(r => r.json())
-      .then(data => {
+    (async () => {
+      try {
+        const response = await fetch(`/api/subscription/session/${sessionId}`, {
+          headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
+        });
+        const data = await response.json();
         if (data.trialEnd) setTrialEnd(new Date(data.trialEnd * 1000));
-      })
-      .catch(() => setLoadError(true));
+      } catch {
+        setLoadError(true);
+      }
+    })();
   }, []);
 
   const fmt = (d: Date) =>

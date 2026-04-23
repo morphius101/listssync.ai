@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { getAuthHeaders } from '@/hooks/useAuth';
 
 export interface SendVerificationParams {
   checklistId: string;
@@ -59,7 +60,7 @@ export function useVerification() {
     try {
       const response = await fetch('/api/verification/generate', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...(await getAuthHeaders()) },
         credentials: 'include',
         body: JSON.stringify({
           checklistId: checklistId.trim(),
