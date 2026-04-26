@@ -30,6 +30,7 @@ export default function SharedChecklist() {
   const [error, setError] = useState<string | null>(null);
   const [targetLanguage, setTargetLanguage] = useState<string>(langFromUrl);
   const [translationApplied, setTranslationApplied] = useState(false);
+  const [translationFailed, setTranslationFailed] = useState(false);
 
   const loadedAtRef = useRef<number>(0); // ms timestamp when checklist first loaded
 
@@ -52,6 +53,7 @@ export default function SharedChecklist() {
             return result.checklist;
           });
           setTranslationApplied(Boolean(result.translationApplied));
+          setTranslationFailed(Boolean(result.translationFailed));
           if (result.targetLanguage) setTargetLanguage(result.targetLanguage);
         }
       } catch {
@@ -104,6 +106,7 @@ export default function SharedChecklist() {
 
         if (result.targetLanguage) setTargetLanguage(result.targetLanguage);
         setTranslationApplied(Boolean(result.translationApplied));
+        setTranslationFailed(Boolean(result.translationFailed));
 
         const loaded: Checklist = result.checklist;
         setChecklist(loaded);
@@ -279,6 +282,18 @@ export default function SharedChecklist() {
               <p className="text-blue-800 font-medium">Auto-Translated</p>
               <p className="text-blue-600 text-sm">
                 This checklist has been automatically translated to {getLanguageName(targetLanguage as any)}
+              </p>
+            </div>
+          </div>
+        )}
+
+        {translationFailed && targetLanguage !== 'en' && (
+          <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-center gap-3">
+            <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0" />
+            <div>
+              <p className="text-amber-800 font-medium">Translation Unavailable</p>
+              <p className="text-amber-700 text-sm">
+                We couldn't translate this checklist to {getLanguageName(targetLanguage as any)} right now — showing the original. Contact <a href="mailto:support@listssync.ai" className="underline">support@listssync.ai</a> if you need help.
               </p>
             </div>
           </div>

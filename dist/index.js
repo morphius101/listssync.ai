@@ -2233,6 +2233,7 @@ async function registerRoutes(app2) {
       let finalChecklist = checklist;
       let effectiveTargetLanguage = verification.targetLanguage || "en";
       let translationApplied = false;
+      let translationFailed = false;
       if (effectiveTargetLanguage && effectiveTargetLanguage !== "en") {
         console.log(`Translating checklist to: ${effectiveTargetLanguage}`);
         try {
@@ -2242,7 +2243,7 @@ async function registerRoutes(app2) {
             finalChecklist = await translateChecklist2(checklist, effectiveTargetLanguage, "en");
             translationApplied = finalChecklist !== checklist && finalChecklist?.translatedTo === effectiveTargetLanguage;
             if (!translationApplied) {
-              effectiveTargetLanguage = "en";
+              translationFailed = true;
             }
           } else {
             finalChecklist = checklist;
@@ -2252,11 +2253,11 @@ async function registerRoutes(app2) {
         } catch (translationError) {
           console.error("Translation failed, serving original checklist:", translationError);
           finalChecklist = checklist;
-          effectiveTargetLanguage = "en";
+          translationFailed = true;
         }
       }
-      console.log(`Serving checklist in target language: ${effectiveTargetLanguage}`);
-      res.json({ success: true, checklist: finalChecklist, targetLanguage: effectiveTargetLanguage, translationApplied });
+      console.log(`Serving checklist in target language: ${effectiveTargetLanguage} (applied=${translationApplied} failed=${translationFailed})`);
+      res.json({ success: true, checklist: finalChecklist, targetLanguage: effectiveTargetLanguage, translationApplied, translationFailed });
     } catch (error) {
       console.error("Error fetching shared checklist:", error);
       res.status(500).json({ success: false, message: "Failed to fetch checklist" });
@@ -2292,6 +2293,7 @@ async function registerRoutes(app2) {
       let effectiveTargetLanguage = verification.targetLanguage || "en";
       let finalChecklist = checklist;
       let translationApplied = false;
+      let translationFailed = false;
       if (effectiveTargetLanguage && effectiveTargetLanguage !== "en") {
         console.log(`Translating checklist to: ${effectiveTargetLanguage}`);
         try {
@@ -2301,7 +2303,7 @@ async function registerRoutes(app2) {
             finalChecklist = await translateChecklist2(checklist, effectiveTargetLanguage, "en");
             translationApplied = finalChecklist !== checklist && finalChecklist?.translatedTo === effectiveTargetLanguage;
             if (!translationApplied) {
-              effectiveTargetLanguage = "en";
+              translationFailed = true;
             }
           } else {
             finalChecklist = checklist;
@@ -2311,11 +2313,11 @@ async function registerRoutes(app2) {
         } catch (translationError) {
           console.error("Translation failed, serving original checklist:", translationError);
           finalChecklist = checklist;
-          effectiveTargetLanguage = "en";
+          translationFailed = true;
         }
       }
-      console.log(`Serving checklist in target language: ${effectiveTargetLanguage}`);
-      res.json({ success: true, checklist: finalChecklist, targetLanguage: effectiveTargetLanguage, translationApplied });
+      console.log(`Serving checklist in target language: ${effectiveTargetLanguage} (applied=${translationApplied} failed=${translationFailed})`);
+      res.json({ success: true, checklist: finalChecklist, targetLanguage: effectiveTargetLanguage, translationApplied, translationFailed });
     } catch (error) {
       console.error("Error fetching shared checklist:", error);
       res.status(500).json({ success: false, message: "Failed to fetch checklist" });

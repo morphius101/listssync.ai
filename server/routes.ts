@@ -1250,7 +1250,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
       let finalChecklist = checklist;
       let effectiveTargetLanguage = verification.targetLanguage || 'en';
       let translationApplied = false;
-      
+      let translationFailed = false;
+
       // Apply translation if needed
       if (effectiveTargetLanguage && effectiveTargetLanguage !== 'en') {
         console.log(`Translating checklist to: ${effectiveTargetLanguage}`);
@@ -1261,7 +1262,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             finalChecklist = await translateChecklist(checklist, effectiveTargetLanguage as any, 'en');
             translationApplied = finalChecklist !== checklist && (finalChecklist as any)?.translatedTo === effectiveTargetLanguage;
             if (!translationApplied) {
-              effectiveTargetLanguage = 'en';
+              translationFailed = true;
             }
           } else {
             finalChecklist = checklist;
@@ -1271,13 +1272,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (translationError) {
           console.error('Translation failed, serving original checklist:', translationError);
           finalChecklist = checklist;
-          effectiveTargetLanguage = 'en';
+          translationFailed = true;
         }
       }
-      
-      console.log(`Serving checklist in target language: ${effectiveTargetLanguage}`);
-      
-      res.json({ success: true, checklist: finalChecklist, targetLanguage: effectiveTargetLanguage, translationApplied });
+
+      console.log(`Serving checklist in target language: ${effectiveTargetLanguage} (applied=${translationApplied} failed=${translationFailed})`);
+
+      res.json({ success: true, checklist: finalChecklist, targetLanguage: effectiveTargetLanguage, translationApplied, translationFailed });
     } catch (error) {
       console.error('Error fetching shared checklist:', error);
       res.status(500).json({ success: false, message: 'Failed to fetch checklist' });
@@ -1321,10 +1322,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       // Determine target language from verification record if token is provided
       let effectiveTargetLanguage = verification.targetLanguage || 'en';
-      
+
       // Apply translation if target language is not English
       let finalChecklist = checklist;
       let translationApplied = false;
+      let translationFailed = false;
       if (effectiveTargetLanguage && effectiveTargetLanguage !== 'en') {
         console.log(`Translating checklist to: ${effectiveTargetLanguage}`);
         try {
@@ -1334,7 +1336,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
             finalChecklist = await translateChecklist(checklist, effectiveTargetLanguage as any, 'en');
             translationApplied = finalChecklist !== checklist && (finalChecklist as any)?.translatedTo === effectiveTargetLanguage;
             if (!translationApplied) {
-              effectiveTargetLanguage = 'en';
+              translationFailed = true;
             }
           } else {
             finalChecklist = checklist;
@@ -1344,13 +1346,13 @@ export async function registerRoutes(app: Express): Promise<Server> {
         } catch (translationError) {
           console.error('Translation failed, serving original checklist:', translationError);
           finalChecklist = checklist;
-          effectiveTargetLanguage = 'en';
+          translationFailed = true;
         }
       }
-      
-      console.log(`Serving checklist in target language: ${effectiveTargetLanguage}`);
-      
-      res.json({ success: true, checklist: finalChecklist, targetLanguage: effectiveTargetLanguage, translationApplied });
+
+      console.log(`Serving checklist in target language: ${effectiveTargetLanguage} (applied=${translationApplied} failed=${translationFailed})`);
+
+      res.json({ success: true, checklist: finalChecklist, targetLanguage: effectiveTargetLanguage, translationApplied, translationFailed });
     } catch (error) {
       console.error('Error fetching shared checklist:', error);
       res.status(500).json({ success: false, message: 'Failed to fetch checklist' });
