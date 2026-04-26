@@ -18,125 +18,154 @@
 <body>
 
   <h1>Privacy Policy</h1>
-  <p class="meta">Last updated: March 31, 2026 &nbsp;·&nbsp; Effective: March 31, 2026</p>
+  <p class="meta">Last updated: April 25, 2026 &nbsp;·&nbsp; Effective: April 25, 2026</p>
 
-  <p>This Privacy Policy describes how <strong>ListsSync.ai</strong> ("we," "us," or "our"), a product of Impact Development Consulting, collects, uses, and protects information about you when you use our platform at <a href="https://listssync.ai">https://listssync.ai</a> (the "Service").</p>
+  <p>This Privacy Policy describes how <strong>ListsSync.ai</strong> ("we," "us," or "our"), a product of <strong>Impact Development Consulting LLC</strong>, a Florida limited liability company, collects, uses, and protects information about you when you use our platform at <a href="https://www.listssync.ai">https://www.listssync.ai</a> (the "Service").</p>
 
-  <p>By creating an account or using the Service, you agree to the collection and use of information in accordance with this policy.</p>
+  <p>ListsSync.ai is a checklist collaboration and task-verification platform for service businesses — including short-term rental hosts, property managers, cleaning crews, and maintenance teams. Account holders ("Owners") create checklists and share them with third parties ("Recipients") for completion and verification.</p>
+
+  <p>By creating an account, sharing a checklist, or otherwise using the Service, you agree to the collection and use of information in accordance with this policy.</p>
 
   <h2>1. Information We Collect</h2>
 
-  <h3>a. Account Information</h3>
+  <h3>a. Account Information (Owners)</h3>
   <ul>
-    <li>Name, email address, and password when you register</li>
-    <li>Phone number (used solely for SMS verification and account security)</li>
-    <li>Billing information (processed securely via Stripe — we do not store card numbers)</li>
+    <li>Name and email address obtained via Google OAuth (Google Sign-In). We do not receive or store your Google password.</li>
+    <li>Optional business-profile information you provide (such as use case, team size, and phone number).</li>
+    <li>Phone number, where you choose to provide one, used solely for SMS verification codes and account security notifications.</li>
+    <li>Billing information (payment method details), processed and stored by Stripe. We do not store full card numbers.</li>
   </ul>
 
-  <h3>b. Marketplace & Business Information</h3>
+  <h3>b. Recipient Contact Information</h3>
   <ul>
-    <li>Marketplace credentials and API keys you connect (Amazon, Flipkart, Meesho)</li>
-    <li>Product data, listings, descriptions, images, and inventory information you upload or sync</li>
-    <li>Business name, GST/business registration info (if provided)</li>
+    <li>Phone numbers and email addresses that <em>Owners</em> explicitly enter when sharing a checklist with a Recipient. Recipients do not create accounts; their contact info is supplied by the Owner solely for the purpose of delivering the share link.</li>
+    <li>Owners are responsible for obtaining any consents required from Recipients before sharing their contact information with us.</li>
   </ul>
 
-  <h3>c. Usage Data</h3>
+  <h3>c. Checklist &amp; Task Data</h3>
   <ul>
-    <li>Log data: IP address, browser type, pages visited, timestamps</li>
-    <li>Device information: operating system, browser version</li>
-    <li>Feature usage patterns to improve the Service</li>
+    <li>Checklist content, task descriptions, and configuration created by Owners.</li>
+    <li>Task completion data submitted by Recipients (status toggles, timestamps, notes).</li>
+    <li>Photo uploads submitted by Recipients as photo-proof of task completion (stored in Firebase Storage).</li>
   </ul>
 
-  <h3>d. Communications</h3>
+  <h3>d. Usage Data</h3>
   <ul>
-    <li>Support tickets and messages you send to us</li>
-    <li>Feedback and survey responses</li>
+    <li>Log data: IP address, browser type, pages visited, timestamps.</li>
+    <li>Device information: operating system, browser version.</li>
+    <li>Feature usage patterns to improve the Service.</li>
+  </ul>
+
+  <h3>e. Communications</h3>
+  <ul>
+    <li>Support tickets and messages you send to us.</li>
+    <li>Feedback and survey responses.</li>
   </ul>
 
   <h2>2. How We Use Your Information</h2>
   <ul>
-    <li><strong>Account management:</strong> Creating and maintaining your account, verifying your identity</li>
-    <li><strong>SMS verification:</strong> Sending one-time passwords (OTPs) and security alerts to your phone number via Twilio</li>
-    <li><strong>Service delivery:</strong> Automating product listings across connected marketplaces on your behalf</li>
-    <li><strong>Payments:</strong> Processing subscription and transaction payments via Stripe</li>
-    <li><strong>Communications:</strong> Sending transactional emails (account alerts, invoice receipts) via SendGrid</li>
-    <li><strong>Improvement:</strong> Analyzing usage to improve features, performance, and reliability</li>
-    <li><strong>Legal compliance:</strong> Meeting obligations under applicable laws and regulations</li>
+    <li><strong>Account management:</strong> Creating and maintaining Owner accounts and verifying identity via Google OAuth.</li>
+    <li><strong>Service delivery:</strong> Creating, storing, sharing, and rendering checklists; delivering share links to Recipients; recording task completion and photo uploads.</li>
+    <li><strong>Translation:</strong> Translating checklist text into supported languages so Recipients (often ESL crews) can complete checklists in their preferred language. Only checklist text is sent to the translation provider; we do not transmit account, contact, or photo data for translation.</li>
+    <li><strong>SMS verification &amp; notifications:</strong> Sending one-time codes and account-security messages to Owner phone numbers; sending transactional checklist-link SMS to Recipient phone numbers Owners have entered (see Section 3).</li>
+    <li><strong>Payments:</strong> Processing subscription payments via Stripe.</li>
+    <li><strong>Transactional email:</strong> Sending account alerts, share-link emails, and invoice receipts via SendGrid.</li>
+    <li><strong>Improvement:</strong> Analyzing usage to improve features, performance, and reliability.</li>
+    <li><strong>Legal compliance:</strong> Meeting obligations under applicable laws and regulations.</li>
   </ul>
 
   <h2>3. SMS Communications</h2>
 
   <div class="highlight">
-    <strong>Message types:</strong> We send SMS messages only for account verification (OTPs) and critical account security notifications. We do not send marketing SMS messages.<br/><br/>
-    <strong>Opt-in:</strong> You consent to SMS messages by entering your phone number during account registration and agreeing to our Terms of Service.<br/><br/>
-    <strong>Opt-out:</strong> Reply <strong>STOP</strong> to any SMS to unsubscribe. You can also disable SMS notifications in your account settings. Note: disabling SMS verification may limit account security features.<br/><br/>
-    <strong>Help:</strong> Reply <strong>HELP</strong> to any SMS for assistance, or contact us at <a href="mailto:support@listssync.ai">support@listssync.ai</a>.<br/><br/>
-    <strong>Frequency:</strong> Message frequency varies based on account activity. Message and data rates may apply.
+    <strong>Message types and use cases.</strong> ListsSync.ai sends SMS for two transactional purposes only:
+    <ul>
+      <li><strong>Owner-facing:</strong> SMS verification codes and account-security notifications, sent to phone numbers Owners provide during account setup or in their account settings.</li>
+      <li><strong>Recipient-facing:</strong> Transactional checklist-link SMS sent to phone numbers that Owners explicitly enter when sharing a checklist. These messages contain the share link and brief context about the checklist being shared.</li>
+    </ul>
+    <strong>We do not send marketing or promotional SMS messages, ever.</strong>
   </div>
 
-  <p>SMS messages are delivered via Twilio, Inc. Twilio's privacy policy is available at <a href="https://www.twilio.com/legal/privacy" target="_blank">https://www.twilio.com/legal/privacy</a>.</p>
+  <div class="highlight">
+    <strong>Opt-in.</strong> Owners consent to receive SMS by entering their phone number in the Service and agreeing to our Terms of Service. Recipients receive SMS because an Owner with a legitimate business relationship to the Recipient has explicitly entered the Recipient's phone number to share a checklist.<br/><br/>
+    <strong>Opt-out.</strong> Reply <strong>STOP</strong> to any SMS to opt out of further messages from ListsSync.ai. Owners may also remove their phone number in account settings.<br/><br/>
+    <strong>Help.</strong> Reply <strong>HELP</strong> to any SMS for assistance, or contact us at <a href="mailto:support@listssync.ai">support@listssync.ai</a>.<br/><br/>
+    <strong>Frequency.</strong> Message frequency varies based on Owner activity and the number of checklists shared. Message and data rates may apply.<br/><br/>
+    <strong>Carrier &amp; provider.</strong> SMS messages are delivered via Twilio, Inc. Twilio's privacy policy is available at <a href="https://www.twilio.com/legal/privacy" target="_blank" rel="noopener">https://www.twilio.com/legal/privacy</a>.
+  </div>
+
+  <p><strong>No mobile information will be shared with third parties or affiliates for marketing or promotional purposes. All categories of personal information described in this policy exclude text messaging originator opt-in data and consent; this information will not be shared with any third parties or affiliates.</strong></p>
 
   <h2>4. Sharing of Information</h2>
 
-  <p>We do not sell your personal information. We may share data with:</p>
+  <p>We do not sell your personal information, and we do not share it for cross-context behavioral advertising. We share data only in the following circumstances:</p>
   <ul>
-    <li><strong>Marketplace platforms</strong> (Amazon, Flipkart, Meesho) as required to perform listing automation on your behalf — only data you explicitly provide or authorize</li>
-    <li><strong>Service providers:</strong> Stripe (payments), Twilio (SMS), SendGrid (email), Firebase (authentication), Neon (database hosting) — under data processing agreements</li>
-    <li><strong>Legal authorities:</strong> If required by law, court order, or to protect our rights</li>
-    <li><strong>Business transfers:</strong> In the event of a merger, acquisition, or sale of assets (you will be notified)</li>
+    <li><strong>Service providers (subprocessors)</strong> that operate the Service on our behalf, listed in Section 5.</li>
+    <li><strong>Recipients you designate.</strong> When an Owner shares a checklist, the share link, checklist content, and any uploaded photos are made accessible to the Recipient(s) the Owner designated.</li>
+    <li><strong>Legal authorities,</strong> if required by law, court order, or to protect our rights and the safety of our users.</li>
+    <li><strong>Business transfers,</strong> in the event of a merger, acquisition, or sale of assets. You will be notified of any such change in ownership or control.</li>
   </ul>
 
-  <h2>5. Data Security</h2>
+  <h2>5. Subprocessors</h2>
+  <p>The Service relies on the following third-party providers to deliver core functionality. Each operates under its own terms and privacy policy and processes data only as necessary to provide its service to us:</p>
   <ul>
-    <li>All data is transmitted over HTTPS (TLS encryption)</li>
-    <li>Passwords are hashed using industry-standard algorithms — we never store plaintext passwords</li>
-    <li>Marketplace API keys are encrypted at rest</li>
-    <li>Access to production systems is restricted to authorized personnel</li>
-    <li>We regularly review security practices and apply patches promptly</li>
+    <li><strong>Stripe, Inc.</strong> — payment processing.</li>
+    <li><strong>Twilio, Inc.</strong> — SMS delivery (Owner verification codes and Recipient checklist-link SMS).</li>
+    <li><strong>SendGrid (Twilio SendGrid)</strong> — transactional email.</li>
+    <li><strong>Firebase (Google LLC)</strong> — Owner authentication (Google OAuth) and photo storage.</li>
+    <li><strong>Neon</strong> — managed Postgres database hosting.</li>
+    <li><strong>Railway</strong> — application hosting.</li>
+    <li><strong>Google Gemini API (Google LLC)</strong> — translation of checklist text only. We do not transmit account, contact, photo, or billing data to Gemini.</li>
+  </ul>
+
+  <h2>6. Data Security</h2>
+  <ul>
+    <li>All data is transmitted over HTTPS (TLS encryption).</li>
+    <li>Authentication is handled by Google and Firebase Authentication; we never see or store your Google password.</li>
+    <li>Access to production systems is restricted to authorized personnel.</li>
+    <li>Photo uploads are stored in Firebase Storage with access governed by short-lived download tokens issued per file.</li>
+    <li>We regularly review security practices and apply patches promptly.</li>
   </ul>
   <p>No method of transmission over the internet is 100% secure. We take commercially reasonable measures to protect your data but cannot guarantee absolute security.</p>
 
-  <h2>6. Data Retention</h2>
+  <h2>7. Data Retention</h2>
   <ul>
-    <li>Account data is retained while your account is active</li>
-    <li>Upon account deletion, we delete personal data within 30 days, except where retention is required by law</li>
-    <li>Aggregated, anonymized analytics data may be retained indefinitely</li>
-    <li>Billing records are retained for 7 years as required by financial regulations</li>
+    <li>Account data and checklist content are retained while your account is active.</li>
+    <li>Share tokens used to deliver checklists to Recipients are time-limited and expire automatically.</li>
+    <li>Upon account deletion, we delete personal data within 30 days, except where retention is required by law.</li>
+    <li>Aggregated, anonymized analytics data may be retained indefinitely.</li>
+    <li>Billing records are retained for 7 years as required by U.S. accounting and tax regulations.</li>
   </ul>
 
-  <h2>7. Your Rights</h2>
+  <h2>8. Your Rights</h2>
   <p>Depending on your location, you may have the right to:</p>
   <ul>
-    <li>Access the personal data we hold about you</li>
-    <li>Correct inaccurate data</li>
-    <li>Request deletion of your data ("right to be forgotten")</li>
-    <li>Export your data in a portable format</li>
-    <li>Object to or restrict certain processing</li>
-    <li>Withdraw consent at any time (where processing is consent-based)</li>
+    <li>Access the personal data we hold about you.</li>
+    <li>Correct inaccurate data.</li>
+    <li>Request deletion of your data ("right to be forgotten").</li>
+    <li>Export your data in a portable format.</li>
+    <li>Object to or restrict certain processing.</li>
+    <li>Withdraw consent at any time (where processing is consent-based).</li>
   </ul>
   <p>To exercise any of these rights, contact us at <a href="mailto:privacy@listssync.ai">privacy@listssync.ai</a>. We will respond within 30 days.</p>
 
-  <h2>8. Cookies</h2>
+  <h2>9. Cookies</h2>
   <p>We use essential cookies to maintain your login session and protect against CSRF attacks. We may use analytics cookies (e.g., page views) to understand how the Service is used. You can disable cookies in your browser settings, but this may affect Service functionality.</p>
 
-  <h2>9. Children's Privacy</h2>
+  <h2>10. Children's Privacy</h2>
   <p>The Service is not directed to individuals under 18 years of age. We do not knowingly collect personal information from minors. If you believe a minor has provided us their data, please contact us immediately at <a href="mailto:privacy@listssync.ai">privacy@listssync.ai</a>.</p>
 
-  <h2>10. International Data Transfers</h2>
+  <h2>11. International Data Transfers</h2>
   <p>Your data may be processed in the United States or other countries where our service providers operate. By using the Service, you consent to such transfers. We ensure appropriate safeguards are in place for cross-border data transfers.</p>
-
-  <h2>11. Third-Party Links</h2>
-  <p>The Service may contain links to third-party websites (e.g., Amazon Seller Central, Flipkart Seller Hub). We are not responsible for the privacy practices of those sites. We encourage you to review their policies.</p>
 
   <h2>12. Changes to This Policy</h2>
   <p>We may update this Privacy Policy from time to time. When we make material changes, we will notify you by email or by displaying a notice in the Service. Your continued use of the Service after the effective date constitutes acceptance of the updated policy.</p>
 
   <h2>13. Contact Us</h2>
   <p>
-    <strong>ListsSync.ai</strong> — a product of Impact Development Consulting<br />
-    Email: <a href="mailto:privacy@listssync.ai">privacy@listssync.ai</a><br />
+    <strong>ListsSync.ai</strong> — a product of Impact Development Consulting LLC, a Florida limited liability company<br />
+    Privacy: <a href="mailto:privacy@listssync.ai">privacy@listssync.ai</a><br />
     Support: <a href="mailto:support@listssync.ai">support@listssync.ai</a><br />
-    Website: <a href="https://listssync.ai">https://listssync.ai</a>
+    Website: <a href="https://www.listssync.ai">https://www.listssync.ai</a>
   </p>
 
 </body>
