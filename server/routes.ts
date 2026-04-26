@@ -238,23 +238,36 @@ export async function registerRoutes(app: Express): Promise<Server> {
         last = parts.slice(1).join(' ') || undefined;
       }
 
-      const user = await storage.upsertUser({
+      // Profile fields are safe to overwrite on every login.
+      // Subscription/onboarding fields must NOT be overwritten on existing users —
+      // those are owned by the Stripe webhook (subscriptionTier, subscriptionStatus,
+      // allowedLanguages) or set once at signup (signupMethod, signupSource,
+      // trialStartedAt). Re-firing this endpoint on every auth-state-change would
+      // otherwise clobber paid-tier state back to 'free'.
+      const existing = await storage.getUser(userId);
+
+      const profileFields = {
         id: userId,
         email,
         firstName: first,
         lastName: last,
         profileImageUrl,
-        subscriptionTier: 'free',
-        subscriptionStatus: 'active',
-        allowedLanguages: TIER_LIMITS.free.allowedLanguages,
         useCase: useCase || null,
         teamSize: teamSize || null,
         phone: phone || null,
+        marketingOptIn: marketingOptIn ?? false,
+      };
+
+      const firstSignupFields = existing ? {} : {
+        subscriptionTier: 'free' as const,
+        subscriptionStatus: 'active' as const,
+        allowedLanguages: TIER_LIMITS.free.allowedLanguages,
         signupMethod: signupMethod || 'google',
         signupSource: signupSource || 'google_oauth',
         trialStartedAt: trialStartedAt ? new Date(trialStartedAt) : new Date(),
-        marketingOptIn: marketingOptIn ?? false,
-      });
+      };
+
+      const user = await storage.upsertUser({ ...profileFields, ...firstSignupFields });
 
       // Mark any lead as converted
       if (email) {

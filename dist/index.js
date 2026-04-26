@@ -1439,23 +1439,27 @@ async function registerRoutes(app2) {
         first = parts[0];
         last = parts.slice(1).join(" ") || void 0;
       }
-      const user = await storage.upsertUser({
+      const existing = await storage.getUser(userId);
+      const profileFields = {
         id: userId,
         email,
         firstName: first,
         lastName: last,
         profileImageUrl,
-        subscriptionTier: "free",
-        subscriptionStatus: "active",
-        allowedLanguages: TIER_LIMITS.free.allowedLanguages,
         useCase: useCase || null,
         teamSize: teamSize || null,
         phone: phone || null,
+        marketingOptIn: marketingOptIn ?? false
+      };
+      const firstSignupFields = existing ? {} : {
+        subscriptionTier: "free",
+        subscriptionStatus: "active",
+        allowedLanguages: TIER_LIMITS.free.allowedLanguages,
         signupMethod: signupMethod || "google",
         signupSource: signupSource || "google_oauth",
-        trialStartedAt: trialStartedAt ? new Date(trialStartedAt) : /* @__PURE__ */ new Date(),
-        marketingOptIn: marketingOptIn ?? false
-      });
+        trialStartedAt: trialStartedAt ? new Date(trialStartedAt) : /* @__PURE__ */ new Date()
+      };
+      const user = await storage.upsertUser({ ...profileFields, ...firstSignupFields });
       if (email) {
         await storage.convertLead(email).catch(() => {
         });
