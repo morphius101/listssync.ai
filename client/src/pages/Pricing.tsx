@@ -88,20 +88,34 @@ export default function Pricing({ userId, userEmail, currentTier }: PricingProps
         return;
       }
 
-      const response = await fetch('/api/create-subscription', {
+      const httpResponse = await fetch('/api/create-subscription', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${idToken}`,
         },
         body: JSON.stringify({ userId, tier: tier.apiTier, email: userEmail }),
-      }).then(res => res.json());
+      });
+      const response = await httpResponse.json().catch(() => ({}));
 
-      if (response.url) {
+      if (httpResponse.ok && response.url) {
         trackStripeEvent('checkout_redirect', undefined, tier.apiTier);
         trackUserAction('stripe_checkout_redirect', tier.apiTier);
         window.location.href = response.url;
+        return;
       }
+
+      // Server reachable but checkout could not be created — surface so the user isn't silently blocked.
+      console.error('Subscription create failed:', { status: httpResponse.status, body: response });
+      trackUserAction('subscription_error', tier.id);
+      toast({
+        title: 'Could Not Start Trial',
+        description:
+          response?.error ||
+          response?.message ||
+          `We couldn't start your trial (status ${httpResponse.status}). Please refresh and try again, or email support@listssync.ai if it keeps happening.`,
+        variant: 'destructive',
+      });
     } catch (error: any) {
       console.error('Subscription error:', error);
       trackUserAction('subscription_error', tier.id);
