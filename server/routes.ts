@@ -252,11 +252,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         firstName: first,
         lastName: last,
         profileImageUrl,
-        useCase: useCase || null,
-        teamSize: teamSize || null,
-        phone: phone || null,
-        marketingOptIn: marketingOptIn ?? false,
       };
+
+      // CRM/onboarding fields — only persist when the request actually carries them.
+      // The login client doesn't send these, so unconditional inclusion would null
+      // them out on every auth-state-change.
+      const crmFields: Record<string, unknown> = {};
+      if (useCase !== undefined) crmFields.useCase = useCase || null;
+      if (teamSize !== undefined) crmFields.teamSize = teamSize || null;
+      if (phone !== undefined) crmFields.phone = phone || null;
+      if (marketingOptIn !== undefined) crmFields.marketingOptIn = marketingOptIn;
 
       const firstSignupFields = existing ? {} : {
         subscriptionTier: 'free' as const,
@@ -267,7 +272,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         trialStartedAt: trialStartedAt ? new Date(trialStartedAt) : new Date(),
       };
 
-      const user = await storage.upsertUser({ ...profileFields, ...firstSignupFields });
+      const user = await storage.upsertUser({ ...profileFields, ...crmFields, ...firstSignupFields });
 
       // Mark any lead as converted
       if (email) {
