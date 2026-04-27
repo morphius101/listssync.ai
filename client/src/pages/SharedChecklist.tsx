@@ -92,12 +92,38 @@ export default function SharedChecklist() {
           return;
         }
 
-        const url = new URL(`/api/shared/checklist`, window.location.origin);
-        url.searchParams.set('token', token);
-        const res = await fetch(url.toString());
-        const result = await res.json();
+        const fetchSharedChecklist = async () => {
+          const url = new URL(`/api/shared/checklist`, window.location.origin);
+          url.searchParams.set('token', token);
+          const res = await fetch(url.toString());
+          return res.json();
+        };
 
+        let result = await fetchSharedChecklist();
         if (cancelled) return;
+
+        // Server can return translationFailed:true on the first request when the
+        // Gemini call comes back without a properly stamped translatedTo (cache
+        // miss / cold start). Retry briefly before unblocking the loader so users
+        // don't see the amber "Translation Unavailable" banner flash to blue.
+        const wantTranslation = (status.targetLanguage || 'en') !== 'en';
+        const RETRY_DELAY_MS = 2000;
+        const MAX_RETRIES = 2;
+        let translationRetries = 0;
+        while (
+          !cancelled &&
+          wantTranslation &&
+          result?.success &&
+          result.translationFailed &&
+          !result.translationApplied &&
+          translationRetries < MAX_RETRIES
+        ) {
+          translationRetries++;
+          await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+          if (cancelled) return;
+          result = await fetchSharedChecklist();
+          if (cancelled) return;
+        }
 
         if (!result.success || !result.checklist) {
           setError(result.message || 'Failed to load checklist');
