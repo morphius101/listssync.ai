@@ -55,6 +55,7 @@ export interface IStorage {
     status?: string;
     endsAt?: Date;
   }): Promise<User | undefined>;
+  clearStripeCustomerId(userId: string): Promise<void>;
   incrementUserUsage(userId: string, type: 'sync' | 'language'): Promise<boolean>;
   checkUserLimits(userId: string, action: 'create_list' | 'translate' | 'sync'): Promise<{
     allowed: boolean;
@@ -579,6 +580,18 @@ export class DatabaseStorage implements IStorage {
     } catch (error) {
       console.error('Error getting user by stripe customer id:', error);
       return undefined;
+    }
+  }
+
+  async clearStripeCustomerId(userId: string): Promise<void> {
+    try {
+      await db
+        .update(users)
+        .set({ stripeCustomerId: null, updatedAt: new Date() })
+        .where(eq(users.id, userId));
+    } catch (error) {
+      console.error('Error clearing stripe customer id:', error);
+      throw error;
     }
   }
 

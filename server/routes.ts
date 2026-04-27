@@ -346,21 +346,45 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ error: 'Invalid subscription tier' });
       }
 
-      // Create or get Stripe customer
-      let customer;
+      // Create or get Stripe customer.
+      // Self-heal stale stripeCustomerId references: Stripe returns {deleted:true}
+      // for retrieved-but-deleted customers (200), or 404/resource_missing if the
+      // customer never existed in the current Stripe account (e.g., test→live key swap).
+      // In either case, mint a fresh customer and persist the new id so future
+      // checkouts succeed instead of perpetually 500ing.
+      let customer: Stripe.Customer;
       const user = await storage.getUser(userId);
-      
+
+      const createFreshCustomer = async (): Promise<Stripe.Customer> => {
+        const c = await stripe!.customers.create({ email, metadata: { userId } });
+        await storage.updateUserSubscription(
+          userId,
+          (user?.subscriptionTier as SubscriptionTier) || 'free',
+          { customerId: c.id }
+        );
+        return c;
+      };
+
       if (user?.stripeCustomerId) {
-        customer = await stripe.customers.retrieve(user.stripeCustomerId);
+        try {
+          const retrieved = await stripe.customers.retrieve(user.stripeCustomerId);
+          // stripe.customers.retrieve returns Customer | DeletedCustomer; discriminator is `.deleted`
+          if (retrieved.deleted) {
+            console.warn(`[create-subscription] stripeCustomerId ${user.stripeCustomerId} is deleted in Stripe — creating fresh customer for user=${userId}`);
+            customer = await createFreshCustomer();
+          } else {
+            customer = retrieved as Stripe.Customer;
+          }
+        } catch (err: any) {
+          if (err?.statusCode === 404 || err?.code === 'resource_missing') {
+            console.warn(`[create-subscription] stripeCustomerId ${user.stripeCustomerId} missing in Stripe — creating fresh customer for user=${userId}`);
+            customer = await createFreshCustomer();
+          } else {
+            throw err;
+          }
+        }
       } else {
-        customer = await stripe.customers.create({
-          email,
-          metadata: { userId }
-        });
-        
-        await storage.updateUserSubscription(userId, user?.subscriptionTier as SubscriptionTier || 'free', {
-          customerId: customer.id
-        });
+        customer = await createFreshCustomer();
       }
 
       const priceId = process.env.STRIPE_PRICE_ID;
@@ -518,6 +542,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
             `WEBHOOK[${event.id}] ${event.type}: ` +
             `user=${userId} tier=${isPaidTier ? tier : 'free'} status=${status}`
           );
+          break;
+        }
+
+        case 'customer.deleted': {
+          // Pair with the stale-customer recovery in /api/create-subscription:
+          // null out our stored reference so the next checkout attempt mints a fresh customer.
+          const deletedCustomer = event.data.object as unknown as Stripe.DeletedCustomer;
+          const u = await storage.getUserByStripeCustomerId(deletedCustomer.id);
+          if (!u) {
+            console.log(`WEBHOOK[${event.id}] customer.deleted: no user found for customer=${deletedCustomer.id}`);
+            break;
+          }
+          await storage.clearStripeCustomerId(u.id);
+          console.log(`WEBHOOK[${event.id}] customer.deleted: cleared stripeCustomerId for user=${u.id} (was ${deletedCustomer.id})`);
           break;
         }
 
