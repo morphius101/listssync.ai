@@ -899,6 +899,14 @@ var DatabaseStorage = class {
       return void 0;
     }
   }
+  async clearStripeCustomerId(userId) {
+    try {
+      await db.update(users).set({ stripeCustomerId: null, updatedAt: /* @__PURE__ */ new Date() }).where(eq(users.id, userId));
+    } catch (error) {
+      console.error("Error clearing stripe customer id:", error);
+      throw error;
+    }
+  }
   async updateUserSubscription(userId, tier, stripeData) {
     try {
       const updateData = {
@@ -1445,12 +1453,13 @@ async function registerRoutes(app2) {
         email,
         firstName: first,
         lastName: last,
-        profileImageUrl,
-        useCase: useCase || null,
-        teamSize: teamSize || null,
-        phone: phone || null,
-        marketingOptIn: marketingOptIn ?? false
+        profileImageUrl
       };
+      const crmFields = {};
+      if (useCase !== void 0) crmFields.useCase = useCase || null;
+      if (teamSize !== void 0) crmFields.teamSize = teamSize || null;
+      if (phone !== void 0) crmFields.phone = phone || null;
+      if (marketingOptIn !== void 0) crmFields.marketingOptIn = marketingOptIn;
       const firstSignupFields = existing ? {} : {
         subscriptionTier: "free",
         subscriptionStatus: "active",
@@ -1459,7 +1468,7 @@ async function registerRoutes(app2) {
         signupSource: signupSource || "google_oauth",
         trialStartedAt: trialStartedAt ? new Date(trialStartedAt) : /* @__PURE__ */ new Date()
       };
-      const user = await storage.upsertUser({ ...profileFields, ...firstSignupFields });
+      const user = await storage.upsertUser({ ...profileFields, ...crmFields, ...firstSignupFields });
       if (email) {
         await storage.convertLead(email).catch(() => {
         });
@@ -1527,16 +1536,34 @@ async function registerRoutes(app2) {
       }
       let customer;
       const user = await storage.getUser(userId);
+      const createFreshCustomer = async () => {
+        const c = await stripe.customers.create({ email, metadata: { userId } });
+        await storage.updateUserSubscription(
+          userId,
+          user?.subscriptionTier || "free",
+          { customerId: c.id }
+        );
+        return c;
+      };
       if (user?.stripeCustomerId) {
-        customer = await stripe.customers.retrieve(user.stripeCustomerId);
+        try {
+          const retrieved = await stripe.customers.retrieve(user.stripeCustomerId);
+          if (retrieved.deleted) {
+            console.warn(`[create-subscription] stripeCustomerId ${user.stripeCustomerId} is deleted in Stripe \u2014 creating fresh customer for user=${userId}`);
+            customer = await createFreshCustomer();
+          } else {
+            customer = retrieved;
+          }
+        } catch (err) {
+          if (err?.statusCode === 404 || err?.code === "resource_missing") {
+            console.warn(`[create-subscription] stripeCustomerId ${user.stripeCustomerId} missing in Stripe \u2014 creating fresh customer for user=${userId}`);
+            customer = await createFreshCustomer();
+          } else {
+            throw err;
+          }
+        }
       } else {
-        customer = await stripe.customers.create({
-          email,
-          metadata: { userId }
-        });
-        await storage.updateUserSubscription(userId, user?.subscriptionTier || "free", {
-          customerId: customer.id
-        });
+        customer = await createFreshCustomer();
       }
       const priceId = process.env.STRIPE_PRICE_ID;
       if (!priceId) {
@@ -1667,6 +1694,17 @@ async function registerRoutes(app2) {
           console.log(
             `WEBHOOK[${event.id}] ${event.type}: user=${userId} tier=${isPaidTier ? tier : "free"} status=${status}`
           );
+          break;
+        }
+        case "customer.deleted": {
+          const deletedCustomer = event.data.object;
+          const u = await storage.getUserByStripeCustomerId(deletedCustomer.id);
+          if (!u) {
+            console.log(`WEBHOOK[${event.id}] customer.deleted: no user found for customer=${deletedCustomer.id}`);
+            break;
+          }
+          await storage.clearStripeCustomerId(u.id);
+          console.log(`WEBHOOK[${event.id}] customer.deleted: cleared stripeCustomerId for user=${u.id} (was ${deletedCustomer.id})`);
           break;
         }
         case "customer.subscription.trial_will_end": {
