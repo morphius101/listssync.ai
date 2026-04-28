@@ -1,4 +1,4 @@
-import { pgTable, index, text, serial, integer, boolean, timestamp, jsonb, varchar } from "drizzle-orm/pg-core";
+import { pgTable, index, uniqueIndex, text, serial, integer, boolean, timestamp, jsonb, varchar } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -138,6 +138,23 @@ export interface ChecklistSummaryDTO {
   createdAt: Date;
   updatedAt: Date;
 }
+
+// Translation cache — keyed by sha256(serialized source) + target language.
+// Hit: skip the Gemini call and return the stored translatedJson. Miss: call
+// Gemini and persist the result. Source content changes (including updatedAt
+// on the checklist) naturally invalidate the entry by changing the hash.
+export const translationCache = pgTable("translation_cache", {
+  id: serial("id").primaryKey(),
+  sourceHash: varchar("source_hash", { length: 64 }).notNull(), // sha256 hex
+  targetLanguage: varchar("target_language", { length: 10 }).notNull(),
+  translatedJson: jsonb("translated_json").notNull(),
+  hits: integer("hits").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  lastHitAt: timestamp("last_hit_at"),
+}, (table) => ({
+  // Lookup by (hash, lang); also serves as the uniqueness constraint for upsert.
+  keyIdx: uniqueIndex("translation_cache_key_idx").on(table.sourceHash, table.targetLanguage),
+}));
 
 // Verification Schema for secure access to shared checklists
 export const verifications = pgTable("verifications", {

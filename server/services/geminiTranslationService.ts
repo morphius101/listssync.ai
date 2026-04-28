@@ -1,7 +1,46 @@
 import { GoogleGenAI } from "@google/genai";
+import crypto from "crypto";
+import { sql, and, eq } from "drizzle-orm";
+import { db } from "../db";
+import { translationCache } from "../../shared/schema";
 
 // Create Gemini client
 const genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+
+// Lookup the (sourceHash, targetLanguage) entry; on hit, fire-and-forget bump
+// the hits/lastHitAt counters. Cache failures never block translation.
+async function getCachedTranslation(sourceHash: string, targetLanguage: string): Promise<any | null> {
+  try {
+    const [row] = await db
+      .select()
+      .from(translationCache)
+      .where(and(
+        eq(translationCache.sourceHash, sourceHash),
+        eq(translationCache.targetLanguage, targetLanguage),
+      ))
+      .limit(1);
+    if (!row) return null;
+    db.update(translationCache)
+      .set({ hits: sql`${translationCache.hits} + 1`, lastHitAt: new Date() })
+      .where(eq(translationCache.id, row.id))
+      .catch((e) => console.error("translation_cache hit-bump failed:", e));
+    return row.translatedJson;
+  } catch (e) {
+    console.error("translation_cache read failed:", e);
+    return null;
+  }
+}
+
+async function writeCachedTranslation(sourceHash: string, targetLanguage: string, translatedJson: any): Promise<void> {
+  try {
+    await db
+      .insert(translationCache)
+      .values({ sourceHash, targetLanguage, translatedJson })
+      .onConflictDoNothing({ target: [translationCache.sourceHash, translationCache.targetLanguage] });
+  } catch (e) {
+    console.error("translation_cache write failed:", e);
+  }
+}
 
 // Available languages for translation
 export const AVAILABLE_LANGUAGES = {
@@ -89,6 +128,17 @@ export async function translateChecklist(
       return checklist;
     }
 
+    // Cache lookup. Hash the serialized checklist — content changes (including
+    // updatedAt) naturally invalidate the entry by changing the hash.
+    const serialized = JSON.stringify(checklist);
+    const sourceHash = crypto.createHash("sha256").update(serialized).digest("hex");
+    const cached = await getCachedTranslation(sourceHash, targetLanguage);
+    if (cached) {
+      console.log(`💾 translation_cache HIT for ${targetLanguage} (hash=${sourceHash.slice(0, 12)}…)`);
+      return cached;
+    }
+    console.log(`💾 translation_cache MISS for ${targetLanguage} (hash=${sourceHash.slice(0, 12)}…) — calling Gemini`);
+
     const targetLangName = AVAILABLE_LANGUAGES[targetLanguage];
     const prompt = `Translate this checklist JSON into ${targetLangName}.
 
@@ -99,7 +149,7 @@ Rules:
 - Return valid JSON only. No markdown, no explanation.
 
 Checklist JSON:
-${JSON.stringify(checklist)}`;
+${serialized}`;
 
     const result = await genAI.models.generateContent({
       model: "gemini-2.5-flash",
@@ -115,6 +165,9 @@ ${JSON.stringify(checklist)}`;
     const parsed = JSON.parse(translatedText);
     parsed.translatedTo = targetLanguage;
     parsed.translatedAt = checklist?.updatedAt || checklist?.translatedAt || new Date().toISOString();
+
+    // Persist on success only — failed/empty/unstamped translations are not cached.
+    await writeCachedTranslation(sourceHash, targetLanguage, parsed);
 
     console.log(`✅ Checklist translation to ${targetLanguage} completed`);
     return parsed;
