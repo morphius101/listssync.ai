@@ -31,7 +31,7 @@ interface ShareLinkModalProps {
   onClose: () => void;
   checklistId: string;
   checklist?: Checklist;
-  onGenerateNewLink?: () => Promise<string>;
+  onGenerateNewLink?: (targetLanguage?: string) => Promise<string>;
 }
 
 const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
@@ -84,17 +84,24 @@ export default function ShareLinkModal({
     }
   }, [isOpen]);
 
-  // Auto-generate share link when Phone tab becomes active
+  // Invalidate the phone-tab link when the language picker changes so the next
+  // generation reflects the recipient's language. Without this the link is
+  // generated once on tab-activation and never updates.
+  useEffect(() => {
+    setPhoneTabLink(null);
+  }, [selectedLanguage]);
+
+  // Auto-generate share link when Phone tab becomes active (or after language change reset)
   useEffect(() => {
     if (!isOpen || activeTab !== 'phone' || phoneTabLink || phoneTabLinkLoading) return;
     if (!onGenerateNewLink) return;
 
     setPhoneTabLinkLoading(true);
-    onGenerateNewLink()
+    onGenerateNewLink(selectedLanguage)
       .then((url) => setPhoneTabLink(url))
       .catch(() => setPhoneTabLink(null))
       .finally(() => setPhoneTabLinkLoading(false));
-  }, [isOpen, activeTab, onGenerateNewLink]);
+  }, [isOpen, activeTab, onGenerateNewLink, phoneTabLink, selectedLanguage]);
 
   const { isLoading, shareChecklist } = useVerification();
   const { languages, isTranslating } = useTranslation();

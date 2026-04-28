@@ -202,8 +202,10 @@ export const updateTaskStatus = async (checklistId: string, taskId: string, upda
   }
 };
 
-// Generate a pre-verified share link for manual sharing (Phone tab / WhatsApp)
-export const generateShareLink = async (checklistId: string): Promise<string> => {
+// Generate a pre-verified share link for manual sharing (Phone tab / WhatsApp).
+// targetLanguage must be plumbed through — without it the server defaults to 'en'
+// and the recipient view never shows the translation banner.
+export const generateShareLink = async (checklistId: string, targetLanguage?: string): Promise<string> => {
   const headers = await getAuthHeaders();
   const res = await fetch(`${API_BASE}/verification/generate`, {
     method: 'POST',
@@ -212,6 +214,7 @@ export const generateShareLink = async (checklistId: string): Promise<string> =>
     body: JSON.stringify({
       checklistId,
       recipientId: `link_${Date.now()}`,
+      targetLanguage: targetLanguage || 'en',
     }),
   });
   if (!res.ok) throw new Error('Failed to generate share link');

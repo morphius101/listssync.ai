@@ -191,11 +191,11 @@ const AdminDashboard = () => {
     }
   };
 
-  const handleGenerateNewLink = async () => {
+  const handleGenerateNewLink = async (targetLanguage?: string) => {
     if (!currentChecklist) return "";
-    
+
     try {
-      const link = await generateShareLink(currentChecklist.id);
+      const link = await generateShareLink(currentChecklist.id, targetLanguage);
       return link;
     } catch (error) {
       console.error("Error generating share link:", error);
