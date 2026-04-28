@@ -33,3 +33,33 @@ Scope: clean up open issues from the prior beta-readiness session and fix the sh
 - **No automated test coverage** for any of these flows — the project has none. The Stripe webhook and customer-recovery paths are the highest-risk untested code in the repo. Consider whether even a single integration test against a Stripe test mode would be worth standing up before more payment work.
 - **Untracked files left in working tree:** `diag1.mjs` and `COWORK.md` per your instruction. Decide separately.
 - **CI bot dist rebuild:** The four fix commits this session (852c78a, 8815fa7, 3ca5460, de59478) were source-only. Push to `github main` will trigger the CI bot's `ci: rebuild dist with latest source` commit — verify Railway picks up the new dist before declaring deployed.
+
+---
+
+## Session 3 — 2026-04-27 — Translation pipeline (real root cause) + dashboard mapping bug
+
+Scope: triage two recipient/dashboard regressions reported in user testing.
+
+### Outcomes
+
+- **Translation flicker, real root cause (`fix(translation): strip Gemini markdown fences + widen client retry budget`, fedd550):** Shipped. The Session 2 retry-on-amber fix (3ca5460) was treating a symptom — the underlying bug is that Gemini intermittently wraps JSON output in markdown code fences (```` ```json ... ``` ````), `JSON.parse` throws, the catch returns the original checklist, the cache never populates, and the next request hits another fresh Gemini call. DB confirmed: for the reported token, the `translation_cache` row appeared ~49 seconds after the verification was created, consistent with 3-5 sequential Gemini calls before one returned raw JSON. Fix is two-part:
+    - Server: strip a single outer ``` fence (anchored regex; embedded backticks survive) before `JSON.parse` in `geminiTranslationService.ts`. This is the actual root cause fix.
+    - Client: widened retry budget from 2×2s to 4×2.5s in `SharedChecklist.tsx`. Safety net for residual cases (genuinely slow Gemini, transient nets).
+    - Documented the Gemini quirk in `CLAUDE.md` so future integrations apply the same defensive parse.
+- **Dashboard task count = 0 (`fix(dashboard): use server-returned taskCount field`, [next commit]):** Shipped. Client at `client/src/services/checklistService.ts:47` was reading `(checklist.tasks || []).length` from the `/api/checklists` summary response — but the server returns `taskCount` directly, not a `tasks` array, so every checklist showed 0 tasks. Defensive fallback: `checklist.taskCount ?? (checklist.tasks || []).length`. Independent of React Query / caching / schema — purely a client field-mapping bug that was probably affecting every checklist on the dashboard.
+- **Earlier same session (Session 2.5 — already shipped):**
+    - `95eaa5a fix(share): plumb targetLanguage through generateShareLink + Phone tab` — fixed the "no banner at all" report from earlier in the conversation; Phone-tab share links were created via a callback that hardcoded no language.
+    - `e8a49b7 feat(translation): add translation_cache table` — schema migration applied via `drizzle-kit push` (CREATE TABLE + UNIQUE INDEX, no destructive changes), wired into `translateChecklist`. Cache hits skip the Gemini call entirely; only successful translations are persisted. Already serving 44 hits as of the user's testing.
+
+### Lessons / paper trail
+
+- **Diagnostic-first matters.** Original prompt framed the issue as "extend retry budget." Doing only that would have papered over the actual parse-failure loop. Symptom-fix vs. root-cause-fix divergence was significant — the markdown-fence strip fixes ~90% of cases on its own; the wider retry budget alone fixes none of them.
+- **The Gemini markdown wrap is now documented** in CLAUDE.md (Infrastructure Notes → Gemini API quirk). Worth scanning for in any future Gemini integration.
+- **The `translation_cache` makes this bug self-healing for non-first recipients.** Once Gemini eventually returns parseable JSON for a (checklist × language) pair, every subsequent visitor gets an instant cache hit. The user's testing confirmed this (44 hits on the one cache row). Pre-cache, every recipient would have hit this independently.
+
+### Followups / verification needed after deploy
+
+- **Manual smoke test:** create a fresh Spanish-targeted share with a *different* checklist (force cold cache), open the recipient link, confirm: spinner → blue "Auto-Translated" banner with Spanish content. No amber banner should appear.
+- **Manual smoke test:** open `/dashboard`, confirm task counts are non-zero where expected (e.g. "test languages" should show `1`, not `0`).
+- **Side finding worth tracking:** the parse-failure loop mostly explains the previously-reported "first translation feels slow" but it's worth confirming over the next few first-recipient sessions whether 5-10s spinner is the new floor, or whether Gemini still occasionally takes >10s on a clean call. If the latter recurs, consider raising MAX_RETRIES further or adding a server-side internal retry.
+- **Diagnostic script `diag-share.mjs` is still untracked at repo root** — reusable for verification-pipeline + cache-state queries. Decide separately whether to keep, move to `scripts/`, or delete.

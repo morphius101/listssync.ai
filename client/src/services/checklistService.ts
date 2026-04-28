@@ -44,7 +44,10 @@ export const getChecklists = async (): Promise<ChecklistSummary[]> => {
       name: checklist.name,
       status: checklist.status || "not-started",
       progress: checklist.progress || 0,
-      taskCount: (checklist.tasks || []).length,
+      // Server's /api/checklists summary endpoint returns `taskCount` directly
+      // (no `tasks` array). The fallback to `(checklist.tasks || []).length`
+      // protects against future server-shape changes.
+      taskCount: checklist.taskCount ?? (checklist.tasks || []).length,
       createdAt: new Date(checklist.createdAt),
       updatedAt: new Date(checklist.updatedAt),
       userId: checklist.userId || null,
