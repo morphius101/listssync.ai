@@ -7,6 +7,9 @@ import { toast } from "@/hooks/use-toast";
 import { Loader2, Mail, Check } from 'lucide-react';
 
 export default function EmailDebug() {
+  // Production guard: this is a dev-only diagnostic page; never render in prod builds.
+  if (import.meta.env.PROD) return null;
+
   const [email, setEmail] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [result, setResult] = useState<any>(null);

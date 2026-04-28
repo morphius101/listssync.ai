@@ -109,7 +109,7 @@ You have full access to the GitHub codebase. Your default behavior is to deeply 
 **Auth:** Firebase Auth (Google OAuth) — JWT verified server-side by Firebase Admin SDK  
 **File storage:** Firebase Storage (photo uploads)  
 **Translation:** Gemini API (`server/services/geminiTranslationService.ts`) — OpenAI package is installed but not used  
-**Payments:** Stripe — 3 tiers: free / professional / enterprise  
+**Payments:** Stripe — schema defines 3 tiers (`free` / `professional` / `enterprise`), but only `professional` is offered self-serve via `/api/create-subscription`. Marketing name for the paid tier is **"Pro"** but the technical identifier in `shared/schema.ts` and throughout the codebase is **`'professional'`**. Do not rename without an explicit migration task — it touches the `users.subscription_tier` column, `TIER_LIMITS`, the `SubscriptionTier` union, and every string literal in `routes.ts`.  
 **Email:** SendGrid | **SMS:** Twilio (use Messaging Service SID, not direct phone number)
 
 ### Commands
@@ -200,3 +200,12 @@ The URLs produced by `getDownloadURL` include a `?alt=media&token=<UUID>` downlo
 ### Railway deploy model
 
 `Dockerfile` is `COPY dist ./dist` + `npm ci --omit=dev` — Railway does **not** run `npm run build` during deploy. It serves the pre-built `dist/` that was committed. Always rebuild and commit `dist/` locally before pushing, or rely on the CI bot's `ci: rebuild dist with latest source [skip ci]` commits to produce the deployed bundle.
+
+---
+
+## Known Issues / Backlog
+
+- **Polling effect inefficiency in `SharedChecklist.tsx`** — the recipient-side polling effect's deps include `checklist`, so every polling refresh tears down and re-creates the 10s interval. Not user-visible; safe to leave for now. Cleanup would split the effect into two: one to mount the interval (deps: `[token, isSubmitted]`), and let the interval read `checklist` via a ref.
+- **`EmailDebug.tsx` is dead code** — not imported in `App.tsx` or any router. Has a prod guard now (defense-in-depth) but could be deleted entirely once we're sure no one's planning to wire it up.
+- **`generated-icon.png` at repo root** — committed but never referenced from the build. Candidate for deletion in a future cleanup pass.
+- **Translation cache cold-start latency** — share-view init now retries up to 2× at 2s when server returns `translationFailed:true` to mask the visible flicker, but the underlying issue is that `translateChecklist` sometimes returns the original checklist without `translatedTo` stamped. Worth investigating server-side (deferred per Session 2 scope: do not change the translation service).
