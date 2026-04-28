@@ -8,6 +8,312 @@ var __export = (target, all) => {
     __defProp(target, name, { get: all[name], enumerable: true });
 };
 
+// shared/schema.ts
+var schema_exports = {};
+__export(schema_exports, {
+  TIER_LIMITS: () => TIER_LIMITS,
+  checklists: () => checklists,
+  insertChecklistSchema: () => insertChecklistSchema,
+  insertMailingListSubscriptionSchema: () => insertMailingListSubscriptionSchema,
+  insertSmsConsentSchema: () => insertSmsConsentSchema,
+  insertTaskSchema: () => insertTaskSchema,
+  insertUserSchema: () => insertUserSchema,
+  insertVerificationSchema: () => insertVerificationSchema,
+  leads: () => leads,
+  mailingListSubscriptions: () => mailingListSubscriptions,
+  sessions: () => sessions,
+  shareAccesses: () => shareAccesses,
+  shareWrites: () => shareWrites,
+  smsConsents: () => smsConsents,
+  tasks: () => tasks,
+  translationCache: () => translationCache,
+  users: () => users,
+  verifications: () => verifications,
+  waitlist: () => waitlist
+});
+import { pgTable, index, uniqueIndex, text, serial, integer, boolean, timestamp, jsonb, varchar } from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+var users, sessions, tasks, checklists, insertTaskSchema, insertChecklistSchema, translationCache, verifications, shareAccesses, insertVerificationSchema, mailingListSubscriptions, insertMailingListSubscriptionSchema, insertUserSchema, TIER_LIMITS, smsConsents, insertSmsConsentSchema, leads, waitlist, shareWrites;
+var init_schema = __esm({
+  "shared/schema.ts"() {
+    "use strict";
+    users = pgTable("users", {
+      id: varchar("id").primaryKey().notNull(),
+      // Firebase UID
+      email: varchar("email").unique(),
+      firstName: varchar("first_name"),
+      lastName: varchar("last_name"),
+      profileImageUrl: varchar("profile_image_url"),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow(),
+      // Subscription fields
+      subscriptionTier: varchar("subscription_tier").notNull().default("free"),
+      // free, starter, professional, business, enterprise
+      stripeCustomerId: varchar("stripe_customer_id"),
+      stripeSubscriptionId: varchar("stripe_subscription_id"),
+      subscriptionStatus: varchar("subscription_status").default("inactive"),
+      // active, inactive, past_due, canceled
+      subscriptionEndsAt: timestamp("subscription_ends_at"),
+      // Usage tracking
+      listSyncCount: integer("list_sync_count").notNull().default(0),
+      languageUseCount: integer("language_use_count").notNull().default(0),
+      lastSyncAt: timestamp("last_sync_at"),
+      // Feature flags
+      allowedLanguages: jsonb("allowed_languages").default(["en", "es"]),
+      // JSON array of language codes
+      // CRM / onboarding profile
+      useCase: varchar("use_case", { length: 100 }),
+      teamSize: varchar("team_size", { length: 50 }),
+      phone: varchar("phone", { length: 30 }),
+      signupMethod: varchar("signup_method", { length: 20 }),
+      // 'google' | 'email'
+      signupSource: varchar("signup_source", { length: 50 }),
+      trialStartedAt: timestamp("trial_started_at"),
+      marketingOptIn: boolean("marketing_opt_in").default(false)
+    }, (table) => [
+      index("users_stripe_customer_idx").on(table.stripeCustomerId),
+      index("users_subscription_tier_idx").on(table.subscriptionTier),
+      index("users_email_idx").on(table.email)
+    ]);
+    sessions = pgTable(
+      "sessions",
+      {
+        sid: varchar("sid").primaryKey(),
+        sess: jsonb("sess").notNull(),
+        expire: timestamp("expire").notNull()
+      },
+      (table) => [index("IDX_session_expire").on(table.expire)]
+    );
+    tasks = pgTable("tasks", {
+      id: serial("id").primaryKey(),
+      checklistId: integer("checklist_id").notNull(),
+      description: text("description").notNull(),
+      details: text("details"),
+      completed: boolean("completed").notNull().default(false),
+      photoRequired: boolean("photo_required").notNull().default(false),
+      photoUrl: text("photo_url"),
+      orderIndex: integer("order_index").notNull().default(0)
+    }, (table) => ({
+      // Index for faster task lookup by checklist
+      checklistIdIdx: index("task_checklist_id_idx").on(table.checklistId),
+      // Composite index for efficient querying of task status within checklists
+      taskStatusIdx: index("task_status_idx").on(table.checklistId, table.completed)
+    }));
+    checklists = pgTable("checklists", {
+      id: text("id").primaryKey(),
+      // Changed to text to support Firebase IDs
+      name: text("name").notNull(),
+      status: text("status").notNull().default("not-started"),
+      progress: integer("progress").notNull().default(0),
+      remarks: text("remarks"),
+      createdAt: timestamp("created_at").notNull().defaultNow(),
+      updatedAt: timestamp("updated_at").notNull().defaultNow(),
+      tasksData: jsonb("tasks_data"),
+      // Store tasks as JSON for Firebase compatibility
+      shareToken: text("share_token"),
+      userId: text("user_id"),
+      // Firebase user ID
+      submittedAt: timestamp("submitted_at"),
+      submittedByToken: varchar("submitted_by_token", { length: 128 })
+    }, (table) => ({
+      // Index for faster lookup by user
+      userIdIdx: index("checklist_user_id_idx").on(table.userId),
+      // Index for finding checklists by status
+      statusIdx: index("checklist_status_idx").on(table.status),
+      // Index for finding shared checklists
+      shareTokenIdx: index("checklist_share_token_idx").on(table.shareToken)
+    }));
+    insertTaskSchema = createInsertSchema(tasks).omit({
+      id: true
+    });
+    insertChecklistSchema = createInsertSchema(checklists).omit({
+      id: true,
+      createdAt: true,
+      updatedAt: true
+    });
+    translationCache = pgTable("translation_cache", {
+      id: serial("id").primaryKey(),
+      sourceHash: varchar("source_hash", { length: 64 }).notNull(),
+      // sha256 hex
+      targetLanguage: varchar("target_language", { length: 10 }).notNull(),
+      translatedJson: jsonb("translated_json").notNull(),
+      hits: integer("hits").notNull().default(0),
+      createdAt: timestamp("created_at").notNull().defaultNow(),
+      lastHitAt: timestamp("last_hit_at")
+    }, (table) => ({
+      // Lookup by (hash, lang); also serves as the uniqueness constraint for upsert.
+      keyIdx: uniqueIndex("translation_cache_key_idx").on(table.sourceHash, table.targetLanguage)
+    }));
+    verifications = pgTable("verifications", {
+      id: serial("id").primaryKey(),
+      token: varchar("token", { length: 128 }).notNull().unique(),
+      code: varchar("code", { length: 10 }),
+      createdAt: timestamp("created_at").notNull().defaultNow(),
+      expiresAt: timestamp("expires_at").notNull(),
+      verified: boolean("verified").notNull().default(false),
+      recipientId: text("recipient_id").notNull(),
+      recipientEmail: text("recipient_email"),
+      recipientPhone: text("recipient_phone"),
+      checklistId: text("checklist_id"),
+      targetLanguage: varchar("target_language", { length: 10 }).default("en")
+    }, (table) => ({
+      // Index for faster token lookup
+      tokenIdx: index("verification_token_idx").on(table.token),
+      // Index for expiration query optimizations
+      expiresAtIdx: index("verification_expires_at_idx").on(table.expiresAt),
+      // Index for finding verifications by checklist
+      checklistIdIdx: index("verification_checklist_id_idx").on(table.checklistId),
+      // Composite index for contact lookups
+      contactIdx: index("verification_contact_idx").on(table.recipientEmail, table.recipientPhone)
+    }));
+    shareAccesses = pgTable("share_accesses", {
+      id: serial("id").primaryKey(),
+      shareToken: varchar("share_token", { length: 128 }).notNull().references(() => verifications.token),
+      firstAccessedAt: timestamp("first_accessed_at").notNull().defaultNow(),
+      lastAccessedAt: timestamp("last_accessed_at").notNull().defaultNow(),
+      ipHash: varchar("ip_hash", { length: 64 }),
+      userAgent: text("user_agent"),
+      accessCount: integer("access_count").notNull().default(1),
+      visitorId: varchar("visitor_id", { length: 36 })
+    }, (table) => ({
+      tokenIdx: index("share_access_token_idx").on(table.shareToken),
+      visitorIdx: index("share_access_visitor_idx").on(table.visitorId)
+    }));
+    insertVerificationSchema = createInsertSchema(verifications).omit({
+      id: true,
+      createdAt: true
+    });
+    mailingListSubscriptions = pgTable("mailing_list_subscriptions", {
+      id: serial("id").primaryKey(),
+      email: varchar("email", { length: 255 }).notNull().unique(),
+      subscribedAt: timestamp("subscribed_at").notNull().defaultNow(),
+      confirmed: boolean("confirmed").notNull().default(false),
+      confirmationToken: varchar("confirmation_token", { length: 128 }),
+      source: varchar("source", { length: 50 }).notNull().default("development_banner"),
+      // Track where they signed up
+      leadType: varchar("lead_type", { length: 50 }).notNull().default("marketing_lead"),
+      // Categorize the type of lead
+      userAgent: text("user_agent"),
+      // For analytics
+      ipAddress: varchar("ip_address", { length: 45 })
+      // For compliance
+    }, (table) => ({
+      // Index for faster email lookup
+      emailIdx: index("mailing_list_email_idx").on(table.email),
+      // Index for finding unconfirmed subscriptions
+      confirmedIdx: index("mailing_list_confirmed_idx").on(table.confirmed),
+      // Index for analytics by source
+      sourceIdx: index("mailing_list_source_idx").on(table.source),
+      // Index for filtering by lead type
+      leadTypeIdx: index("mailing_list_lead_type_idx").on(table.leadType)
+    }));
+    insertMailingListSubscriptionSchema = createInsertSchema(mailingListSubscriptions).omit({
+      id: true,
+      subscribedAt: true
+    });
+    insertUserSchema = createInsertSchema(users).omit({
+      createdAt: true,
+      updatedAt: true
+    });
+    TIER_LIMITS = {
+      free: {
+        maxLists: 5,
+        maxUsers: 1,
+        syncFrequency: "6hours",
+        allowedLanguages: ["en", "es"],
+        maxLanguages: 2,
+        storageGB: 1,
+        features: ["manual_sync", "basic_translation", "mobile_access"]
+      },
+      professional: {
+        maxLists: 100,
+        maxUsers: 10,
+        syncFrequency: "realtime",
+        maxLanguages: 15,
+        storageGB: 50,
+        features: ["realtime_sync", "advanced_analytics", "integrations", "workflow_automation", "api_access", "team_collaboration", "priority_support"]
+      },
+      enterprise: {
+        maxLists: Infinity,
+        maxUsers: Infinity,
+        syncFrequency: "realtime",
+        maxLanguages: Infinity,
+        storageGB: Infinity,
+        features: ["unlimited_everything", "custom_deployment", "enterprise_sla", "custom_integrations", "onboarding"]
+      }
+    };
+    smsConsents = pgTable("sms_consents", {
+      id: serial("id").primaryKey(),
+      phoneNumber: text("phone_number").notNull(),
+      firstName: text("first_name").notNull(),
+      lastName: text("last_name").notNull(),
+      consentedAt: timestamp("consented_at").notNull(),
+      ipAddress: text("ip_address"),
+      userAgent: text("user_agent"),
+      isActive: boolean("is_active").default(true),
+      createdAt: timestamp("created_at").defaultNow(),
+      updatedAt: timestamp("updated_at").defaultNow()
+    });
+    insertSmsConsentSchema = createInsertSchema(smsConsents).omit({
+      id: true,
+      createdAt: true,
+      updatedAt: true
+    });
+    leads = pgTable("leads", {
+      id: serial("id").primaryKey(),
+      email: varchar("email", { length: 255 }).notNull(),
+      source: varchar("source", { length: 100 }),
+      createdAt: timestamp("created_at").defaultNow(),
+      converted: boolean("converted").notNull().default(false)
+    }, (table) => ({
+      emailIdx: index("leads_email_idx").on(table.email)
+    }));
+    waitlist = pgTable("waitlist", {
+      id: serial("id").primaryKey(),
+      email: varchar("email", { length: 255 }).notNull().unique(),
+      source: varchar("source", { length: 100 }),
+      createdAt: timestamp("created_at").defaultNow(),
+      userAgent: text("user_agent"),
+      ipHash: varchar("ip_hash", { length: 64 })
+    }, (table) => ({
+      emailIdx: index("waitlist_email_idx").on(table.email)
+    }));
+    shareWrites = pgTable("share_writes", {
+      id: serial("id").primaryKey(),
+      shareToken: varchar("share_token", { length: 128 }).notNull(),
+      taskId: text("task_id"),
+      action: varchar("action", { length: 20 }).notNull(),
+      // 'task_toggle' | 'photo_upload' | 'submit'
+      ipHash: varchar("ip_hash", { length: 64 }),
+      visitorId: varchar("visitor_id", { length: 36 }),
+      createdAt: timestamp("created_at").notNull().defaultNow()
+    }, (table) => ({
+      tokenIdx: index("share_writes_token_idx").on(table.shareToken),
+      createdAtIdx: index("share_writes_created_at_idx").on(table.createdAt)
+    }));
+  }
+});
+
+// server/db.ts
+import { Pool, neonConfig } from "@neondatabase/serverless";
+import { drizzle } from "drizzle-orm/neon-serverless";
+import ws from "ws";
+var pool, db;
+var init_db = __esm({
+  "server/db.ts"() {
+    "use strict";
+    init_schema();
+    neonConfig.webSocketConstructor = ws;
+    if (!process.env.DATABASE_URL) {
+      throw new Error(
+        "DATABASE_URL must be set. Did you forget to provision a database?"
+      );
+    }
+    pool = new Pool({ connectionString: process.env.DATABASE_URL });
+    db = drizzle(pool, { schema: schema_exports });
+  }
+});
+
 // server/services/geminiTranslationService.ts
 var geminiTranslationService_exports = {};
 __export(geminiTranslationService_exports, {
@@ -17,6 +323,29 @@ __export(geminiTranslationService_exports, {
   translateText: () => translateText
 });
 import { GoogleGenAI } from "@google/genai";
+import crypto from "crypto";
+import { sql, and as and2, eq as eq2 } from "drizzle-orm";
+async function getCachedTranslation(sourceHash, targetLanguage) {
+  try {
+    const [row] = await db.select().from(translationCache).where(and2(
+      eq2(translationCache.sourceHash, sourceHash),
+      eq2(translationCache.targetLanguage, targetLanguage)
+    )).limit(1);
+    if (!row) return null;
+    db.update(translationCache).set({ hits: sql`${translationCache.hits} + 1`, lastHitAt: /* @__PURE__ */ new Date() }).where(eq2(translationCache.id, row.id)).catch((e) => console.error("translation_cache hit-bump failed:", e));
+    return row.translatedJson;
+  } catch (e) {
+    console.error("translation_cache read failed:", e);
+    return null;
+  }
+}
+async function writeCachedTranslation(sourceHash, targetLanguage, translatedJson) {
+  try {
+    await db.insert(translationCache).values({ sourceHash, targetLanguage, translatedJson }).onConflictDoNothing({ target: [translationCache.sourceHash, translationCache.targetLanguage] });
+  } catch (e) {
+    console.error("translation_cache write failed:", e);
+  }
+}
 async function translateText(text2, targetLanguage, sourceLanguage) {
   try {
     if (!process.env.GEMINI_API_KEY) {
@@ -56,6 +385,14 @@ async function translateChecklist(checklist, targetLanguage, _sourceLanguage) {
     if (targetLanguage === "en") {
       return checklist;
     }
+    const serialized = JSON.stringify(checklist);
+    const sourceHash = crypto.createHash("sha256").update(serialized).digest("hex");
+    const cached = await getCachedTranslation(sourceHash, targetLanguage);
+    if (cached) {
+      console.log(`\u{1F4BE} translation_cache HIT for ${targetLanguage} (hash=${sourceHash.slice(0, 12)}\u2026)`);
+      return cached;
+    }
+    console.log(`\u{1F4BE} translation_cache MISS for ${targetLanguage} (hash=${sourceHash.slice(0, 12)}\u2026) \u2014 calling Gemini`);
     const targetLangName = AVAILABLE_LANGUAGES[targetLanguage];
     const prompt = `Translate this checklist JSON into ${targetLangName}.
 
@@ -66,7 +403,7 @@ Rules:
 - Return valid JSON only. No markdown, no explanation.
 
 Checklist JSON:
-${JSON.stringify(checklist)}`;
+${serialized}`;
     const result = await genAI.models.generateContent({
       model: "gemini-2.5-flash",
       contents: [{ role: "user", parts: [{ text: prompt }] }]
@@ -79,6 +416,7 @@ ${JSON.stringify(checklist)}`;
     const parsed = JSON.parse(translatedText);
     parsed.translatedTo = targetLanguage;
     parsed.translatedAt = checklist?.updatedAt || checklist?.translatedAt || (/* @__PURE__ */ new Date()).toISOString();
+    await writeCachedTranslation(sourceHash, targetLanguage, parsed);
     console.log(`\u2705 Checklist translation to ${targetLanguage} completed`);
     return parsed;
   } catch (error) {
@@ -93,6 +431,8 @@ var genAI, AVAILABLE_LANGUAGES;
 var init_geminiTranslationService = __esm({
   "server/services/geminiTranslationService.ts"() {
     "use strict";
+    init_db();
+    init_schema();
     genAI = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
     AVAILABLE_LANGUAGES = {
       en: "English",
@@ -231,286 +571,9 @@ import cookieParser from "cookie-parser";
 // server/routes.ts
 import { createServer } from "http";
 
-// shared/schema.ts
-var schema_exports = {};
-__export(schema_exports, {
-  TIER_LIMITS: () => TIER_LIMITS,
-  checklists: () => checklists,
-  insertChecklistSchema: () => insertChecklistSchema,
-  insertMailingListSubscriptionSchema: () => insertMailingListSubscriptionSchema,
-  insertSmsConsentSchema: () => insertSmsConsentSchema,
-  insertTaskSchema: () => insertTaskSchema,
-  insertUserSchema: () => insertUserSchema,
-  insertVerificationSchema: () => insertVerificationSchema,
-  leads: () => leads,
-  mailingListSubscriptions: () => mailingListSubscriptions,
-  sessions: () => sessions,
-  shareAccesses: () => shareAccesses,
-  shareWrites: () => shareWrites,
-  smsConsents: () => smsConsents,
-  tasks: () => tasks,
-  users: () => users,
-  verifications: () => verifications,
-  waitlist: () => waitlist
-});
-import { pgTable, index, text, serial, integer, boolean, timestamp, jsonb, varchar } from "drizzle-orm/pg-core";
-import { createInsertSchema } from "drizzle-zod";
-var users = pgTable("users", {
-  id: varchar("id").primaryKey().notNull(),
-  // Firebase UID
-  email: varchar("email").unique(),
-  firstName: varchar("first_name"),
-  lastName: varchar("last_name"),
-  profileImageUrl: varchar("profile_image_url"),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow(),
-  // Subscription fields
-  subscriptionTier: varchar("subscription_tier").notNull().default("free"),
-  // free, starter, professional, business, enterprise
-  stripeCustomerId: varchar("stripe_customer_id"),
-  stripeSubscriptionId: varchar("stripe_subscription_id"),
-  subscriptionStatus: varchar("subscription_status").default("inactive"),
-  // active, inactive, past_due, canceled
-  subscriptionEndsAt: timestamp("subscription_ends_at"),
-  // Usage tracking
-  listSyncCount: integer("list_sync_count").notNull().default(0),
-  languageUseCount: integer("language_use_count").notNull().default(0),
-  lastSyncAt: timestamp("last_sync_at"),
-  // Feature flags
-  allowedLanguages: jsonb("allowed_languages").default(["en", "es"]),
-  // JSON array of language codes
-  // CRM / onboarding profile
-  useCase: varchar("use_case", { length: 100 }),
-  teamSize: varchar("team_size", { length: 50 }),
-  phone: varchar("phone", { length: 30 }),
-  signupMethod: varchar("signup_method", { length: 20 }),
-  // 'google' | 'email'
-  signupSource: varchar("signup_source", { length: 50 }),
-  trialStartedAt: timestamp("trial_started_at"),
-  marketingOptIn: boolean("marketing_opt_in").default(false)
-}, (table) => [
-  index("users_stripe_customer_idx").on(table.stripeCustomerId),
-  index("users_subscription_tier_idx").on(table.subscriptionTier),
-  index("users_email_idx").on(table.email)
-]);
-var sessions = pgTable(
-  "sessions",
-  {
-    sid: varchar("sid").primaryKey(),
-    sess: jsonb("sess").notNull(),
-    expire: timestamp("expire").notNull()
-  },
-  (table) => [index("IDX_session_expire").on(table.expire)]
-);
-var tasks = pgTable("tasks", {
-  id: serial("id").primaryKey(),
-  checklistId: integer("checklist_id").notNull(),
-  description: text("description").notNull(),
-  details: text("details"),
-  completed: boolean("completed").notNull().default(false),
-  photoRequired: boolean("photo_required").notNull().default(false),
-  photoUrl: text("photo_url"),
-  orderIndex: integer("order_index").notNull().default(0)
-}, (table) => ({
-  // Index for faster task lookup by checklist
-  checklistIdIdx: index("task_checklist_id_idx").on(table.checklistId),
-  // Composite index for efficient querying of task status within checklists
-  taskStatusIdx: index("task_status_idx").on(table.checklistId, table.completed)
-}));
-var checklists = pgTable("checklists", {
-  id: text("id").primaryKey(),
-  // Changed to text to support Firebase IDs
-  name: text("name").notNull(),
-  status: text("status").notNull().default("not-started"),
-  progress: integer("progress").notNull().default(0),
-  remarks: text("remarks"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  updatedAt: timestamp("updated_at").notNull().defaultNow(),
-  tasksData: jsonb("tasks_data"),
-  // Store tasks as JSON for Firebase compatibility
-  shareToken: text("share_token"),
-  userId: text("user_id"),
-  // Firebase user ID
-  submittedAt: timestamp("submitted_at"),
-  submittedByToken: varchar("submitted_by_token", { length: 128 })
-}, (table) => ({
-  // Index for faster lookup by user
-  userIdIdx: index("checklist_user_id_idx").on(table.userId),
-  // Index for finding checklists by status
-  statusIdx: index("checklist_status_idx").on(table.status),
-  // Index for finding shared checklists
-  shareTokenIdx: index("checklist_share_token_idx").on(table.shareToken)
-}));
-var insertTaskSchema = createInsertSchema(tasks).omit({
-  id: true
-});
-var insertChecklistSchema = createInsertSchema(checklists).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true
-});
-var verifications = pgTable("verifications", {
-  id: serial("id").primaryKey(),
-  token: varchar("token", { length: 128 }).notNull().unique(),
-  code: varchar("code", { length: 10 }),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-  expiresAt: timestamp("expires_at").notNull(),
-  verified: boolean("verified").notNull().default(false),
-  recipientId: text("recipient_id").notNull(),
-  recipientEmail: text("recipient_email"),
-  recipientPhone: text("recipient_phone"),
-  checklistId: text("checklist_id"),
-  targetLanguage: varchar("target_language", { length: 10 }).default("en")
-}, (table) => ({
-  // Index for faster token lookup
-  tokenIdx: index("verification_token_idx").on(table.token),
-  // Index for expiration query optimizations
-  expiresAtIdx: index("verification_expires_at_idx").on(table.expiresAt),
-  // Index for finding verifications by checklist
-  checklistIdIdx: index("verification_checklist_id_idx").on(table.checklistId),
-  // Composite index for contact lookups
-  contactIdx: index("verification_contact_idx").on(table.recipientEmail, table.recipientPhone)
-}));
-var shareAccesses = pgTable("share_accesses", {
-  id: serial("id").primaryKey(),
-  shareToken: varchar("share_token", { length: 128 }).notNull().references(() => verifications.token),
-  firstAccessedAt: timestamp("first_accessed_at").notNull().defaultNow(),
-  lastAccessedAt: timestamp("last_accessed_at").notNull().defaultNow(),
-  ipHash: varchar("ip_hash", { length: 64 }),
-  userAgent: text("user_agent"),
-  accessCount: integer("access_count").notNull().default(1),
-  visitorId: varchar("visitor_id", { length: 36 })
-}, (table) => ({
-  tokenIdx: index("share_access_token_idx").on(table.shareToken),
-  visitorIdx: index("share_access_visitor_idx").on(table.visitorId)
-}));
-var insertVerificationSchema = createInsertSchema(verifications).omit({
-  id: true,
-  createdAt: true
-});
-var mailingListSubscriptions = pgTable("mailing_list_subscriptions", {
-  id: serial("id").primaryKey(),
-  email: varchar("email", { length: 255 }).notNull().unique(),
-  subscribedAt: timestamp("subscribed_at").notNull().defaultNow(),
-  confirmed: boolean("confirmed").notNull().default(false),
-  confirmationToken: varchar("confirmation_token", { length: 128 }),
-  source: varchar("source", { length: 50 }).notNull().default("development_banner"),
-  // Track where they signed up
-  leadType: varchar("lead_type", { length: 50 }).notNull().default("marketing_lead"),
-  // Categorize the type of lead
-  userAgent: text("user_agent"),
-  // For analytics
-  ipAddress: varchar("ip_address", { length: 45 })
-  // For compliance
-}, (table) => ({
-  // Index for faster email lookup
-  emailIdx: index("mailing_list_email_idx").on(table.email),
-  // Index for finding unconfirmed subscriptions
-  confirmedIdx: index("mailing_list_confirmed_idx").on(table.confirmed),
-  // Index for analytics by source
-  sourceIdx: index("mailing_list_source_idx").on(table.source),
-  // Index for filtering by lead type
-  leadTypeIdx: index("mailing_list_lead_type_idx").on(table.leadType)
-}));
-var insertMailingListSubscriptionSchema = createInsertSchema(mailingListSubscriptions).omit({
-  id: true,
-  subscribedAt: true
-});
-var insertUserSchema = createInsertSchema(users).omit({
-  createdAt: true,
-  updatedAt: true
-});
-var TIER_LIMITS = {
-  free: {
-    maxLists: 5,
-    maxUsers: 1,
-    syncFrequency: "6hours",
-    allowedLanguages: ["en", "es"],
-    maxLanguages: 2,
-    storageGB: 1,
-    features: ["manual_sync", "basic_translation", "mobile_access"]
-  },
-  professional: {
-    maxLists: 100,
-    maxUsers: 10,
-    syncFrequency: "realtime",
-    maxLanguages: 15,
-    storageGB: 50,
-    features: ["realtime_sync", "advanced_analytics", "integrations", "workflow_automation", "api_access", "team_collaboration", "priority_support"]
-  },
-  enterprise: {
-    maxLists: Infinity,
-    maxUsers: Infinity,
-    syncFrequency: "realtime",
-    maxLanguages: Infinity,
-    storageGB: Infinity,
-    features: ["unlimited_everything", "custom_deployment", "enterprise_sla", "custom_integrations", "onboarding"]
-  }
-};
-var smsConsents = pgTable("sms_consents", {
-  id: serial("id").primaryKey(),
-  phoneNumber: text("phone_number").notNull(),
-  firstName: text("first_name").notNull(),
-  lastName: text("last_name").notNull(),
-  consentedAt: timestamp("consented_at").notNull(),
-  ipAddress: text("ip_address"),
-  userAgent: text("user_agent"),
-  isActive: boolean("is_active").default(true),
-  createdAt: timestamp("created_at").defaultNow(),
-  updatedAt: timestamp("updated_at").defaultNow()
-});
-var insertSmsConsentSchema = createInsertSchema(smsConsents).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true
-});
-var leads = pgTable("leads", {
-  id: serial("id").primaryKey(),
-  email: varchar("email", { length: 255 }).notNull(),
-  source: varchar("source", { length: 100 }),
-  createdAt: timestamp("created_at").defaultNow(),
-  converted: boolean("converted").notNull().default(false)
-}, (table) => ({
-  emailIdx: index("leads_email_idx").on(table.email)
-}));
-var waitlist = pgTable("waitlist", {
-  id: serial("id").primaryKey(),
-  email: varchar("email", { length: 255 }).notNull().unique(),
-  source: varchar("source", { length: 100 }),
-  createdAt: timestamp("created_at").defaultNow(),
-  userAgent: text("user_agent"),
-  ipHash: varchar("ip_hash", { length: 64 })
-}, (table) => ({
-  emailIdx: index("waitlist_email_idx").on(table.email)
-}));
-var shareWrites = pgTable("share_writes", {
-  id: serial("id").primaryKey(),
-  shareToken: varchar("share_token", { length: 128 }).notNull(),
-  taskId: text("task_id"),
-  action: varchar("action", { length: 20 }).notNull(),
-  // 'task_toggle' | 'photo_upload' | 'submit'
-  ipHash: varchar("ip_hash", { length: 64 }),
-  visitorId: varchar("visitor_id", { length: 36 }),
-  createdAt: timestamp("created_at").notNull().defaultNow()
-}, (table) => ({
-  tokenIdx: index("share_writes_token_idx").on(table.shareToken),
-  createdAtIdx: index("share_writes_created_at_idx").on(table.createdAt)
-}));
-
-// server/db.ts
-import { Pool, neonConfig } from "@neondatabase/serverless";
-import { drizzle } from "drizzle-orm/neon-serverless";
-import ws from "ws";
-neonConfig.webSocketConstructor = ws;
-if (!process.env.DATABASE_URL) {
-  throw new Error(
-    "DATABASE_URL must be set. Did you forget to provision a database?"
-  );
-}
-var pool = new Pool({ connectionString: process.env.DATABASE_URL });
-var db = drizzle(pool, { schema: schema_exports });
-
 // server/storage.ts
+init_schema();
+init_db();
 import { eq, and, desc } from "drizzle-orm";
 import { v4 as uuidv4 } from "uuid";
 var DatabaseStorage = class {
@@ -1271,7 +1334,8 @@ async function sendShareSMS(phone, token, ownerName) {
 }
 
 // server/routes.ts
-import crypto from "crypto";
+init_schema();
+import crypto2 from "crypto";
 import Stripe from "stripe";
 var verificationRateLimit = rateLimit({
   windowMs: 15 * 60 * 1e3,
@@ -1316,7 +1380,7 @@ function getSiteBaseUrl(req) {
 }
 function hashIp(ip) {
   const salt = process.env.SHARE_ACCESS_SALT || "";
-  return crypto.createHash("sha256").update(ip + salt).digest("hex");
+  return crypto2.createHash("sha256").update(ip + salt).digest("hex");
 }
 function getVisitorId(req, res) {
   const existing = req.cookies?.visitor_id;
@@ -1509,8 +1573,8 @@ async function registerRoutes(app2) {
       }
       const userAgent = req.headers["user-agent"] || void 0;
       const ip = (req.ip || "").replace(/::ffff:/, "");
-      const crypto2 = await import("crypto");
-      const ipHash = crypto2.createHash("sha256").update(ip).digest("hex");
+      const crypto3 = await import("crypto");
+      const ipHash = crypto3.createHash("sha256").update(ip).digest("hex");
       await storage.upsertWaitlist(email, source || "beta_gate", userAgent, ipHash);
       res.json({ success: true });
     } catch (error) {
