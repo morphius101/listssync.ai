@@ -181,6 +181,10 @@ When `BETA_MODE=true`, the app is locked down:
 
 ## Infrastructure Notes
 
+### Gemini API quirk
+
+Gemini occasionally wraps JSON responses in markdown code fences (```` ```json ... ``` ````) despite explicit "return valid JSON only, no markdown" instructions. `JSON.parse` throws on the wrapper, the catch returns the original payload, and downstream code reports translation failure even though the model produced usable output. Always strip outer fences before `JSON.parse` on any Gemini-returned JSON. Reference pattern in `server/services/geminiTranslationService.ts` (anchored regex so embedded backticks in translated content survive). Apply the same defensive parse to any new Gemini integrations.
+
 ### Firebase Storage rules (as of 2026-04-21)
 
 Both read AND write for `task-photos/*` are relaxed to allow unauthenticated recipients. Recipients of a shared checklist are never Firebase-authenticated, so both `uploadBytes` (write) and `getDownloadURL` (read — hits the metadata endpoint which needs read permission) must work without auth. If either rule tightens, the shared-checklist upload flow hangs silently on mobile Safari rather than failing cleanly.

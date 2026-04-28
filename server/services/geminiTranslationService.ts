@@ -162,7 +162,14 @@ ${serialized}`;
       return checklist;
     }
 
-    const parsed = JSON.parse(translatedText);
+    // Gemini occasionally wraps JSON in ```json ... ``` despite the explicit
+    // "no markdown" instruction. Strip a single outer fence before parse —
+    // anchored to start/end so embedded backticks in translated content survive.
+    const stripped = translatedText
+      .replace(/^```(?:json)?\s*/i, '')
+      .replace(/\s*```$/, '')
+      .trim();
+    const parsed = JSON.parse(stripped);
     parsed.translatedTo = targetLanguage;
     parsed.translatedAt = checklist?.updatedAt || checklist?.translatedAt || new Date().toISOString();
 

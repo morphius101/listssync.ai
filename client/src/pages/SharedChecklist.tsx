@@ -106,9 +106,13 @@ export default function SharedChecklist() {
         // Gemini call comes back without a properly stamped translatedTo (cache
         // miss / cold start). Retry briefly before unblocking the loader so users
         // don't see the amber "Translation Unavailable" banner flash to blue.
+        // Budget: 4 retries × 2.5s ≈ 10s of explicit waits, plus per-retry fetch
+        // latency. Real root cause for repeated misses is handled server-side by
+        // stripping Gemini's markdown fences before JSON.parse — this is the
+        // safety net for the residual cases (genuinely slow Gemini, transient nets).
         const wantTranslation = (status.targetLanguage || 'en') !== 'en';
-        const RETRY_DELAY_MS = 2000;
-        const MAX_RETRIES = 2;
+        const RETRY_DELAY_MS = 2500;
+        const MAX_RETRIES = 4;
         let translationRetries = 0;
         while (
           !cancelled &&
