@@ -413,7 +413,8 @@ ${serialized}`;
       console.warn("\u26A0\uFE0F Gemini returned empty checklist translation; using original checklist");
       return checklist;
     }
-    const parsed = JSON.parse(translatedText);
+    const stripped = translatedText.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/, "").trim();
+    const parsed = JSON.parse(stripped);
     parsed.translatedTo = targetLanguage;
     parsed.translatedAt = checklist?.updatedAt || checklist?.translatedAt || (/* @__PURE__ */ new Date()).toISOString();
     await writeCachedTranslation(sourceHash, targetLanguage, parsed);
