@@ -37,6 +37,7 @@ import {
   formatPhoneForDisplay,
   formatEmailForDisplay,
 } from "./services/verificationService";
+import { registerTwilioWebhookRoutes } from "./routes/twilioWebhook";
 import crypto from "crypto";
 import { ChecklistDTO, TIER_LIMITS, SubscriptionTier } from "../shared/schema";
 import Stripe from "stripe";
@@ -167,7 +168,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.get(`${API_BASE}/health`, (_req, res) => {
     res.json({ status: "ok", timestamp: new Date().toISOString() });
   });
-  
+
+  // Twilio inbound SMS webhook (A2P 10DLC double-opt-in state machine).
+  // Mounts POST /api/twilio/inbound-sms with route-level urlencoded parser
+  // and signature validation. See server/routes/twilioWebhook.ts.
+  registerTwilioWebhookRoutes(app);
+
   // Setup API response compression for performance
   app.use(compression());
 

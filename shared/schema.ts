@@ -1,4 +1,5 @@
 import { pgTable, index, uniqueIndex, text, serial, integer, boolean, timestamp, jsonb, varchar } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -31,6 +32,7 @@ export const users = pgTable("users", {
   signupSource: varchar("signup_source", { length: 50 }),
   trialStartedAt: timestamp("trial_started_at"),
   marketingOptIn: boolean("marketing_opt_in").default(false),
+  businessName: varchar("business_name", { length: 120 }),
 }, (table) => [
   index("users_stripe_customer_idx").on(table.stripeCustomerId),
   index("users_subscription_tier_idx").on(table.subscriptionTier),
@@ -387,3 +389,83 @@ export const shareWrites = pgTable("share_writes", {
 }));
 
 export type ShareWrite = typeof shareWrites.$inferSelect;
+
+// ─── Recipient SMS double opt-in (A2P 10DLC compliance) ──────────────────────
+// Phone-number-level consent: once a number opts in, any Owner can send to it.
+// All phone columns are canonical E.164 (e.g., "+15551234567"). Owner-input
+// formats are normalized at the boundary via libphonenumber-js.
+
+export const recipientSmsConsent = pgTable("recipient_sms_consent", {
+  id: serial("id").primaryKey(),
+  phoneE164: varchar("phone_e164", { length: 20 }).notNull().unique(),
+  status: varchar("status", { length: 16 }).notNull(), // 'pending' | 'opted_in' | 'opted_out'
+  firstOwnerId: varchar("first_owner_id").references(() => users.id),
+  optInMessageSid: varchar("opt_in_message_sid", { length: 64 }),
+  optInTimestamp: timestamp("opt_in_timestamp"),
+  optOutTimestamp: timestamp("opt_out_timestamp"),
+  lastMessageSid: varchar("last_message_sid", { length: 64 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (table) => ({
+  statusIdx: index("recipient_sms_consent_status_idx").on(table.status),
+}));
+
+export const pendingShareSms = pgTable("pending_share_sms", {
+  id: serial("id").primaryKey(),
+  phoneE164: varchar("phone_e164", { length: 20 }).notNull(),
+  shareToken: varchar("share_token", { length: 128 }).notNull().references(() => verifications.token),
+  ownerId: varchar("owner_id").notNull().references(() => users.id),
+  queuedAt: timestamp("queued_at").notNull().defaultNow(),
+  sentAt: timestamp("sent_at"),
+  // 'expired_72h' | 'recipient_opted_out' | 'send_failed'
+  droppedReason: varchar("dropped_reason", { length: 32 }),
+}, (table) => ({
+  phoneQueuedIdx: index("pending_share_sms_phone_idx").on(table.phoneE164, table.queuedAt),
+  tokenIdx: index("pending_share_sms_token_idx").on(table.shareToken),
+}));
+
+// Append-only audit trail. Never UPDATE or DELETE rows here — this is the
+// legal defense for FL/WA/OK TCPA private-right-of-action exposure.
+// The partial unique on message_sid is the inbound-webhook idempotency key:
+// duplicate Twilio retries hit the unique constraint and are skipped.
+export const consentAuditLog = pgTable("consent_audit_log", {
+  id: serial("id").primaryKey(),
+  phoneE164: varchar("phone_e164", { length: 20 }).notNull(),
+  // 'opt_in_sent' | 'inbound_yes' | 'inbound_orphan_yes' | 'inbound_stop'
+  // | 'inbound_help' | 'inbound_other' | 'share_sent'
+  // | 'opt_in_blocked_pending' | 'share_blocked_opted_out'
+  // | 'share_blocked_no_business_name'
+  // FK retention note: any user deletion (GDPR/CCPA) must first NULL out
+  // owner_id on these rows or skip them. Today, deleting a user with any
+  // consent or audit row referencing them fails with FK violation.
+  eventType: varchar("event_type", { length: 40 }).notNull(),
+  messageSid: varchar("message_sid", { length: 64 }),
+  body: text("body"),
+  sourceIp: varchar("source_ip", { length: 64 }),
+  ownerId: varchar("owner_id").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  phoneCreatedIdx: index("consent_audit_log_phone_idx").on(table.phoneE164, table.createdAt),
+  messageSidUniqueIdx: uniqueIndex("consent_audit_log_message_sid_idx")
+    .on(table.messageSid)
+    .where(sql`message_sid IS NOT NULL`),
+}));
+
+export const insertRecipientSmsConsentSchema = createInsertSchema(recipientSmsConsent).omit({
+  id: true, createdAt: true, updatedAt: true,
+});
+export const insertPendingShareSmsSchema = createInsertSchema(pendingShareSms).omit({
+  id: true, queuedAt: true,
+});
+export const insertConsentAuditLogSchema = createInsertSchema(consentAuditLog).omit({
+  id: true, createdAt: true,
+});
+
+export type RecipientSmsConsent = typeof recipientSmsConsent.$inferSelect;
+export type PendingShareSms = typeof pendingShareSms.$inferSelect;
+export type ConsentAuditLog = typeof consentAuditLog.$inferSelect;
+export type InsertRecipientSmsConsent = z.infer<typeof insertRecipientSmsConsentSchema>;
+export type InsertPendingShareSms = z.infer<typeof insertPendingShareSmsSchema>;
+export type InsertConsentAuditLog = z.infer<typeof insertConsentAuditLogSchema>;
+
+export type RecipientSmsConsentStatus = 'pending' | 'opted_in' | 'opted_out';

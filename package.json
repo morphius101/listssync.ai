@@ -69,6 +69,7 @@
     "firebase-admin": "^13.7.0",
     "framer-motion": "^11.13.1",
     "input-otp": "^1.4.2",
+    "libphonenumber-js": "^1.12.42",
     "lucide-react": "^0.453.0",
     "memoizee": "^0.4.17",
     "memorystore": "^1.6.7",
