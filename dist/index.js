@@ -13,14 +13,20 @@ var schema_exports = {};
 __export(schema_exports, {
   TIER_LIMITS: () => TIER_LIMITS,
   checklists: () => checklists,
+  consentAuditLog: () => consentAuditLog,
   insertChecklistSchema: () => insertChecklistSchema,
+  insertConsentAuditLogSchema: () => insertConsentAuditLogSchema,
   insertMailingListSubscriptionSchema: () => insertMailingListSubscriptionSchema,
+  insertPendingShareSmsSchema: () => insertPendingShareSmsSchema,
+  insertRecipientSmsConsentSchema: () => insertRecipientSmsConsentSchema,
   insertSmsConsentSchema: () => insertSmsConsentSchema,
   insertTaskSchema: () => insertTaskSchema,
   insertUserSchema: () => insertUserSchema,
   insertVerificationSchema: () => insertVerificationSchema,
   leads: () => leads,
   mailingListSubscriptions: () => mailingListSubscriptions,
+  pendingShareSms: () => pendingShareSms,
+  recipientSmsConsent: () => recipientSmsConsent,
   sessions: () => sessions,
   shareAccesses: () => shareAccesses,
   shareWrites: () => shareWrites,
@@ -32,8 +38,9 @@ __export(schema_exports, {
   waitlist: () => waitlist
 });
 import { pgTable, index, uniqueIndex, text, serial, integer, boolean, timestamp, jsonb, varchar } from "drizzle-orm/pg-core";
+import { sql } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
-var users, sessions, tasks, checklists, insertTaskSchema, insertChecklistSchema, translationCache, verifications, shareAccesses, insertVerificationSchema, mailingListSubscriptions, insertMailingListSubscriptionSchema, insertUserSchema, TIER_LIMITS, smsConsents, insertSmsConsentSchema, leads, waitlist, shareWrites;
+var users, sessions, tasks, checklists, insertTaskSchema, insertChecklistSchema, translationCache, verifications, shareAccesses, insertVerificationSchema, mailingListSubscriptions, insertMailingListSubscriptionSchema, insertUserSchema, TIER_LIMITS, smsConsents, insertSmsConsentSchema, leads, waitlist, shareWrites, recipientSmsConsent, pendingShareSms, consentAuditLog, insertRecipientSmsConsentSchema, insertPendingShareSmsSchema, insertConsentAuditLogSchema;
 var init_schema = __esm({
   "shared/schema.ts"() {
     "use strict";
@@ -69,7 +76,8 @@ var init_schema = __esm({
       // 'google' | 'email'
       signupSource: varchar("signup_source", { length: 50 }),
       trialStartedAt: timestamp("trial_started_at"),
-      marketingOptIn: boolean("marketing_opt_in").default(false)
+      marketingOptIn: boolean("marketing_opt_in").default(false),
+      businessName: varchar("business_name", { length: 120 })
     }, (table) => [
       index("users_stripe_customer_idx").on(table.stripeCustomerId),
       index("users_subscription_tier_idx").on(table.subscriptionTier),
@@ -291,6 +299,67 @@ var init_schema = __esm({
       tokenIdx: index("share_writes_token_idx").on(table.shareToken),
       createdAtIdx: index("share_writes_created_at_idx").on(table.createdAt)
     }));
+    recipientSmsConsent = pgTable("recipient_sms_consent", {
+      id: serial("id").primaryKey(),
+      phoneE164: varchar("phone_e164", { length: 20 }).notNull().unique(),
+      status: varchar("status", { length: 16 }).notNull(),
+      // 'pending' | 'opted_in' | 'opted_out'
+      firstOwnerId: varchar("first_owner_id").references(() => users.id),
+      optInMessageSid: varchar("opt_in_message_sid", { length: 64 }),
+      optInTimestamp: timestamp("opt_in_timestamp"),
+      optOutTimestamp: timestamp("opt_out_timestamp"),
+      lastMessageSid: varchar("last_message_sid", { length: 64 }),
+      createdAt: timestamp("created_at").notNull().defaultNow(),
+      updatedAt: timestamp("updated_at").notNull().defaultNow()
+    }, (table) => ({
+      statusIdx: index("recipient_sms_consent_status_idx").on(table.status)
+    }));
+    pendingShareSms = pgTable("pending_share_sms", {
+      id: serial("id").primaryKey(),
+      phoneE164: varchar("phone_e164", { length: 20 }).notNull(),
+      shareToken: varchar("share_token", { length: 128 }).notNull().references(() => verifications.token),
+      ownerId: varchar("owner_id").notNull().references(() => users.id),
+      queuedAt: timestamp("queued_at").notNull().defaultNow(),
+      sentAt: timestamp("sent_at"),
+      // 'expired_72h' | 'recipient_opted_out' | 'send_failed'
+      droppedReason: varchar("dropped_reason", { length: 32 })
+    }, (table) => ({
+      phoneQueuedIdx: index("pending_share_sms_phone_idx").on(table.phoneE164, table.queuedAt),
+      tokenIdx: index("pending_share_sms_token_idx").on(table.shareToken)
+    }));
+    consentAuditLog = pgTable("consent_audit_log", {
+      id: serial("id").primaryKey(),
+      phoneE164: varchar("phone_e164", { length: 20 }).notNull(),
+      // 'opt_in_sent' | 'inbound_yes' | 'inbound_orphan_yes' | 'inbound_stop'
+      // | 'inbound_help' | 'inbound_other' | 'share_sent'
+      // | 'opt_in_blocked_pending' | 'share_blocked_opted_out'
+      // | 'share_blocked_no_business_name'
+      // FK retention note: any user deletion (GDPR/CCPA) must first NULL out
+      // owner_id on these rows or skip them. Today, deleting a user with any
+      // consent or audit row referencing them fails with FK violation.
+      eventType: varchar("event_type", { length: 40 }).notNull(),
+      messageSid: varchar("message_sid", { length: 64 }),
+      body: text("body"),
+      sourceIp: varchar("source_ip", { length: 64 }),
+      ownerId: varchar("owner_id").references(() => users.id),
+      createdAt: timestamp("created_at").notNull().defaultNow()
+    }, (table) => ({
+      phoneCreatedIdx: index("consent_audit_log_phone_idx").on(table.phoneE164, table.createdAt),
+      messageSidUniqueIdx: uniqueIndex("consent_audit_log_message_sid_idx").on(table.messageSid).where(sql`message_sid IS NOT NULL`)
+    }));
+    insertRecipientSmsConsentSchema = createInsertSchema(recipientSmsConsent).omit({
+      id: true,
+      createdAt: true,
+      updatedAt: true
+    });
+    insertPendingShareSmsSchema = createInsertSchema(pendingShareSms).omit({
+      id: true,
+      queuedAt: true
+    });
+    insertConsentAuditLogSchema = createInsertSchema(consentAuditLog).omit({
+      id: true,
+      createdAt: true
+    });
   }
 });
 
@@ -324,7 +393,7 @@ __export(geminiTranslationService_exports, {
 });
 import { GoogleGenAI } from "@google/genai";
 import crypto from "crypto";
-import { sql, and as and2, eq as eq2 } from "drizzle-orm";
+import { sql as sql2, and as and2, eq as eq2 } from "drizzle-orm";
 async function getCachedTranslation(sourceHash, targetLanguage) {
   try {
     const [row] = await db.select().from(translationCache).where(and2(
@@ -332,7 +401,7 @@ async function getCachedTranslation(sourceHash, targetLanguage) {
       eq2(translationCache.targetLanguage, targetLanguage)
     )).limit(1);
     if (!row) return null;
-    db.update(translationCache).set({ hits: sql`${translationCache.hits} + 1`, lastHitAt: /* @__PURE__ */ new Date() }).where(eq2(translationCache.id, row.id)).catch((e) => console.error("translation_cache hit-bump failed:", e));
+    db.update(translationCache).set({ hits: sql2`${translationCache.hits} + 1`, lastHitAt: /* @__PURE__ */ new Date() }).where(eq2(translationCache.id, row.id)).catch((e) => console.error("translation_cache hit-bump failed:", e));
     return row.translatedJson;
   } catch (e) {
     console.error("translation_cache read failed:", e);
@@ -566,7 +635,7 @@ var init_emailService = __esm({
 });
 
 // server/index.ts
-import express2 from "express";
+import express3 from "express";
 import cookieParser from "cookie-parser";
 
 // server/routes.ts
@@ -1334,6 +1403,250 @@ async function sendShareSMS(phone, token, ownerName) {
   }
 }
 
+// server/routes/twilioWebhook.ts
+init_db();
+init_schema();
+import express, { Router } from "express";
+import twilio2 from "twilio";
+import { and as and3, eq as eq3, gt, inArray, isNull, lte, sql as sql3 } from "drizzle-orm";
+
+// server/utils/phone.ts
+import { parsePhoneNumberWithError } from "libphonenumber-js";
+function normalizeInboundPhone(input) {
+  try {
+    const parsed = parsePhoneNumberWithError(input, "US");
+    if (!parsed.isValid()) return { ok: false };
+    return { ok: true, e164: parsed.number };
+  } catch {
+    return { ok: false };
+  }
+}
+
+// server/routes/twilioWebhook.ts
+var STOP_KEYWORDS = /* @__PURE__ */ new Set(["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"]);
+var HELP_KEYWORDS = /* @__PURE__ */ new Set(["HELP", "INFO"]);
+function classifyBody(body) {
+  const trimmed = body.trim();
+  const tokens = trimmed.split(/\s+/).map((t) => t.replace(/[^A-Za-z]/g, "").toUpperCase()).filter(Boolean);
+  if (tokens.some((t) => STOP_KEYWORDS.has(t))) return "STOP";
+  if (tokens.some((t) => HELP_KEYWORDS.has(t))) return "HELP";
+  if (trimmed.toUpperCase() === "YES") return "YES";
+  return "OTHER";
+}
+var RATE_WINDOW_MS = 6e4;
+var RATE_MAX = 10;
+var rateMap = /* @__PURE__ */ new Map();
+function checkRateLimit(phoneE164) {
+  const now = Date.now();
+  const cutoff = now - RATE_WINDOW_MS;
+  const recent = (rateMap.get(phoneE164) ?? []).filter((t) => t > cutoff);
+  if (recent.length >= RATE_MAX) {
+    rateMap.set(phoneE164, recent);
+    return false;
+  }
+  recent.push(now);
+  rateMap.set(phoneE164, recent);
+  return true;
+}
+function buildFullUrl(req) {
+  const protocol = req.protocol;
+  const host = req.get("host");
+  return `${protocol}://${host}${req.originalUrl}`;
+}
+async function handleInboundSms(req, res) {
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  if (!authToken) {
+    console.error("twilio webhook: TWILIO_AUTH_TOKEN not set \u2014 rejecting");
+    res.status(500).send("Server misconfigured");
+    return;
+  }
+  const signature = req.header("X-Twilio-Signature");
+  if (!signature) {
+    res.status(403).send("Missing signature");
+    return;
+  }
+  const fullUrl = buildFullUrl(req);
+  const isValid = twilio2.validateRequest(authToken, signature, fullUrl, req.body ?? {});
+  if (!isValid) {
+    console.warn(`twilio webhook: invalid signature for url=${fullUrl}`);
+    res.status(403).send("Invalid signature");
+    return;
+  }
+  const fromRaw = req.body?.From ?? "";
+  const body = req.body?.Body ?? "";
+  const messageSid = req.body?.MessageSid ?? "";
+  if (!fromRaw || !messageSid) {
+    res.status(400).send("Missing required Twilio fields");
+    return;
+  }
+  const normalized = normalizeInboundPhone(fromRaw);
+  if (!normalized.ok) {
+    console.error(`twilio webhook: unparseable From=${fromRaw} sid=${messageSid}`);
+    res.status(400).send("Unparseable From");
+    return;
+  }
+  const phoneE164 = normalized.e164;
+  if (!checkRateLimit(phoneE164)) {
+    console.warn(`twilio webhook: rate-limited phone=${phoneE164} sid=${messageSid}`);
+    res.set("Content-Type", "text/xml").send("<Response/>");
+    return;
+  }
+  const classification = classifyBody(body);
+  const sourceIp = (req.headers["x-forwarded-for"] || req.ip || "").split(",")[0].trim() || null;
+  let queuedToSend = [];
+  let isDuplicate = false;
+  try {
+    await db.transaction(async (tx) => {
+      const existing = await tx.select().from(recipientSmsConsent).where(eq3(recipientSmsConsent.phoneE164, phoneE164)).limit(1);
+      const current = existing[0];
+      let eventType;
+      if (classification === "YES") {
+        if (!current) {
+          eventType = "inbound_orphan_yes";
+        } else {
+          eventType = "inbound_yes";
+        }
+      } else if (classification === "STOP") {
+        eventType = "inbound_stop";
+      } else if (classification === "HELP") {
+        eventType = "inbound_help";
+      } else {
+        eventType = "inbound_other";
+      }
+      await tx.insert(consentAuditLog).values({
+        phoneE164,
+        eventType,
+        messageSid,
+        body,
+        sourceIp,
+        ownerId: null
+      });
+      const now = /* @__PURE__ */ new Date();
+      if (classification === "STOP") {
+        if (current && current.status !== "opted_out") {
+          await tx.update(recipientSmsConsent).set({
+            status: "opted_out",
+            optOutTimestamp: now,
+            lastMessageSid: messageSid,
+            updatedAt: now
+          }).where(eq3(recipientSmsConsent.phoneE164, phoneE164));
+          await tx.update(pendingShareSms).set({ droppedReason: "recipient_opted_out" }).where(
+            and3(
+              eq3(pendingShareSms.phoneE164, phoneE164),
+              isNull(pendingShareSms.sentAt),
+              isNull(pendingShareSms.droppedReason)
+            )
+          );
+        } else if (current) {
+          await tx.update(recipientSmsConsent).set({ lastMessageSid: messageSid, updatedAt: now }).where(eq3(recipientSmsConsent.phoneE164, phoneE164));
+        }
+      } else if (classification === "YES" && current && current.status === "pending") {
+        await tx.update(recipientSmsConsent).set({
+          status: "opted_in",
+          optInMessageSid: messageSid,
+          optInTimestamp: now,
+          lastMessageSid: messageSid,
+          updatedAt: now
+        }).where(eq3(recipientSmsConsent.phoneE164, phoneE164));
+        const claimed = await tx.update(pendingShareSms).set({ sentAt: now }).where(
+          and3(
+            eq3(pendingShareSms.phoneE164, phoneE164),
+            gt(pendingShareSms.queuedAt, sql3`now() - interval '72 hours'`),
+            isNull(pendingShareSms.sentAt),
+            isNull(pendingShareSms.droppedReason)
+          )
+        ).returning({ id: pendingShareSms.id, shareToken: pendingShareSms.shareToken });
+        queuedToSend = claimed;
+        await tx.update(pendingShareSms).set({ droppedReason: "expired_72h" }).where(
+          and3(
+            eq3(pendingShareSms.phoneE164, phoneE164),
+            lte(pendingShareSms.queuedAt, sql3`now() - interval '72 hours'`),
+            isNull(pendingShareSms.sentAt),
+            isNull(pendingShareSms.droppedReason)
+          )
+        );
+      } else if (current) {
+        await tx.update(recipientSmsConsent).set({ lastMessageSid: messageSid, updatedAt: now }).where(eq3(recipientSmsConsent.phoneE164, phoneE164));
+      }
+    });
+  } catch (err) {
+    if (err?.code === "23505") {
+      isDuplicate = true;
+    } else {
+      console.error("twilio webhook: tx failed", { sid: messageSid, phone: phoneE164, err });
+      res.status(500).send("Transaction failed");
+      return;
+    }
+  }
+  if (isDuplicate) {
+    res.set("Content-Type", "text/xml").send("<Response/>");
+    return;
+  }
+  if (queuedToSend.length > 0) {
+    const results = await Promise.allSettled(
+      queuedToSend.map(async ({ shareToken }) => sendShareSMS(phoneE164, shareToken))
+    );
+    const failedIds = [];
+    for (let i = 0; i < results.length; i++) {
+      const r = results[i];
+      const id = queuedToSend[i].id;
+      if (r.status === "rejected") {
+        console.error(`twilio webhook: sendShareSMS threw for queue id=${id}`, r.reason);
+        failedIds.push(id);
+      } else if (r.value === false) {
+        failedIds.push(id);
+      }
+    }
+    if (failedIds.length > 0) {
+      try {
+        await db.update(pendingShareSms).set({ droppedReason: "send_failed" }).where(inArray(pendingShareSms.id, failedIds));
+      } catch (e) {
+        console.error("twilio webhook: failed to record send_failed", { failedIds, e });
+      }
+    }
+  }
+  res.set("Content-Type", "text/xml").send("<Response/>");
+}
+var DEV_PLACEHOLDERS = /* @__PURE__ */ new Set([
+  "changeme",
+  "change_me",
+  "placeholder",
+  "your_twilio_auth_token",
+  "todo",
+  "xxx",
+  "test",
+  "dev",
+  "secret"
+]);
+function assertTwilioAuthTokenSane() {
+  const tok = process.env.TWILIO_AUTH_TOKEN;
+  const banner = "\n*********************************************************\n";
+  if (!tok) {
+    console.error(`${banner}* TWILIO WEBHOOK: TWILIO_AUTH_TOKEN is NOT SET.        *
+* Inbound SMS signature validation will reject ALL     *
+* requests with 403. Set the token before deploying.   *${banner}`);
+    return;
+  }
+  if (DEV_PLACEHOLDERS.has(tok.toLowerCase()) || tok.length < 16) {
+    console.error(`${banner}* TWILIO WEBHOOK: TWILIO_AUTH_TOKEN looks like a       *
+* placeholder/dev value (len=${String(tok.length).padEnd(3)}). Refusing to boot. *${banner}`);
+    throw new Error("TWILIO_AUTH_TOKEN appears to be a placeholder/dev value \u2014 refusing to start");
+  }
+}
+function registerTwilioWebhookRoutes(app2) {
+  assertTwilioAuthTokenSane();
+  const router = Router();
+  router.post(
+    "/inbound-sms",
+    express.urlencoded({ extended: false }),
+    handleInboundSms
+  );
+  router.all("/inbound-sms", (_req, res) => {
+    res.set("Allow", "POST").status(405).send("Method Not Allowed");
+  });
+  app2.use("/api/twilio", router);
+}
+
 // server/routes.ts
 init_schema();
 import crypto2 from "crypto";
@@ -1451,6 +1764,7 @@ async function registerRoutes(app2) {
   app2.get(`${API_BASE}/health`, (_req, res) => {
     res.json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
   });
+  registerTwilioWebhookRoutes(app2);
   app2.use(compression());
   app2.get(`${API_BASE}/user/:userId/subscription`, requireAuth, async (req, res) => {
     try {
@@ -2225,8 +2539,8 @@ async function registerRoutes(app2) {
             }
           }
           console.log(`\u{1F4F1} Formatted phone number: ${formattedPhone}`);
-          const twilio2 = await import("twilio").then((module) => module.default);
-          const client = twilio2(accountSid, authToken);
+          const twilio3 = await import("twilio").then((module) => module.default);
+          const client = twilio3(accountSid, authToken);
           const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
           const msgParams = { body: testMessage, to: formattedPhone };
           if (messagingServiceSid) {
@@ -2794,7 +3108,7 @@ async function registerRoutes(app2) {
 }
 
 // server/vite.ts
-import express from "express";
+import express2 from "express";
 import fs from "fs";
 import path from "path";
 import { nanoid } from "nanoid";
@@ -2859,7 +3173,7 @@ function serveStatic(app2) {
       `Could not find the build directory: ${distPath}, make sure to build the client first`
     );
   }
-  app2.use(express.static(distPath));
+  app2.use(express2.static(distPath));
   app2.use("/api", (_req, res) => {
     res.status(404).json({ message: "Not Found" });
   });
@@ -2928,15 +3242,15 @@ console.log("Twilio SID first chars:", process.env.TWILIO_ACCOUNT_SID?.substring
 console.log("Twilio Auth first chars:", process.env.TWILIO_AUTH_TOKEN?.substring(0, 5));
 console.log("Twilio Phone:", process.env.TWILIO_PHONE_NUMBER);
 console.log("================================");
-var app = express2();
+var app = express3();
 app.set("trust proxy", 1);
 app.use(cookieParser());
-app.use(express2.json({
+app.use(express3.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;
   }
 }));
-app.use(express2.urlencoded({ extended: false }));
+app.use(express3.urlencoded({ extended: false }));
 app.use((req, res, next) => {
   const host = req.headers.host || "";
   if (host === "listssync.ai") {
