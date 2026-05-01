@@ -129,7 +129,7 @@ export default function SmsConsent() {
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="font-semibold text-gray-900 mb-2">Technical details:</h3>
               <ul className="text-sm text-gray-700 space-y-1">
-                <li>• Messages sent from: <strong>+1 (866) 350-3513</strong></li>
+                <li>• Messages sent from: <strong>+1 (260) 465-5669</strong></li>
                 <li>• Frequency: Only when checklists are shared with you</li>
                 <li>• Supported carriers: All major US carriers</li>
               </ul>
