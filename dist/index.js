@@ -1040,6 +1040,15 @@ var DatabaseStorage = class {
       throw error;
     }
   }
+  async updateUserBusinessName(userId, businessName) {
+    try {
+      const [updated] = await db.update(users).set({ businessName, updatedAt: /* @__PURE__ */ new Date() }).where(eq(users.id, userId)).returning();
+      return updated || void 0;
+    } catch (error) {
+      console.error("Error updating user business name:", error);
+      throw error;
+    }
+  }
   async updateUserSubscription(userId, tier, stripeData) {
     try {
       const updateData = {
@@ -1366,6 +1375,9 @@ async function getVerification(token) {
   }
 }
 async function sendShareSMS(phone, token, ownerName) {
+  if (process.env.NODE_ENV === "development" && token.startsWith("TEST_FAIL_")) {
+    return false;
+  }
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
@@ -1793,6 +1805,41 @@ async function registerRoutes(app2) {
     } catch (error) {
       console.error("Error getting user subscription:", error);
       res.status(500).json({ error: "Failed to get subscription" });
+    }
+  });
+  app2.get(`${API_BASE}/users/me`, requireAuth, async (req, res) => {
+    try {
+      const userId = req.user?.uid;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: "User not found" });
+      res.json(user);
+    } catch (error) {
+      console.error("Error getting current user:", error);
+      res.status(500).json({ error: "Failed to get user" });
+    }
+  });
+  app2.patch(`${API_BASE}/users/me`, requireAuth, async (req, res) => {
+    try {
+      const userId = req.user?.uid;
+      if (!userId) return res.status(401).json({ error: "Unauthorized" });
+      const raw = req.body?.business_name ?? req.body?.businessName;
+      if (typeof raw !== "string") {
+        return res.status(400).json({ error: "business_name must be a string" });
+      }
+      const trimmed = raw.trim();
+      if (trimmed.length === 0) {
+        return res.status(400).json({ error: "business_name cannot be empty" });
+      }
+      if (trimmed.length > 120) {
+        return res.status(400).json({ error: "business_name must be 120 characters or fewer" });
+      }
+      const updated = await storage.updateUserBusinessName(userId, trimmed);
+      if (!updated) return res.status(404).json({ error: "User not found" });
+      res.json(updated);
+    } catch (error) {
+      console.error("Error updating user profile:", error);
+      res.status(500).json({ error: "Failed to update profile" });
     }
   });
   app2.post(`${API_BASE}/user/register`, requireAuth, async (req, res) => {
