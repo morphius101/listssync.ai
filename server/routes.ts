@@ -217,6 +217,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Current authenticated user's profile (used by /settings to prefill).
+  app.get(`${API_BASE}/users/me`, requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user?.uid;
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+      const user = await storage.getUser(userId);
+      if (!user) return res.status(404).json({ error: 'User not found' });
+      res.json(user);
+    } catch (error) {
+      console.error('Error getting current user:', error);
+      res.status(500).json({ error: 'Failed to get user' });
+    }
+  });
+
+  // Update current user's profile. Currently only business_name is editable
+  // through this endpoint; subscription/CRM fields are owned by other paths.
+  app.patch(`${API_BASE}/users/me`, requireAuth, async (req, res) => {
+    try {
+      const userId = (req as any).user?.uid;
+      if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+      const raw = (req.body?.business_name ?? req.body?.businessName) as unknown;
+      if (typeof raw !== 'string') {
+        return res.status(400).json({ error: 'business_name must be a string' });
+      }
+      const trimmed = raw.trim();
+      if (trimmed.length === 0) {
+        return res.status(400).json({ error: 'business_name cannot be empty' });
+      }
+      if (trimmed.length > 120) {
+        return res.status(400).json({ error: 'business_name must be 120 characters or fewer' });
+      }
+
+      const updated = await storage.updateUserBusinessName(userId, trimmed);
+      if (!updated) return res.status(404).json({ error: 'User not found' });
+      res.json(updated);
+    } catch (error) {
+      console.error('Error updating user profile:', error);
+      res.status(500).json({ error: 'Failed to update profile' });
+    }
+  });
+
   // Create or update user with automatic free tier enrollment
   app.post(`${API_BASE}/user/register`, requireAuth, async (req, res) => {
     try {

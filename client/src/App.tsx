@@ -9,6 +9,7 @@ import ChecklistView from "@/pages/ChecklistView";
 import SharedChecklist from "@/pages/SharedChecklist";
 import Pricing from "@/pages/Pricing";
 import SmsConsent from "@/pages/SmsConsent";
+import Settings from "@/pages/Settings";
 import BetaGate from "@/pages/BetaGate";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
@@ -149,6 +150,15 @@ function Router() {
         )}
       </Route>
       
+      {/* Protected settings page */}
+      <Route path="/settings">
+        {() => (
+          <ProtectedRoute>
+            <Settings />
+          </ProtectedRoute>
+        )}
+      </Route>
+
       {/* Protected checklist view */}
       <Route path="/checklist/:id">
         {(params) => (

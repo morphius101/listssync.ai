@@ -15,4 +15,4 @@ replit.md
 
 # One-shot ops diagnostics — each phase produces its own; not production code.
 # Use `git add -f diag-keeper.mjs` if a particular diag becomes worth keeping.
-diag-*.mjs
+diag*.mjs

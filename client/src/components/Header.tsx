@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from "@/hooks/useAuth";
 import { signInWithGoogle, signOutUser } from "@/lib/firebase";
 import { Logo } from "./Logo";
-import { User, Clipboard, LogOut } from "lucide-react";
+import { User, Clipboard, LogOut, Settings as SettingsIcon } from "lucide-react";
 
 const BETA_MODE = import.meta.env.VITE_BETA_MODE === 'true';
 const BETA_ALLOWLIST: string[] = (import.meta.env.VITE_BETA_ALLOWLIST_EMAILS || '')
@@ -59,9 +59,21 @@ const Header = () => {
                   </span>
                 </div>
                 
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
+                <Link href="/settings">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-600"
+                    aria-label="Settings"
+                  >
+                    <SettingsIcon className="h-4 w-4" />
+                    <span className="sr-only">Settings</span>
+                  </Button>
+                </Link>
+
+                <Button
+                  variant="ghost"
+                  size="sm"
                   onClick={handleLogout}
                   className="text-gray-600 hover:text-red-600"
                 >
