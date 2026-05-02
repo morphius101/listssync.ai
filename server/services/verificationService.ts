@@ -87,6 +87,14 @@ export async function getVerification(token: string): Promise<VerificationDTO | 
  * Send a share link via SMS (Option A — owner-attributed, no code).
  */
 export async function sendShareSMS(phone: string, token: string, ownerName?: string): Promise<boolean> {
+  // Dev-only test seam: lets diag-phase4-warm-send-failed.mjs exercise the
+  // webhook's send_failed disposition path. Real share tokens are
+  // server-generated UUIDs — no collision possible. Strict NODE_ENV check
+  // (not !== 'production') ensures this never fires outside local dev.
+  if (process.env.NODE_ENV === 'development' && token.startsWith('TEST_FAIL_')) {
+    return false;
+  }
+
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
