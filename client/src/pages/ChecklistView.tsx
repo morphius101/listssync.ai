@@ -187,13 +187,16 @@ const ChecklistView = ({ id: propId }: ChecklistViewProps) => {
       
       {!isCompleted && (
         <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
-          <Button 
+          <Button
             onClick={handleSubmit}
-            disabled={isSubmitting}
+            disabled={true}
             className="w-full px-4 py-3 bg-primary text-white text-center font-medium rounded-md shadow hover:bg-primary-dark focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 transition-colors"
           >
-            {isSubmitting ? "Submitting..." : "Submit Completed Checklist"}
+            Waiting for recipient to complete
           </Button>
+          <p className="text-xs text-gray-500 mt-2 text-center">
+            This checklist completes when your recipient submits it via their share link. Share the link from your dashboard.
+          </p>
         </div>
       )}
       
