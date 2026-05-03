@@ -1307,6 +1307,18 @@ function getAllowlist() {
 function isBetaActive() {
   return process.env.BETA_MODE === "true";
 }
+function isTwilioReviewBypassActive() {
+  return (process.env.BETA_TWILIO_REVIEW_BYPASS || "").toLowerCase() === "true";
+}
+function warnIfTwilioReviewBypassActive() {
+  if (!isTwilioReviewBypassActive()) return;
+  const banner = "*".repeat(57);
+  console.warn(banner);
+  console.warn("[BETA_TWILIO_REVIEW_BYPASS] ENABLED \u2014 beta gate bypassed on");
+  console.warn("/api/verification/generate. Disable this flag after Twilio");
+  console.warn("review completes.");
+  console.warn(banner);
+}
 var betaModeGuard = (req, res, next) => {
   if (!isBetaActive()) return next();
   const allowlist = getAllowlist();
@@ -1314,6 +1326,10 @@ var betaModeGuard = (req, res, next) => {
   const userEmail = (req.user?.email || "").toLowerCase();
   if (userEmail && allowlist.includes(userEmail)) return next();
   return res.status(403).json({ error: "Private beta", code: "BETA_MODE_ACTIVE" });
+};
+var betaModeGuardWithReviewBypass = (req, res, next) => {
+  if (isTwilioReviewBypassActive()) return next();
+  return betaModeGuard(req, res, next);
 };
 
 // server/routes.ts
@@ -1772,6 +1788,7 @@ async function resolveUserId(opts) {
   return void 0;
 }
 async function registerRoutes(app2) {
+  warnIfTwilioReviewBypassActive();
   const API_BASE = "/api";
   app2.get(`${API_BASE}/health`, (_req, res) => {
     res.json({ status: "ok", timestamp: (/* @__PURE__ */ new Date()).toISOString() });
@@ -2523,7 +2540,7 @@ async function registerRoutes(app2) {
       res.status(500).json({ message: error.message });
     }
   });
-  app2.post(`${API_BASE}/verification/generate`, requireAuth, betaModeGuard, async (req, res) => {
+  app2.post(`${API_BASE}/verification/generate`, requireAuth, betaModeGuardWithReviewBypass, async (req, res) => {
     try {
       const { checklistId, recipientId, targetLanguage, email, phone, checklistName, ownerName } = req.body;
       if (!checklistId) return res.status(400).json({ error: "checklistId required" });
