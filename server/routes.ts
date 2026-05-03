@@ -2,7 +2,7 @@ import type { Express, Request, Response } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { requireAuth } from "./middleware/auth";
-import { betaModeGuard } from "./middleware/betaMode";
+import { betaModeGuard, betaModeGuardWithReviewBypass, warnIfTwilioReviewBypassActive } from "./middleware/betaMode";
 import rateLimit from "express-rate-limit";
 import { v4 as uuidv4 } from "uuid";
 
@@ -161,6 +161,10 @@ async function resolveUserId(opts: {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
+  // Boot-time banner if BETA_TWILIO_REVIEW_BYPASS is enabled. No-op when the
+  // flag is unset, which is the default state.
+  warnIfTwilioReviewBypassActive();
+
   // API base path
   const API_BASE = "/api";
 
@@ -1115,7 +1119,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Verification system routes
 
   // Generate a pre-verified share token and optionally send it via email or SMS
-  app.post(`${API_BASE}/verification/generate`, requireAuth, betaModeGuard, async (req, res) => {
+  app.post(`${API_BASE}/verification/generate`, requireAuth, betaModeGuardWithReviewBypass, async (req, res) => {
     try {
       const { checklistId, recipientId, targetLanguage, email, phone, checklistName, ownerName } = req.body;
       if (!checklistId) return res.status(400).json({ error: 'checklistId required' });
