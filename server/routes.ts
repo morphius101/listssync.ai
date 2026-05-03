@@ -1118,11 +1118,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Verification system routes
 
-  // Generate a pre-verified share token and optionally send it via email or SMS
+  // Generate a pre-verified share token and optionally send it via email or
+  // SMS. When `phone` is provided, the consent gate (Phase 4b) runs first
+  // and may short-circuit without creating a verification row. The response
+  // discriminator is `smsStatus` — see ShareCreateResult in
+  // verificationService.ts for the full union.
   app.post(`${API_BASE}/verification/generate`, requireAuth, betaModeGuardWithReviewBypass, async (req, res) => {
     try {
       const { checklistId, recipientId, targetLanguage, email, phone, checklistName, ownerName } = req.body;
       if (!checklistId) return res.status(400).json({ error: 'checklistId required' });
+
+      const ownerId = (req as any).user?.uid;
+      if (!ownerId) return res.status(401).json({ error: 'Unauthorized' });
 
       const rid = recipientId || `link_${Date.now()}`;
 
@@ -1130,8 +1137,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const protocol = isProduction ? 'https' : (req.protocol || 'http');
       const host = isProduction ? 'www.listssync.ai' : (req.get('host') || 'localhost:5000');
 
-      const { token } = await createVerification(
+      const result = await createVerification(
         rid,
+        ownerId,
         email || undefined,
         phone || undefined,
         checklistId,
@@ -1140,10 +1148,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ownerName || undefined,
       );
 
-      let shareUrl = `${protocol}://${host}/shared/${token}`;
-      if (targetLanguage && targetLanguage !== 'en') shareUrl += `?lang=${targetLanguage}`;
+      // Token-bearing branches (sent / pending_consent / email-only) include
+      // a shareUrl so the Owner can copy/email even when SMS is queued.
+      if ('token' in result) {
+        let shareUrl = `${protocol}://${host}/shared/${result.token}`;
+        if (targetLanguage && targetLanguage !== 'en') shareUrl += `?lang=${targetLanguage}`;
+        return res.json({
+          token: result.token,
+          shareUrl,
+          ...(result.smsStatus ? { smsStatus: result.smsStatus } : {}),
+        });
+      }
 
-      res.json({ token, shareUrl });
+      // Blocked branches (opted_out / invalid_phone / missing_business_name)
+      // — no row, no URL, frontend renders the error state by smsStatus.
+      return res.json(result);
     } catch (error) {
       console.error('Error generating share link:', error);
       res.status(500).json({ error: 'Failed to generate share link' });
