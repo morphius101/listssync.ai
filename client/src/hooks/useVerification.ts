@@ -12,10 +12,14 @@ export interface SendVerificationParams {
   ownerName?: string;
 }
 
-export interface ShareChecklistResponse {
-  token: string;
-  shareUrl: string;
-}
+// Mirrors server/services/verificationService.ts:ShareCreateResult.
+// Phone-bearing requests run through the consent gate and may resolve
+// without a token (opted_out, invalid_phone, missing_business_name).
+export type ShareChecklistResponse =
+  | { token: string; shareUrl: string; smsStatus?: 'sent' | 'pending_consent' }
+  | { smsStatus: 'opted_out' }
+  | { smsStatus: 'invalid_phone'; reason: 'invalid' | 'non_us' }
+  | { smsStatus: 'missing_business_name' };
 
 interface VerificationStatus {
   verified: boolean;
