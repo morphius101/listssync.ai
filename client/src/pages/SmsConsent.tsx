@@ -72,7 +72,7 @@ export default function SmsConsent() {
             <div className="bg-green-50 p-4 rounded-lg">
               <p className="text-sm text-green-800">
                 <strong>What happens next:</strong><br />
-                You'll receive SMS verification codes and checklist updates from ListsSync.ai when checklists are shared with you.
+                You'll receive SMS notifications from ListsSync.ai when checklists are shared with you.
               </p>
             </div>
             <Link href="/">
@@ -110,7 +110,7 @@ export default function SmsConsent() {
             <div className="bg-blue-50 p-4 rounded-lg">
               <h3 className="font-semibold text-blue-900 mb-2">What you'll receive:</h3>
               <ul className="text-sm text-blue-800 space-y-1">
-                <li>• Verification codes to access shared checklists</li>
+                <li>• Checklist-share confirmations from ListsSync.ai</li>
                 <li>• Checklist completion notifications</li>
                 <li>• Important updates about your shared tasks</li>
               </ul>
@@ -129,6 +129,7 @@ export default function SmsConsent() {
             <div className="bg-gray-50 p-4 rounded-lg">
               <h3 className="font-semibold text-gray-900 mb-2">Technical details:</h3>
               <ul className="text-sm text-gray-700 space-y-1">
+                <li>• Sender: <strong>ListsSync.ai</strong>, operated by Impact Development Consulting LLC</li>
                 <li>• Messages sent from: <strong>+1 (260) 465-5669</strong></li>
                 <li>• Frequency: Only when checklists are shared with you</li>
                 <li>• Supported carriers: All major US carriers</li>
@@ -141,7 +142,10 @@ export default function SmsConsent() {
           <CardHeader>
             <CardTitle>Provide Your Consent</CardTitle>
             <CardDescription>
-              Please fill out the form below to consent to receiving SMS messages from ListsSync.ai
+              Please fill out the form below to consent to receiving SMS messages from ListsSync.ai. By submitting, you agree to our{' '}
+              <a href="/privacy-policy" className="text-blue-600 hover:underline">Privacy Policy</a>
+              {' '}and{' '}
+              <a href="/terms" className="text-blue-600 hover:underline">Terms of Service</a>.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -196,12 +200,13 @@ export default function SmsConsent() {
                   />
                   <div className="flex-1">
                     <Label htmlFor="consent" className="text-sm font-medium text-blue-900">
-                      SMS Consent
+                      SMS Consent (Transactional)
                     </Label>
                     <p className="text-xs text-blue-800 mt-1">
-                      I consent to receive SMS messages from ListsSync.ai at the phone number provided above. 
-                      I understand that message and data rates may apply, and I can opt out at any time by 
-                      replying STOP to any message.
+                      I consent to receive transactional SMS messages from <strong>ListsSync.ai</strong>, operated by Impact Development Consulting LLC, at the phone number provided above. Message types include checklist-share confirmations and task notifications. Message frequency varies by activity. Message and data rates may apply. Reply STOP to opt out, HELP for help. I agree to the{' '}
+                      <a href="/privacy-policy" className="underline">Privacy Policy</a>
+                      {' '}and{' '}
+                      <a href="/terms" className="underline">Terms of Service</a>.
                     </p>
                   </div>
                 </div>
@@ -218,7 +223,7 @@ export default function SmsConsent() {
                       Marketing Communications (Optional)
                     </Label>
                     <p className="text-xs text-blue-800 mt-1">
-                      I would also like to receive promotional messages about new features, tips, and updates from ListsSync.ai.
+                      I would also like to receive promotional SMS from ListsSync.ai about new features, tips, and updates. Frequency varies. Message and data rates may apply. Reply STOP to opt out.
                     </p>
                   </div>
                 </div>
@@ -227,8 +232,7 @@ export default function SmsConsent() {
               <div className="flex items-center space-x-2 p-3 bg-yellow-50 rounded-lg">
                 <AlertCircle className="w-4 h-4 text-yellow-600 flex-shrink-0" />
                 <p className="text-xs text-yellow-800">
-                  By submitting this form, you're providing explicit consent to receive SMS messages from ListsSync.ai. 
-                  This consent is required for SMS-based checklist sharing features.
+                  Consent is granted only if you check the SMS Consent box above. SMS messages will not be sent to your number unless you opt in. You can revoke consent at any time by replying STOP.
                 </p>
               </div>
 
