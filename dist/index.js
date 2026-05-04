@@ -1342,9 +1342,39 @@ import compression from "compression";
 
 // server/services/verificationService.ts
 import { v4 as uuidv42 } from "uuid";
-init_emailService();
+import { eq as eq3 } from "drizzle-orm";
 import twilio from "twilio";
+init_db();
+init_schema();
+init_emailService();
+
+// server/utils/phone.ts
+import { parsePhoneNumberWithError } from "libphonenumber-js";
+function normalizeUSPhone(input) {
+  try {
+    const parsed = parsePhoneNumberWithError(input, "US");
+    if (!parsed.isValid()) return { ok: false, reason: "invalid" };
+    if (parsed.country !== "US") return { ok: false, reason: "non_us" };
+    return { ok: true, e164: parsed.number, country: parsed.country };
+  } catch {
+    return { ok: false, reason: "invalid" };
+  }
+}
+function normalizeInboundPhone(input) {
+  try {
+    const parsed = parsePhoneNumberWithError(input, "US");
+    if (!parsed.isValid()) return { ok: false };
+    return { ok: true, e164: parsed.number };
+  } catch {
+    return { ok: false };
+  }
+}
+
+// server/services/verificationService.ts
 var SHARE_TOKEN_TTL_HOURS = 72;
+function buildOptInBody(ownerBusinessName) {
+  return `ListsSync.ai: ${ownerBusinessName} would like to text you work checklists. Reply YES to confirm. Reply STOP to opt out. Reply HELP for help. Msg&data rates may apply. Msg freq varies.`;
+}
 function generateToken() {
   return uuidv42();
 }
@@ -1358,29 +1388,127 @@ function formatEmailForDisplay(email) {
   if (!username || !domain) return email;
   return `${username.charAt(0)}*****@${domain}`;
 }
-async function createVerification(recipientId, email, phone, checklistId, targetLanguage, checklistName, ownerName) {
+async function createVerification(recipientId, ownerId, email, phone, checklistId, targetLanguage, checklistName, ownerName) {
   const token = generateToken();
   const now = /* @__PURE__ */ new Date();
   const expires = new Date(now.getTime() + SHARE_TOKEN_TTL_HOURS * 60 * 60 * 1e3);
-  const verificationData = {
-    token,
-    createdAt: now,
-    expiresAt: expires,
-    verified: true,
-    recipientId,
-    recipientEmail: email,
-    recipientPhone: phone,
-    checklistId,
-    targetLanguage: targetLanguage || "en"
-  };
-  await storage.createVerification(verificationData);
-  if (phone) {
-    await sendShareSMS(phone, token, ownerName);
+  const lang = targetLanguage || "en";
+  if (!phone) {
+    const verificationData = {
+      token,
+      createdAt: now,
+      expiresAt: expires,
+      verified: true,
+      recipientId,
+      recipientEmail: email,
+      checklistId,
+      targetLanguage: lang
+    };
+    await storage.createVerification(verificationData);
+    if (email) {
+      await sendVerificationEmail(email, token, checklistName);
+    }
+    return { token };
   }
+  const normalized = normalizeUSPhone(phone);
+  if (!normalized.ok) {
+    return { smsStatus: "invalid_phone", reason: normalized.reason };
+  }
+  const phoneE164 = normalized.e164;
+  const owner = await storage.getUser(ownerId);
+  const businessName = owner?.businessName?.trim() || "";
+  if (!businessName) {
+    return { smsStatus: "missing_business_name" };
+  }
+  const existing = await db.select().from(recipientSmsConsent).where(eq3(recipientSmsConsent.phoneE164, phoneE164)).limit(1);
+  const consent = existing[0];
+  if (consent?.status === "opted_out") {
+    await db.insert(consentAuditLog).values({
+      phoneE164,
+      eventType: "share_blocked_opted_out",
+      ownerId
+    });
+    return { smsStatus: "opted_out" };
+  }
+  if (consent?.status === "opted_in") {
+    const verificationData = {
+      token,
+      createdAt: now,
+      expiresAt: expires,
+      verified: true,
+      recipientId,
+      recipientEmail: email,
+      recipientPhone: phoneE164,
+      checklistId,
+      targetLanguage: lang
+    };
+    await storage.createVerification(verificationData);
+    if (email) {
+      await sendVerificationEmail(email, token, checklistName);
+    }
+    await sendShareSMS(phoneE164, token, ownerName);
+    return { token, smsStatus: "sent" };
+  }
+  if (consent?.status === "pending") {
+    await db.transaction(async (tx) => {
+      await tx.insert(verifications).values({
+        token,
+        expiresAt: expires,
+        verified: true,
+        recipientId,
+        recipientEmail: email,
+        recipientPhone: phoneE164,
+        checklistId,
+        targetLanguage: lang
+      });
+      await tx.insert(pendingShareSms).values({
+        phoneE164,
+        shareToken: token,
+        ownerId
+      });
+      await tx.insert(consentAuditLog).values({
+        phoneE164,
+        eventType: "opt_in_blocked_pending",
+        ownerId
+      });
+    });
+    if (email) {
+      await sendVerificationEmail(email, token, checklistName);
+    }
+    return { token, smsStatus: "pending_consent" };
+  }
+  await db.transaction(async (tx) => {
+    await tx.insert(verifications).values({
+      token,
+      expiresAt: expires,
+      verified: true,
+      recipientId,
+      recipientEmail: email,
+      recipientPhone: phoneE164,
+      checklistId,
+      targetLanguage: lang
+    });
+    await tx.insert(recipientSmsConsent).values({
+      phoneE164,
+      status: "pending",
+      firstOwnerId: ownerId
+    });
+    await tx.insert(pendingShareSms).values({
+      phoneE164,
+      shareToken: token,
+      ownerId
+    });
+    await tx.insert(consentAuditLog).values({
+      phoneE164,
+      eventType: "opt_in_sent",
+      ownerId
+    });
+  });
   if (email) {
     await sendVerificationEmail(email, token, checklistName);
   }
-  return { token };
+  await sendOptInSMS(phoneE164, businessName);
+  return { token, smsStatus: "pending_consent" };
 }
 async function getVerification(token) {
   try {
@@ -1430,27 +1558,43 @@ async function sendShareSMS(phone, token, ownerName) {
     return false;
   }
 }
+async function sendOptInSMS(phone, ownerBusinessName) {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
+  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+  if (!accountSid || !authToken) {
+    if (process.env.NODE_ENV === "development") return true;
+    return false;
+  }
+  const body = buildOptInBody(ownerBusinessName);
+  try {
+    const client = twilio(accountSid, authToken);
+    const params = { body, to: phone };
+    if (messagingServiceSid) {
+      params.messagingServiceSid = messagingServiceSid;
+    } else if (twilioPhone) {
+      params.from = twilioPhone;
+    } else {
+      console.error("sendOptInSMS: no Twilio from address configured");
+      return false;
+    }
+    const message = await client.messages.create(params);
+    console.log(`\u{1F4F1} Opt-in SMS sent: ${message.sid}`);
+    return true;
+  } catch (err) {
+    console.error("Error sending opt-in SMS:", err.message);
+    if (process.env.NODE_ENV === "development") return true;
+    return false;
+  }
+}
 
 // server/routes/twilioWebhook.ts
 init_db();
 init_schema();
 import express, { Router } from "express";
 import twilio2 from "twilio";
-import { and as and3, eq as eq3, gt, inArray, isNull, lte, sql as sql3 } from "drizzle-orm";
-
-// server/utils/phone.ts
-import { parsePhoneNumberWithError } from "libphonenumber-js";
-function normalizeInboundPhone(input) {
-  try {
-    const parsed = parsePhoneNumberWithError(input, "US");
-    if (!parsed.isValid()) return { ok: false };
-    return { ok: true, e164: parsed.number };
-  } catch {
-    return { ok: false };
-  }
-}
-
-// server/routes/twilioWebhook.ts
+import { and as and3, eq as eq4, gt, inArray, isNull, lte, sql as sql3 } from "drizzle-orm";
 var STOP_KEYWORDS = /* @__PURE__ */ new Set(["STOP", "STOPALL", "UNSUBSCRIBE", "CANCEL", "END", "QUIT"]);
 var HELP_KEYWORDS = /* @__PURE__ */ new Set(["HELP", "INFO"]);
 function classifyBody(body) {
@@ -1525,7 +1669,7 @@ async function handleInboundSms(req, res) {
   let isDuplicate = false;
   try {
     await db.transaction(async (tx) => {
-      const existing = await tx.select().from(recipientSmsConsent).where(eq3(recipientSmsConsent.phoneE164, phoneE164)).limit(1);
+      const existing = await tx.select().from(recipientSmsConsent).where(eq4(recipientSmsConsent.phoneE164, phoneE164)).limit(1);
       const current = existing[0];
       let eventType;
       if (classification === "YES") {
@@ -1557,16 +1701,16 @@ async function handleInboundSms(req, res) {
             optOutTimestamp: now,
             lastMessageSid: messageSid,
             updatedAt: now
-          }).where(eq3(recipientSmsConsent.phoneE164, phoneE164));
+          }).where(eq4(recipientSmsConsent.phoneE164, phoneE164));
           await tx.update(pendingShareSms).set({ droppedReason: "recipient_opted_out" }).where(
             and3(
-              eq3(pendingShareSms.phoneE164, phoneE164),
+              eq4(pendingShareSms.phoneE164, phoneE164),
               isNull(pendingShareSms.sentAt),
               isNull(pendingShareSms.droppedReason)
             )
           );
         } else if (current) {
-          await tx.update(recipientSmsConsent).set({ lastMessageSid: messageSid, updatedAt: now }).where(eq3(recipientSmsConsent.phoneE164, phoneE164));
+          await tx.update(recipientSmsConsent).set({ lastMessageSid: messageSid, updatedAt: now }).where(eq4(recipientSmsConsent.phoneE164, phoneE164));
         }
       } else if (classification === "YES" && current && current.status === "pending") {
         await tx.update(recipientSmsConsent).set({
@@ -1575,10 +1719,10 @@ async function handleInboundSms(req, res) {
           optInTimestamp: now,
           lastMessageSid: messageSid,
           updatedAt: now
-        }).where(eq3(recipientSmsConsent.phoneE164, phoneE164));
+        }).where(eq4(recipientSmsConsent.phoneE164, phoneE164));
         const claimed = await tx.update(pendingShareSms).set({ sentAt: now }).where(
           and3(
-            eq3(pendingShareSms.phoneE164, phoneE164),
+            eq4(pendingShareSms.phoneE164, phoneE164),
             gt(pendingShareSms.queuedAt, sql3`now() - interval '72 hours'`),
             isNull(pendingShareSms.sentAt),
             isNull(pendingShareSms.droppedReason)
@@ -1587,14 +1731,14 @@ async function handleInboundSms(req, res) {
         queuedToSend = claimed;
         await tx.update(pendingShareSms).set({ droppedReason: "expired_72h" }).where(
           and3(
-            eq3(pendingShareSms.phoneE164, phoneE164),
+            eq4(pendingShareSms.phoneE164, phoneE164),
             lte(pendingShareSms.queuedAt, sql3`now() - interval '72 hours'`),
             isNull(pendingShareSms.sentAt),
             isNull(pendingShareSms.droppedReason)
           )
         );
       } else if (current) {
-        await tx.update(recipientSmsConsent).set({ lastMessageSid: messageSid, updatedAt: now }).where(eq3(recipientSmsConsent.phoneE164, phoneE164));
+        await tx.update(recipientSmsConsent).set({ lastMessageSid: messageSid, updatedAt: now }).where(eq4(recipientSmsConsent.phoneE164, phoneE164));
       }
     });
   } catch (err) {
@@ -2544,12 +2688,15 @@ async function registerRoutes(app2) {
     try {
       const { checklistId, recipientId, targetLanguage, email, phone, checklistName, ownerName } = req.body;
       if (!checklistId) return res.status(400).json({ error: "checklistId required" });
+      const ownerId = req.user?.uid;
+      if (!ownerId) return res.status(401).json({ error: "Unauthorized" });
       const rid = recipientId || `link_${Date.now()}`;
       const isProduction = process.env.NODE_ENV === "production";
       const protocol = isProduction ? "https" : req.protocol || "http";
       const host = isProduction ? "www.listssync.ai" : req.get("host") || "localhost:5000";
-      const { token } = await createVerification(
+      const result = await createVerification(
         rid,
+        ownerId,
         email || void 0,
         phone || void 0,
         checklistId,
@@ -2557,9 +2704,16 @@ async function registerRoutes(app2) {
         checklistName || void 0,
         ownerName || void 0
       );
-      let shareUrl = `${protocol}://${host}/shared/${token}`;
-      if (targetLanguage && targetLanguage !== "en") shareUrl += `?lang=${targetLanguage}`;
-      res.json({ token, shareUrl });
+      if ("token" in result) {
+        let shareUrl = `${protocol}://${host}/shared/${result.token}`;
+        if (targetLanguage && targetLanguage !== "en") shareUrl += `?lang=${targetLanguage}`;
+        return res.json({
+          token: result.token,
+          shareUrl,
+          ...result.smsStatus ? { smsStatus: result.smsStatus } : {}
+        });
+      }
+      return res.json(result);
     } catch (error) {
       console.error("Error generating share link:", error);
       res.status(500).json({ error: "Failed to generate share link" });
