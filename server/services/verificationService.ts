@@ -15,12 +15,16 @@ import { normalizeUSPhone } from '../utils/phone';
 
 const SHARE_TOKEN_TTL_HOURS = 72;
 
-// Phase 4b placeholder for the double-opt-in SMS body. Phase 4e replaces this
-// with the carrier-approved text and removes the production guard inside
-// sendOptInSMS(). Keep the [OPT_IN_PLACEHOLDER prefix — sendOptInSMS uses it
-// to detect the unshipped state and refuse to send in production.
-const OPT_IN_BODY_PLACEHOLDER =
-  '[OPT_IN_PLACEHOLDER — Phase 4e ships approved body. Reply YES to confirm.]';
+// Carrier-reviewed double-opt-in SMS body (Phase 4e). Always 2 segments;
+// each line of CTIA boilerplate prefixed with explicit "Reply" per strict
+// reviewer expectations. Template is GSM-7 clean — letters, digits, space,
+// period, comma, colon, ampersand only. If `ownerBusinessName` carries any
+// non-GSM-7 char (accented letter, smart quote, emoji), Twilio silently
+// downgrades the whole message to UCS-2 (70-char segments). Mitigation
+// deferred to Phase 5; see CLEANUP.md.
+export function buildOptInBody(ownerBusinessName: string): string {
+  return `ListsSync.ai: ${ownerBusinessName} would like to text you work checklists. Reply YES to confirm. Reply STOP to opt out. Reply HELP for help. Msg&data rates may apply. Msg freq varies.`;
+}
 
 function generateToken(): string {
   return uuidv4();
@@ -270,28 +274,13 @@ export async function sendShareSMS(phone: string, token: string, ownerName?: str
 export const sendVerificationSMS = sendShareSMS;
 
 /**
- * Send the double-opt-in SMS to a brand-new recipient phone.
- *
- * Phase 4b: this function uses OPT_IN_BODY_PLACEHOLDER and refuses to send
- * in production until Phase 4e replaces the body with carrier-approved text.
- * In dev (no Twilio creds) it short-circuits to true via the standard path,
- * so the consent state machine and the diag exercise the full flow without
- * ever hitting Twilio.
+ * Send the double-opt-in SMS to a brand-new recipient phone. Body is
+ * built via buildOptInBody() with the Owner's business_name interpolated
+ * for recipient identification. In dev (no Twilio creds) the function
+ * short-circuits to true via the standard path so the diag exercises the
+ * consent state machine without hitting Twilio.
  */
 export async function sendOptInSMS(phone: string, ownerBusinessName: string): Promise<boolean> {
-  // Phase 4b safety: refuse to send the placeholder body in production.
-  // Phase 4e replaces OPT_IN_BODY_PLACEHOLDER with the carrier-approved
-  // body and removes this guard. Until then, the state machine writes its
-  // rows but no SMS actually leaves the server in production.
-  if (process.env.NODE_ENV === 'production'
-      && OPT_IN_BODY_PLACEHOLDER.startsWith('[OPT_IN_PLACEHOLDER')) {
-    console.warn(
-      'sendOptInSMS: refusing to send placeholder body in production '
-      + '(Phase 4e not yet shipped). phone=' + phone.slice(-4)
-    );
-    return false;
-  }
-
   const accountSid = process.env.TWILIO_ACCOUNT_SID;
   const authToken = process.env.TWILIO_AUTH_TOKEN;
   const twilioPhone = process.env.TWILIO_PHONE_NUMBER;
@@ -302,8 +291,7 @@ export async function sendOptInSMS(phone: string, ownerBusinessName: string): Pr
     return false;
   }
 
-  // Body interpolation — Phase 4e wires ownerBusinessName into the real body.
-  const body = OPT_IN_BODY_PLACEHOLDER;
+  const body = buildOptInBody(ownerBusinessName);
 
   try {
     const client = twilio(accountSid, authToken);
